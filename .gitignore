@@ -4,8 +4,6 @@ logs
 
 # Dependency directories
 node_modules/
-package-lock.json
-yarn.lock
 
 # Build output
 build/
