@@ -4,7 +4,7 @@ A cross-platform native Node.js module for retrieving filesystem metadata includ
 
 Built and supported by [PhotoStructure](https://photostructure.com).
 
-[![npm version](https://img.shields.io/npm/v/fs-metadata.svg)](https://www.npmjs.com/package/fs-metadata)
+[![npm version](https://img.shields.io/npm/v/@photostructure/fs-metadata.svg)](https://www.npmjs.com/package/@photostructure/fs-metadata)
 [![Node.js CI](https://github.com/photostructure/fs-metadata/actions/workflows/test.yml/badge.svg)](https://github.com/photostructure/fs-metadata/actions/workflows/test.yml)
 [![GitHub issues](https://img.shields.io/github/issues/photostructure/fs-metadata.svg)](https://github.com/photostructure/fs-metadata/issues)
 [![Known Vulnerabilities](https://snyk.io/test/github/photostructure/fs-metadata/badge.svg?targetFile=package.json)](https://snyk.io/test/github/photostructure/fs-metadata?targetFile=package.json)
