@@ -13,9 +13,7 @@ module.exports = {
     }]
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  // Coverage checks are pretty silly for this project, but it's a good example
-  // for other projects that aren't all native code.
-  collectCoverage: true,
+  collectCoverage: false,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
   coveragePathIgnorePatterns: [
