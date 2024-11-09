@@ -100,6 +100,7 @@ describe("Filesystem Metadata", () => {
         } catch (error) {
           // Some drives might not be accessible (e.g., empty DVD drive)
           console.log(`Skipping inaccessible drive ${drive}: ${error}`);
+          return
         }
         expect(metadata).toBeDefined();
         expect(metadata?.mountpoint).toBe(drive);
