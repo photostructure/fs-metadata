@@ -36,15 +36,9 @@ describe("decodeOctalEscapes", () => {
   });
 
   it("throws error for invalid octal values", () => {
-    expect(() => decodeOctalEscapes("\\000")).toThrow(
-      /Invalid octal sequence/
-    );
-    expect(() => decodeOctalEscapes("\\400")).toThrow(
-      /Invalid octal sequence/
-    );
-    expect(() => decodeOctalEscapes("\\777")).toThrow(
-      /Invalid octal sequence/
-    );
+    expect(() => decodeOctalEscapes("\\000")).toThrow(/Invalid octal sequence/);
+    expect(() => decodeOctalEscapes("\\400")).toThrow(/Invalid octal sequence/);
+    expect(() => decodeOctalEscapes("\\777")).toThrow(/Invalid octal sequence/);
   });
 
   it("handles empty string", () => {
@@ -63,7 +57,7 @@ describe("decodeOctalEscapes", () => {
 
     it("handles mixed valid and invalid sequences", () => {
       expect(() => decodeOctalEscapes("valid\\040but\\777invalid")).toThrow(
-        /Invalid octal sequence/
+        /Invalid octal sequence/,
       );
     });
 

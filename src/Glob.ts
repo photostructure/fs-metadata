@@ -54,10 +54,10 @@ export function compileGlob(patterns: string[] | readonly string[]): RegExp {
     }
     return regex;
   });
-  const final = regexPatterns.filter(ea => ea.length > 0);
-return (final.length === 0) ?
-// Empty pattern matches nothing
- /(?!)/ 
-// Case insensitive for Windows paths
-:  new RegExp(`^(?:${final.join("|")})$`, "i"); 
+  const final = regexPatterns.filter((ea) => ea.length > 0);
+  return final.length === 0
+    ? // Empty pattern matches nothing
+      /(?!)/
+    : // Case insensitive for Windows paths
+      new RegExp(`^(?:${final.join("|")})$`, "i");
 }

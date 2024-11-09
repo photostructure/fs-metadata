@@ -1,5 +1,6 @@
 // index.ts
 import { stat } from "node:fs/promises";
+import { asyncFilter } from "./Array";
 import { readMtab } from "./linux/mtab";
 
 export { DefaultConfig, getConfig, setConfig } from "./Config";
@@ -73,12 +74,25 @@ export interface VolumeMetadata {
   status?: string;
 }
 
+/**
+ * @return true if `path` exists
+ */
+async function exists(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)) != null;
+  } catch {
+    return false;
+  }
+}
+
 const isLinux = process.platform === "linux";
+
 /**
  * List all active local and remote mountpoints on the system
  */
 export async function getMountpoints(): Promise<string[]> {
-  return isLinux ? readMtab() : native.getMountpoints();
+  const arr = isLinux ? readMtab() : native.getMountpoints();
+  return asyncFilter(await arr, exists);
 }
 
 const uuidRegex = /[a-z0-9-]{10,}/i;

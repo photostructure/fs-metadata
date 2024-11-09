@@ -18,22 +18,20 @@ describe("Filesystem API Async Behavior", () => {
   describe("Concurrent Operations", () => {
     it("should handle multiple concurrent getMountpoints calls", async () => {
       const numCalls = 5;
-      const promises = Array(numCalls)
-        .fill(0)
-        .map(() => getMountpoints());
+      const promises = Array.from({ length: numCalls }, () => getMountpoints());
       const results = await Promise.all(promises);
 
       // All results should be arrays
-      results.forEach((mountpoints) => {
-        expect(Array.isArray(mountpoints)).toBe(true);
-        expect(mountpoints.length).toBeGreaterThan(0);
-      });
+      for (const ea of results) {
+        expect(Array.isArray(ea)).toBe(true);
+        expect(ea.length).toBeGreaterThan(0);
+      }
 
       // All results should be identical
-      const [first, ...rest] = results;
-      rest.forEach((mountpoints) => {
-        expect(mountpoints).toEqual(first);
-      });
+      const first = results.shift();
+      for (const ea of results) {
+        expect(ea).toEqual(first);
+      }
     });
 
     it("should handle multiple concurrent getVolumeMetadata calls", async () => {

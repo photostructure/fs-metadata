@@ -87,16 +87,16 @@ describe("Filesystem Metadata", () => {
     });
     it("should return consistent drive information", async () => {
       const arr = await getMountpoints();
-      console.log("current mountpoints: " + JSON.stringify(arr))
+      console.log("current mountpoints: " + JSON.stringify(arr));
       for (const drive of arr) {
         let metadata;
         try {
           metadata = await getVolumeMetadata(drive);
-          console.log("fetched metadata: " + JSON.stringify(metadata))
+          console.log("fetched metadata: " + JSON.stringify(metadata));
         } catch (error) {
           // Some drives might not be accessible (e.g., empty DVD drive)
           console.warn(`Skipping inaccessible drive ${drive}: ${error}`);
-          continue
+          continue;
         }
         expect(metadata).toBeDefined();
         expect(metadata?.mountpoint).toBe(drive);

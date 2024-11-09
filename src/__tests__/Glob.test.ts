@@ -72,11 +72,10 @@ describe("compileGlob", () => {
     expect(regex.test("src/appminjs")).toBe(false);
   });
 
-
   // Test empty pattern
   test("handles empty pattern array", () => {
     const regex = compileGlob([]);
-    
+
     expect(regex.test("")).toBe(false);
     expect(regex.test("anything")).toBe(false);
   });

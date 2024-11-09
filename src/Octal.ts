@@ -17,7 +17,9 @@ export function decodeOctalEscapes(input: string): string {
 
     // Ensure the octal value is valid (0-255)
     if (charCode > 255 || charCode < 32) {
-      throw new Error(`Invalid octal sequence: \${match} (decimal: ${charCode})`);
+      throw new Error(
+        `Invalid octal sequence: \${match} (decimal: ${charCode})`,
+      );
     }
 
     // Convert to character
