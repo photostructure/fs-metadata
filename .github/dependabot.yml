@@ -1,0 +1,29 @@
+# .github/dependabot.yml
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Raise pull requests for version updates against the default branch
+    target-branch: "main"
+    # Labels to apply to pull requests
+    labels:
+      - "dependencies"
+      - "npm"
+    # Allow up to 10 open pull requests
+    open-pull-requests-limit: 10
+    # Configure version update behavior
+    versioning-strategy: increase
+    
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    open-pull-requests-limit: 10
