@@ -73,7 +73,9 @@ describe("Filesystem Metadata", () => {
         "Mountpoint is required",
       );
     });
+  });
 
+  describeWindows("Basic Filesystem Operations", () => {
     it("should work with valid Windows system paths", async () => {
       if (process.env.SystemDrive) {
         const systemDrive = process.env.SystemDrive + "\\";
@@ -83,24 +85,18 @@ describe("Filesystem Metadata", () => {
         assertMetadata(metadata);
       }
     });
-  });
-
-  describeWindows("Basic Filesystem Operations", () => {
-    let availableDrives: string[] = [];
-
-    beforeAll(async () => {
-      availableDrives = await getMountpoints();
-    });
-
     it("should return consistent drive information", async () => {
-      for (const drive of availableDrives.slice(0, 1)) {
+      const arr = await getMountpoints();
+      console.log("current mountpoints: " + JSON.stringify(arr))
+      for (const drive of arr) {
         let metadata;
         try {
           metadata = await getVolumeMetadata(drive);
+          console.log("fetched metadata: " + JSON.stringify(metadata))
         } catch (error) {
           // Some drives might not be accessible (e.g., empty DVD drive)
-          console.log(`Skipping inaccessible drive ${drive}: ${error}`);
-          return
+          console.warn(`Skipping inaccessible drive ${drive}: ${error}`);
+          continue
         }
         expect(metadata).toBeDefined();
         expect(metadata?.mountpoint).toBe(drive);
