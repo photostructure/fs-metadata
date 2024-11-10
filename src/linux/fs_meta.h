@@ -14,7 +14,7 @@ public:
 
 private:
   struct VolumeMetadata {
-    std::string filesystem;
+    std::string fileSystem;
     std::string label;
     std::string uuid;
     std::string remoteHost;

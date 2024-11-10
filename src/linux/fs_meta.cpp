@@ -129,7 +129,7 @@ void GetVolumeMetadataWorker::Execute() {
     metadata.size = blockSize * vfs.f_blocks;
     metadata.available = blockSize * vfs.f_bavail;
     metadata.used = metadata.size - (blockSize * vfs.f_bfree);
-    metadata.filesystem = fstype;
+    metadata.fileSystem = fstype;
 
     // Check if it's a remote filesystem
     metadata.remote = isNetworkFileSystem(fstype.c_str());
