@@ -1,6 +1,6 @@
 // src/__tests__/Array.test.ts
 
-import { asyncFilter } from "../Array";
+import { asyncFilter, uniq } from "../Array";
 
 describe("Array", () => {
   describe("asyncFilter", () => {
@@ -104,6 +104,46 @@ describe("Array", () => {
 
       const result = await asyncFilter(mixedArray, isNumberAsync);
       expect(result).toEqual([1, 2]);
+    });
+  });
+
+  describe("uniq", () => {
+    // Test with an array of numbers
+    it("should return unique numbers", () => {
+      const numbers = [1, 2, 2, 3, 4, 4, 5];
+      const result = uniq(numbers);
+      expect(result).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    // Test with an array of strings
+    it("should return unique strings", () => {
+      const strings = ["a", "b", "b", "c", "a"];
+      const result = uniq(strings);
+      expect(result).toEqual(["a", "b", "c"]);
+    });
+
+    // Test with an empty array
+    it("should return an empty array when input is empty", () => {
+      const emptyArray: any[] = [];
+      const result = uniq(emptyArray);
+      expect(result).toEqual([]);
+    });
+
+    // Test with an array of objects
+    it("should return unique objects based on reference", () => {
+      const obj1 = { id: 1 };
+      const obj2 = { id: 2 };
+      const obj3 = obj1;
+      const objects = [obj1, obj2, obj3];
+      const result = uniq(objects);
+      expect(result).toEqual([obj1, obj2]);
+    });
+
+    // Test with mixed types
+    it("should return unique values for mixed types", () => {
+      const mixedArray = [1, "a", 1, "b", "a"];
+      const result = uniq(mixedArray);
+      expect(result).toEqual([1, "a", "b"]);
     });
   });
 });
