@@ -5,10 +5,9 @@ import { describePlatform } from "../test-utils/platform";
 
 describe("Filesystem API Async Behavior", () => {
   const describeLinux = describePlatform("linux");
-  const describeWindows = describePlatform("win32");
 
   // Helper to measure execution time
-  const timeExecution = async (fn: () => Promise<any>): Promise<number> => {
+  const timeExecution = async (fn: () => Promise<unknown>): Promise<number> => {
     const start = process.hrtime();
     await fn();
     const [seconds, nanoseconds] = process.hrtime(start);

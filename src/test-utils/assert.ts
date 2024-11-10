@@ -1,5 +1,4 @@
 // src/test-utils/assert.ts
-import { statSync } from "node:fs";
 import { VolumeMetadata } from "../index";
 
 /**
@@ -19,9 +18,6 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
   if (metadata.fileSystem !== undefined) {
     expect(typeof metadata.fileSystem).toBe("string");
   }
-
-  // Validate device ID
-  const s = statSync(metadata.mountPoint);
 
   // Size checks
   expect(metadata.size).toBeGreaterThan(0);

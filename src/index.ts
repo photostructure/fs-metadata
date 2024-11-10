@@ -8,6 +8,7 @@ import { getLinuxMountPoints, TypedMountPoint } from "./linux/mtab";
 export { DefaultConfig, getConfig, setConfig } from "./Config";
 export type { Config } from "./Config";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require("bindings")("node_fs_meta");
 
 /**
@@ -137,7 +138,7 @@ export async function getVolumeMetadata(
   try {
     await stat(mountPoint);
   } catch (e) {
-    throw new Error(`mountPoint ${mountPoint} is not accessible`);
+    throw new Error(`mountPoint ${mountPoint} is not accessible: ${e}`);
   }
 
   const result = await native.getVolumeMetadata(mountPoint);

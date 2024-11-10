@@ -16,8 +16,8 @@
     "test:coverage": "jest --coverage",
     "test:clear": "jest --clearCache",
     "test:debug": "node --inspect-brk jest --runInBand",
-    "lint": "eslint . --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
     "fmt": "prettier --write \"src/**/*.ts\" && npm run fmt:cpp",
     "fmt:cpp": "clang-format --style=LLVM -i src/*/*.cpp src/*/*.h"
   },
@@ -36,19 +36,20 @@
     "node-addon-api": "^8.2.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.14.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.9.0",
     "@typescript-eslint/eslint-plugin": "^8.13.0",
     "@typescript-eslint/parser": "^8.13.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.2.1",
     "eslint": "^9.14.0",
+    "globals": "^15.12.0",
     "jest": "^29.7.0",
     "node-gyp": "^10.2.0",
-    "prettier-plugin-organize-imports": "4.1.0",
     "prettier": "^3.3.3",
+    "prettier-plugin-organize-imports": "4.1.0",
     "ts-jest": "^29.2.5",
     "typedoc": "^0.26.11",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.13.0"
   }
 }

@@ -20,7 +20,7 @@ export async function getLinuxMountPoints(
     const mtabContent = await readFile(input, "utf8");
     const result: { mountPoint: string; fstype: string }[] = [];
 
-    for (let ea of mtabContent.split("\n")) {
+    for (const ea of mtabContent.split("\n")) {
       const line = ea.trim();
       if (line.length === 0 || line.startsWith("#")) continue;
       const [fstype, mp] = line.split(/\s+/);

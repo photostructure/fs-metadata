@@ -65,12 +65,11 @@ describe("Filesystem Metadata", () => {
     });
 
     it("should handle empty or null mountPoint", async () => {
-      // @ts-ignore - Testing invalid input
       await expect(getVolumeMetadata("")).rejects.toThrow(
         /mountPoint is required/i,
       );
-      // @ts-ignore - Testing invalid input
-      await expect(getVolumeMetadata(null)).rejects.toThrow(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await expect(getVolumeMetadata(null as any)).rejects.toThrow(
         /mountpoint is required/i,
       );
     });

@@ -120,6 +120,7 @@ describeUnix("Unix (Linux/macOS) File system metadata", () => {
       ];
 
       for (const path of invalidPaths) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await expect(getVolumeMetadata(path as any)).rejects.toThrow();
       }
     });
