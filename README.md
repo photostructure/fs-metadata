@@ -23,24 +23,24 @@ Built and supported by [PhotoStructure](https://photostructure.com).
   - macOS (x64, arm64)
   - Linux (x64, arm64)
 - Written in modern TypeScript with full type definitions
-- Native implementation for optimal performance
+- Native async implementation to avoid blocking the event loop
 - Promise-based async API
 - Comprehensive test coverage
 
 ## Installation
 
 ```bash
-npm install fs-metadata
+npm install @photostructure/fs-metadata
 ```
 
 ## Usage
 
 ```typescript
-import { getMountpoints, getVolumeMetadata } from "fs-metadata";
+import { getVolumeMountPoints, getVolumeMetadata } from "@photostructure/fs-metadata";
 
 // List all mounted volumes
-const mountpoints = await getMountpoints();
-console.log("Mounted volumes:", mountpoints);
+const mountPoints = await getVolumeMountPoints();
+console.dir({ mountPoints });
 // Example output: ['C:\\', 'D:\\'] on Windows
 // Example output: ['/', '/home', '/Users'] on Unix-like systems
 
@@ -90,15 +90,21 @@ npm run docs
 npm test
 ```
 
+## License
+
+MIT
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 Please make sure to update tests and documentation as appropriate.
 
-## License
+## Development Tools
 
-MIT
+This project uses various development tools and technologies to maintain high code quality and productivity. During development, we utilized AI-powered code analysis and generation tools, including GitHub Copilot and Claude, as development aids. These tools helped with tasks like code completion, documentation generation, and test coverage. However, all code was reviewed, tested, and validated by a human developer before inclusion in the project.
+
+The core implementation, architecture decisions, and maintenance remain the responsibility of the human development team. If you're interested in contributing, please see our contributing guidelines above.
 
 ## Security
 
