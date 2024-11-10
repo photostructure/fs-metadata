@@ -22,17 +22,16 @@ private:
     uint64_t size;
     uint64_t used;
     uint64_t available;
-    dev_t dev;
     bool remote;
     bool ok;
     std::string status;
   };
 
-  std::string mountpoint;
+  std::string mountPoint;
   VolumeMetadata metadata;
   Napi::Promise::Deferred deferred_;
 };
 
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string& mountpoint);
+Napi::Value GetVolumeMetadata(Napi::Env env, const std::string& mountPoint);
 
 } // namespace FSMeta

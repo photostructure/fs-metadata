@@ -7,11 +7,11 @@
   "license": "MIT",
   "scripts": {
     "install": "node-gyp rebuild",
+    "prebuild": "rm -rf dist",
     "build": "tsc",
     "docs": "typedoc --out docs src/index.ts",
-    "clean": "rm -rf build dist node_modules",
     "pretest": "npm run build",
-    "test": "jest",
+    "test": "jest --silent=false",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:clear": "jest --clearCache",

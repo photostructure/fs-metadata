@@ -10,9 +10,9 @@
 #endif
 
 #if defined(_WIN32) || defined(__APPLE__)
-Napi::Value GetMountpoints(const Napi::CallbackInfo& info) {
+Napi::Value getVolumeMountPoints(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
-  return FSMeta::GetMountpoints(env);
+  return FSMeta::GetVolumeMountPoints(env);
 }
 #endif
 
@@ -24,14 +24,14 @@ Napi::Value GetVolumeMetadata(const Napi::CallbackInfo& info) {
     return env.Null();
   }
 
-  std::string mountpoint = info[0].As<Napi::String>().Utf8Value();
-  return FSMeta::GetVolumeMetadata(env, mountpoint);
+  std::string mountPoint = info[0].As<Napi::String>().Utf8Value();
+  return FSMeta::GetVolumeMetadata(env, mountPoint);
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
   #if defined(_WIN32) || defined(__APPLE__)
-  exports.Set("getMountpoints", 
-    Napi::Function::New(env, GetMountpoints));
+  exports.Set("getVolumeMountPoints", 
+    Napi::Function::New(env, getVolumeMountPoints));
   #endif
   
   exports.Set("getVolumeMetadata", 

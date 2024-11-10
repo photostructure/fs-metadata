@@ -1,5 +1,6 @@
 // src/__tests__/windows.test.ts
-import { getMountpoints, getVolumeMetadata } from "../index";
+
+import { getVolumeMetadata, getVolumeMountPoints } from "../index";
 import { assertMetadata } from "../test-utils/assert";
 import { describePlatform } from "../test-utils/platform";
 
@@ -8,32 +9,32 @@ describe("Filesystem Metadata", () => {
   const describeWindows = describePlatform("win32");
 
   describeWindows("Asynchronous Operations", () => {
-    it("should get mountpoints without errors", async () => {
-      const mountpoints = await getMountpoints();
-      expect(Array.isArray(mountpoints)).toBe(true);
-      expect(mountpoints.length).toBeGreaterThan(0);
-      expect(mountpoints).toContain("C:\\");
+    it("should get mount points without errors", async () => {
+      const mountPoints = await getVolumeMountPoints();
+      expect(Array.isArray(mountPoints)).toBe(true);
+      expect(mountPoints.length).toBeGreaterThan(0);
+      expect(mountPoints).toContain("C:\\");
     });
 
-    it("should handle multiple getMountpoints calls", async () => {
+    it("should handle multiple getVolumeMountPoints calls", async () => {
       // Make multiple concurrent calls
       const promises = Array(3)
         .fill(0)
-        .map(() => getMountpoints());
+        .map(() => getVolumeMountPoints());
       const results = await Promise.all(promises);
 
       // Verify all results are valid
-      results.forEach((mountpoints) => {
-        expect(Array.isArray(mountpoints)).toBe(true);
-        expect(mountpoints.length).toBeGreaterThan(0);
-        expect(mountpoints).toContain("C:\\");
+      results.forEach((mountPoints) => {
+        expect(Array.isArray(mountPoints)).toBe(true);
+        expect(mountPoints.length).toBeGreaterThan(0);
+        expect(mountPoints).toContain("C:\\");
       });
     });
 
     it("should get C: drive metadata", async () => {
       const metadata = await getVolumeMetadata("C:\\");
       expect(metadata).toBeDefined();
-      expect(metadata.mountpoint).toBe("C:\\");
+      expect(metadata.mountPoint).toBe("C:\\");
       assertMetadata(metadata);
     });
 
@@ -45,7 +46,7 @@ describe("Filesystem Metadata", () => {
 
       results.forEach((metadata) => {
         expect(metadata).toBeDefined();
-        expect(metadata.mountpoint).toBe("C:\\");
+        expect(metadata.mountPoint).toBe("C:\\");
         assertMetadata(metadata);
       });
     });
@@ -63,14 +64,14 @@ describe("Filesystem Metadata", () => {
       }
     });
 
-    it("should handle empty or null mountpoint", async () => {
+    it("should handle empty or null mountPoint", async () => {
       // @ts-ignore - Testing invalid input
       await expect(getVolumeMetadata("")).rejects.toThrow(
-        "Mountpoint is required",
+        /mountPoint is required/i,
       );
       // @ts-ignore - Testing invalid input
       await expect(getVolumeMetadata(null)).rejects.toThrow(
-        "Mountpoint is required",
+        /mountpoint is required/i,
       );
     });
   });
@@ -81,13 +82,13 @@ describe("Filesystem Metadata", () => {
         const systemDrive = process.env.SystemDrive + "\\";
         const metadata = await getVolumeMetadata(systemDrive);
         expect(metadata).toBeDefined();
-        expect(metadata.mountpoint).toBe(systemDrive);
+        expect(metadata.mountPoint).toBe(systemDrive);
         assertMetadata(metadata);
       }
     });
     it("should return consistent drive information", async () => {
-      const arr = await getMountpoints();
-      console.log("current mountpoints: " + JSON.stringify(arr));
+      const arr = await getVolumeMountPoints();
+      console.log("current mountPoints: " + JSON.stringify(arr));
       for (const drive of arr) {
         let metadata;
         try {
@@ -99,7 +100,7 @@ describe("Filesystem Metadata", () => {
           continue;
         }
         expect(metadata).toBeDefined();
-        expect(metadata?.mountpoint).toBe(drive);
+        expect(metadata?.mountPoint).toBe(drive);
         assertMetadata(metadata);
       }
     });

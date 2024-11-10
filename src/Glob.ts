@@ -1,3 +1,19 @@
+// src/Glob.ts
+
+/**
+ * Compiles an array of glob patterns into a single regular expression.
+ *
+ * The function supports the following patterns:
+ * - `**` matches any number of directories.
+ * - `*` matches any number of characters except for `/`.
+ * - `?` matches exactly one character except for `/`.
+ * - `.` is escaped to match a literal period.
+ * - `/` at the end of the pattern matches either a slash or the end of the string.
+ * - Other regex special characters are escaped.
+ *
+ * @param patterns - An array of glob patterns to compile.
+ * @returns A `RegExp` object that matches any of the provided patterns.
+ */
 export function compileGlob(patterns: string[] | readonly string[]): RegExp {
   const regexPatterns = patterns.map((pattern) => {
     let regex = "";

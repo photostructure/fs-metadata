@@ -18,11 +18,11 @@ GetVolumeMetadataWorker::GetVolumeMetadataWorker(
     const std::string& path,
     const Napi::Promise::Deferred& deferred)
     : Napi::AsyncWorker(deferred.Env()),
-      mountpoint(path),
+      mountPoint(path),
       deferred_(deferred) {}
 
 namespace {
-bool isNetworkFilesystem(const char* fstype) {
+bool isNetworkFileSystem(const char* fstype) {
   static const char* network_fs[] = {
       "nfs", "nfs4", "cifs", "smb", "smbfs", "ncpfs", "afs", nullptr
   };
@@ -72,12 +72,12 @@ void GetVolumeMetadataWorker::Execute() {
     struct stat st;
 
     // Get basic filesystem stats
-    if (statvfs(mountpoint.c_str(), &vfs) != 0) {
-      throw std::runtime_error("Failed to get filesystem statistics");
+    if (statvfs(mountPoint.c_str(), &vfs) != 0) {
+      throw std::runtime_error("Failed to get file system statistics");
     }
 
-    if (stat(mountpoint.c_str(), &st) != 0) {
-      throw std::runtime_error("Failed to get mountpoint statistics");
+    if (stat(mountPoint.c_str(), &st) != 0) {
+      throw std::runtime_error("Failed to get mount point statistics");
     }
 
     // Find the filesystem type and source
@@ -91,7 +91,7 @@ void GetVolumeMetadataWorker::Execute() {
     bool found = false;
 
     while ((ent = getmntent(mtab)) != nullptr) {
-      if (strcmp(ent->mnt_dir, mountpoint.c_str()) == 0) {
+      if (strcmp(ent->mnt_dir, mountPoint.c_str()) == 0) {
         fstype = ent->mnt_type;
         source = ent->mnt_fsname;
         found = true;
@@ -129,11 +129,10 @@ void GetVolumeMetadataWorker::Execute() {
     metadata.size = blockSize * vfs.f_blocks;
     metadata.available = blockSize * vfs.f_bavail;
     metadata.used = metadata.size - (blockSize * vfs.f_bfree);
-    metadata.dev = st.st_dev;
     metadata.filesystem = fstype;
 
     // Check if it's a remote filesystem
-    metadata.remote = isNetworkFilesystem(fstype.c_str());
+    metadata.remote = isNetworkFileSystem(fstype.c_str());
     if (metadata.remote) {
       metadata.remoteHost = getRemoteHost(source);
       metadata.remoteShare = getRemoteShare(source);
@@ -150,12 +149,11 @@ void GetVolumeMetadataWorker::OnOK() {
   Napi::HandleScope scope(Env());
   Napi::Object result = Napi::Object::New(Env());
 
-  result.Set("mountpoint", mountpoint);
-  result.Set("filesystem", metadata.filesystem);
+  result.Set("mountPoint", mountPoint);
+  result.Set("fileSystem", metadata.fileSystem);
   result.Set("size", Napi::Number::New(Env(), static_cast<double>(metadata.size)));
   result.Set("used", Napi::Number::New(Env(), static_cast<double>(metadata.used)));
   result.Set("available", Napi::Number::New(Env(), static_cast<double>(metadata.available)));
-  result.Set("dev", Napi::Number::New(Env(), static_cast<double>(metadata.dev)));
   result.Set("remote", Napi::Boolean::New(Env(), metadata.remote));
   result.Set("ok", Napi::Boolean::New(Env(), metadata.ok));
 
@@ -180,9 +178,9 @@ void GetVolumeMetadataWorker::OnOK() {
   deferred_.Resolve(result);
 }
 
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string& mountpoint) {
+Napi::Value GetVolumeMetadata(Napi::Env env, const std::string& mountPoint) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto* worker = new GetVolumeMetadataWorker(mountpoint, deferred);
+  auto* worker = new GetVolumeMetadataWorker(mountPoint, deferred);
   worker->Queue();
   return deferred.Promise();
 }

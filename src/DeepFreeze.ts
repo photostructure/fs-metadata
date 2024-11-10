@@ -1,3 +1,5 @@
+// src/DeepFreeze.ts
+
 export type DeepReadonly<T> = T extends (infer R)[]
   ? ReadonlyArray<DeepReadonly<R>>
   : T extends Function
@@ -8,6 +10,9 @@ export type DeepReadonly<T> = T extends (infer R)[]
 
 export type OrDeepReadonly<T> = T | DeepReadonly<T>;
 
+/**
+ * Recursively freezes an object and all of its properties
+ */
 export function deepFreeze<T>(obj: T): DeepReadonly<T> {
   if (obj == null || typeof obj !== "object" || Object.isFrozen(obj)) {
     return obj as any;

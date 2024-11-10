@@ -12,18 +12,16 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
   expect(metadata).toBeDefined();
   if (metadata == null) throw new Error("Metadata is undefined");
 
-  expect(metadata.mountpoint).toBeDefined();
-  expect(typeof metadata.mountpoint).toBe("string");
-  expect(metadata.mountpoint.length).toBeGreaterThan(0);
+  expect(metadata.mountPoint).toBeDefined();
+  expect(typeof metadata.mountPoint).toBe("string");
+  expect(metadata.mountPoint.length).toBeGreaterThan(0);
 
-  if (metadata.filesystem !== undefined) {
-    expect(typeof metadata.filesystem).toBe("string");
+  if (metadata.fileSystem !== undefined) {
+    expect(typeof metadata.fileSystem).toBe("string");
   }
 
   // Validate device ID
-  const s = statSync(metadata.mountpoint);
-  expect(s.dev).toBeGreaterThan(0);
-  expect(metadata.dev).toBe(s.dev);
+  const s = statSync(metadata.mountPoint);
 
   // Size checks
   expect(metadata.size).toBeGreaterThan(0);

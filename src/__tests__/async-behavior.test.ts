@@ -1,5 +1,6 @@
 // src/__tests__/async-behavior.test.ts
-import { getMountpoints, getVolumeMetadata } from "../index";
+
+import { getVolumeMetadata, getVolumeMountPoints } from "../index";
 import { describePlatform } from "../test-utils/platform";
 
 describe("Filesystem API Async Behavior", () => {
@@ -16,9 +17,11 @@ describe("Filesystem API Async Behavior", () => {
 
   // Test concurrent operations
   describe("Concurrent Operations", () => {
-    it("should handle multiple concurrent getMountpoints calls", async () => {
+    it("should handle multiple concurrent getVolumeMountPoints calls", async () => {
       const numCalls = 5;
-      const promises = Array.from({ length: numCalls }, () => getMountpoints());
+      const promises = Array.from({ length: numCalls }, () =>
+        getVolumeMountPoints(),
+      );
       const results = await Promise.all(promises);
 
       // All results should be arrays
@@ -35,8 +38,8 @@ describe("Filesystem API Async Behavior", () => {
     });
 
     it("should handle multiple concurrent getVolumeMetadata calls", async () => {
-      const mountpoints = await getMountpoints();
-      const testPath = mountpoints[0]; // Use first available mountpoint
+      const mountPoints = await getVolumeMountPoints();
+      const testPath = mountPoints[0]; // Use first available mountpoint
 
       const numCalls = 5;
       const promises = Array(numCalls)
@@ -46,7 +49,7 @@ describe("Filesystem API Async Behavior", () => {
 
       // All results should have valid metadata
       results.forEach((metadata) => {
-        expect(metadata.mountpoint).toBe(testPath);
+        expect(metadata.mountPoint).toBe(testPath);
         expect(typeof metadata.size).toBe("number");
         expect(metadata.size).toBeGreaterThan(0);
       });
@@ -55,18 +58,18 @@ describe("Filesystem API Async Behavior", () => {
 
   describeLinux("Linux Implementation", () => {
     it("should complete filesystem operations quickly on accessible paths", async () => {
-      const executionTime = await timeExecution(() => getMountpoints());
+      const executionTime = await timeExecution(() => getVolumeMountPoints());
       // Even synchronous operations should be fast for accessible paths
       expect(executionTime).toBeLessThan(1000); // Less than 1 second
     });
 
     // This test demonstrates the potential blocking behavior
     it("should potentially block on slow filesystem operations", async () => {
-      const mountpoints = await getMountpoints();
+      const mountPoints = await getVolumeMountPoints();
 
       // Start multiple concurrent operations
       const startTime = Date.now();
-      const operations = mountpoints
+      const operations = mountPoints
         .slice(0, 3)
         .map((mp) => getVolumeMetadata(mp));
       await Promise.all(operations);

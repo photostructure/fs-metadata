@@ -1,14 +1,14 @@
-// Config.ts
+// src/Config.ts
 
 import { deepFreeze, DeepReadonly } from "./DeepFreeze";
 
 export interface Config {
-  excludedFilesystemTypes: string[];
-  excludedMountpointGlobs: string[];
+  excludedFileSystemTypes: string[];
+  excludedMountPointGlobs: string[];
 }
 
 export const DefaultConfig: DeepReadonly<Config> = deepFreeze({
-  excludedFilesystemTypes: [
+  excludedFileSystemTypes: [
     "proc",
     "sysfs",
     "devpts",
@@ -20,11 +20,12 @@ export const DefaultConfig: DeepReadonly<Config> = deepFreeze({
     "debugfs",
     "configfs",
   ],
-  excludedMountpointGlobs: [
+  excludedMountPointGlobs: [
     "/proc/**",
     "/snap/**",
     "/sys/**",
     "/dev/**",
+    "/dev",
     "/run",
     "/run/lock",
     "/run/qemu",

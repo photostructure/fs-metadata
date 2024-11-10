@@ -1,3 +1,5 @@
+// src/Octal.ts
+
 /**
  * Converts a string containing octal escape sequences to its decoded form.
  * Handles octal sequences in the format \040 through \377

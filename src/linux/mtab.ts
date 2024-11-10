@@ -1,36 +1,37 @@
 // src/linux/mtab.ts
 import { readFile } from "node:fs/promises";
-import { Config, getConfig } from "../Config";
-import { OrDeepReadonly } from "../DeepFreeze";
-import { compileGlob } from "../Glob";
 import { decodeOctalEscapes } from "../Octal";
 
+function hasContent(s: string | undefined | null): s is string {
+  return s != null && s.trim().length > 0;
+}
+export type TypedMountPoint = {
+  mountPoint: string;
+  fstype: string;
+};
+
 /**
- * Get list of mountpoints from /proc/mounts or /etc/mtab
+ * Get list of mount points from /proc/mounts or /etc/mtab
  */
-export async function readMtab(
+export async function getLinuxMountPoints(
   input = "/proc/mounts",
-  config: OrDeepReadonly<Config> = getConfig(),
-): Promise<string[]> {
+): Promise<TypedMountPoint[]> {
   try {
-    const excludedFsRE = compileGlob(config.excludedFilesystemTypes);
-    const excludeRE = compileGlob(config.excludedMountpointGlobs);
     const mtabContent = await readFile(input, "utf8");
-    const mountpoints = new Set<string>();
+    const result: { mountPoint: string; fstype: string }[] = [];
 
     for (let ea of mtabContent.split("\n")) {
       const line = ea.trim();
       if (line.length === 0 || line.startsWith("#")) continue;
-      const [fs, mp] = line.split(/\s+/);
-      if (fs == null || mp == null || excludedFsRE.test(fs)) continue;
-
-      const mountpoint = decodeOctalEscapes(mp);
-      if (mountpoint.length === 0 || excludeRE.test(mountpoint)) continue;
-      mountpoints.add(mountpoint);
+      const [fstype, mp] = line.split(/\s+/);
+      const mountPoint = decodeOctalEscapes(mp ?? "");
+      if (hasContent(fstype) && hasContent(mountPoint)) {
+        result.push({ mountPoint, fstype });
+      }
     }
-    return [...mountpoints].sort();
+    return result;
   } catch (error) {
-    console.error("Error reading /etc/mtab:", error);
+    console.error("Error reading " + input + ":" + error);
     throw error;
   }
 }

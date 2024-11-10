@@ -9,9 +9,9 @@
 
 namespace FSMeta {
 
-class GetMountpointsWorker : public Napi::AsyncWorker {
+class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
 public:
-  GetMountpointsWorker(const Napi::Promise::Deferred &deferred)
+  GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred)
       : Napi::AsyncWorker(deferred.Env()), deferred_(deferred) {}
 
   void Execute() override {
@@ -19,7 +19,7 @@ public:
       DWORD drives = GetLogicalDrives();
       for (char drive = 'A'; drive <= 'Z'; drive++) {
         if (drives & (1 << (drive - 'A'))) {
-          mountpoints.push_back(std::string(1, drive) + ":\\");
+          mountPoints.push_back(std::string(1, drive) + ":\\");
         }
       }
     } catch (const std::exception &e) {
@@ -31,8 +31,8 @@ public:
     Napi::HandleScope scope(Env());
     Napi::Array result = Napi::Array::New(Env());
 
-    for (size_t i = 0; i < mountpoints.size(); i++) {
-      result.Set(i, mountpoints[i]);
+    for (size_t i = 0; i < mountPoints.size(); i++) {
+      result.Set(i, mountPoints[i]);
     }
 
     deferred_.Resolve(result);
@@ -43,7 +43,7 @@ public:
   }
 
 private:
-  std::vector<std::string> mountpoints;
+  std::vector<std::string> mountPoints;
   Napi::Promise::Deferred deferred_;
 };
 
@@ -51,7 +51,7 @@ class GetVolumeMetadataWorker : public Napi::AsyncWorker {
 public:
   GetVolumeMetadataWorker(const std::string &path,
                           const Napi::Promise::Deferred &deferred)
-      : Napi::AsyncWorker(deferred.Env()), mountpoint(path),
+      : Napi::AsyncWorker(deferred.Env()), mountPoint(path),
         deferred_(deferred) {}
 
   void Execute() override {
@@ -64,21 +64,20 @@ public:
       DWORD fsFlags = 0;
 
       if (!GetVolumeInformationA(
-              mountpoint.c_str(), volumeName, sizeof(volumeName), &serialNumber,
+              mountPoint.c_str(), volumeName, sizeof(volumeName), &serialNumber,
               &maxComponentLen, &fsFlags, fileSystem, sizeof(fileSystem))) {
         throw std::runtime_error("Failed to get volume information");
       }
 
       metadata.label = volumeName;
-      metadata.filesystem = fileSystem;
-      metadata.dev = serialNumber;
+      metadata.fileSystem = fileSystem;
 
       // Get disk space information
       ULARGE_INTEGER totalBytes;
       ULARGE_INTEGER freeBytes;
       ULARGE_INTEGER totalFreeBytes;
 
-      if (!GetDiskFreeSpaceExA(mountpoint.c_str(), &freeBytes, &totalBytes,
+      if (!GetDiskFreeSpaceExA(mountPoint.c_str(), &freeBytes, &totalBytes,
                                &totalFreeBytes)) {
         throw std::runtime_error("Failed to get disk space information");
       }
@@ -88,7 +87,7 @@ public:
       metadata.used = metadata.size - metadata.available;
 
       // Check if drive is remote
-      metadata.remote = (GetDriveTypeA(mountpoint.c_str()) == DRIVE_REMOTE);
+      metadata.remote = (GetDriveTypeA(mountPoint.c_str()) == DRIVE_REMOTE);
 
       // Get volume GUID
       char volumeGuid[50] = {0};
@@ -106,13 +105,12 @@ public:
     Napi::HandleScope scope(Env());
     Napi::Object result = Napi::Object::New(Env());
 
-    result.Set("mountpoint", mountpoint);
-    result.Set("filesystem", metadata.filesystem);
+    result.Set("mountPoint", mountPoint);
+    result.Set("fileSystem", metadata.fileSystem);
     result.Set("label", metadata.label);
     result.Set("size", metadata.size);
     result.Set("used", metadata.used);
     result.Set("available", metadata.available);
-    result.Set("dev", metadata.dev);
     result.Set("remote", metadata.remote);
     result.Set("uuid", metadata.uuid);
 
@@ -124,30 +122,29 @@ public:
   }
 
 private:
-  std::string mountpoint;
+  std::string mountPoint;
   Napi::Promise::Deferred deferred_;
   struct {
-    std::string filesystem;
+    std::string fileSystem;
     std::string label;
     std::string uuid;
     double size;
     double used;
     double available;
-    DWORD dev;
     bool remote;
   } metadata;
 };
 
-Napi::Value GetMountpoints(Napi::Env env) {
+Napi::Value getVolumeMountPoints(Napi::Env env) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new GetMountpointsWorker(deferred);
+  auto *worker = new getVolumeMountPointsWorker(deferred);
   worker->Queue();
   return deferred.Promise();
 }
 
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountpoint) {
+Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new GetVolumeMetadataWorker(mountpoint, deferred);
+  auto *worker = new GetVolumeMetadataWorker(mountPoint, deferred);
   worker->Queue();
   return deferred.Promise();
 }
