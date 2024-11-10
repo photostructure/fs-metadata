@@ -135,9 +135,9 @@ private:
   } metadata;
 };
 
-Napi::Value getVolumeMountPoints(Napi::Env env) {
+Napi::Value GetVolumeMountPoints(Napi::Env env) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new getVolumeMountPointsWorker(deferred);
+  auto *worker = new GetVolumeMountPointsWorker(deferred);
   worker->Queue();
   return deferred.Promise();
 }
