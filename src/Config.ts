@@ -9,27 +9,28 @@ export interface Config {
 
 export const DefaultConfig: DeepReadonly<Config> = deepFreeze({
   excludedFileSystemTypes: [
-    "proc",
-    "sysfs",
-    "devpts",
-    "tmpfs",
     "cgroup",
     "cgroup2",
+    "configfs",
+    "debugfs",
+    "devpts",
+    "proc",
     "pstore",
     "securityfs",
-    "debugfs",
-    "configfs",
+    "sysfs",
+    "tmpfs",
   ],
   excludedMountPointGlobs: [
-    "/proc/**",
-    "/snap/**",
-    "/sys/**",
-    "/dev/**",
     "/dev",
+    "/dev/**",
+    "/proc/**",
     "/run",
     "/run/lock",
     "/run/qemu",
     "/run/snapd/ns",
+    "/snap",
+    "/snap/**",
+    "/sys/**",
   ],
 });
 
