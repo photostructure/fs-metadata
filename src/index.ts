@@ -1,6 +1,6 @@
 // index.ts
 import { stat } from "node:fs/promises";
-import { asyncFilter } from "./Array";
+import { asyncFilter, uniq } from "./Array";
 import { getConfig } from "./Config";
 import { compileGlob } from "./Glob";
 import { getLinuxMountPoints, TypedMountPoint } from "./linux/mtab";
@@ -95,11 +95,13 @@ async function getUnixMountPoints(): Promise<string[]> {
   const config = getConfig();
   const excludedFsRE = compileGlob(config.excludedFileSystemTypes);
   const excludeRE = compileGlob(config.excludedMountPointGlobs);
-  return arr
-    .filter((mp) => {
-      return !excludedFsRE.test(mp.fstype) && !excludeRE.test(mp.mountPoint);
-    })
-    .map((ea) => ea.mountPoint);
+  return uniq(
+    arr
+      .filter((mp) => {
+        return !excludedFsRE.test(mp.fstype) && !excludeRE.test(mp.mountPoint);
+      })
+      .map((ea) => ea.mountPoint),
+  );
 }
 
 /**
