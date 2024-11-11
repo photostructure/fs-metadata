@@ -1,15 +1,11 @@
 // src/linux/mtab.ts
 import { readFile } from "node:fs/promises";
-import { decodeOctalEscapes } from "../Octal";
+import { decodeOctalEscapes } from "../Octal.js";
+import { TypedMountPoint } from "../TypedMountPoint.js";
 
 function hasContent(s: string | undefined | null): s is string {
   return s != null && s.trim().length > 0;
 }
-export type TypedMountPoint = {
-  mountPoint: string;
-  fstype: string;
-};
-
 /**
  * Get list of mount points from /proc/mounts or /etc/mtab
  */

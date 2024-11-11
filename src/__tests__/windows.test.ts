@@ -1,8 +1,8 @@
 // src/__tests__/windows.test.ts
 
-import { getVolumeMetadata, getVolumeMountPoints } from "../index";
-import { assertMetadata } from "../test-utils/assert";
-import { describePlatform } from "../test-utils/platform";
+import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
+import { assertMetadata } from "../test-utils/assert.js";
+import { describePlatform } from "../test-utils/platform.js";
 
 describe("Filesystem Metadata", () => {
   // Skip all tests if not on Windows

@@ -1,12 +1,14 @@
 // index.ts
 import { stat } from "node:fs/promises";
-import { asyncFilter, uniq } from "./Array";
-import { getConfig } from "./Config";
-import { compileGlob } from "./Glob";
-import { getLinuxMountPoints, TypedMountPoint } from "./linux/mtab";
+import { getConfig } from "./Config.js";
+import { filterMountPoints, filterTypedMountPoints } from "./filter.js";
+import { getLinuxMountPoints } from "./linux/mtab.js";
+import { TypedMountPoint } from "./TypedMountPoint.js";
+import { extractUUID } from "./uuid.js";
 
-export { DefaultConfig, getConfig, setConfig } from "./Config";
-export type { Config } from "./Config";
+export { DefaultConfig, EmptyConfig, getConfig, setConfig } from "./Config.js";
+export type { Config } from "./Config.js";
+export type { DeepReadonly } from "./DeepFreeze.js";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require("bindings")("node_fs_meta");
@@ -74,17 +76,6 @@ export interface VolumeMetadata {
   status?: string;
 }
 
-/**
- * @return true if `path` exists
- */
-async function exists(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)) != null;
-  } catch {
-    return false;
-  }
-}
-
 const isLinux = process.platform === "linux";
 const isWindows = process.platform === "win32";
 
@@ -92,33 +83,19 @@ async function getUnixMountPoints(): Promise<string[]> {
   const arr = (await (isLinux
     ? getLinuxMountPoints()
     : native.getVolumeMountPoints())) as TypedMountPoint[];
-  const config = getConfig();
-  const excludedFsRE = compileGlob(config.excludedFileSystemTypes);
-  const excludeRE = compileGlob(config.excludedMountPointGlobs);
-  return uniq(
-    arr
-      .filter((mp) => {
-        return !excludedFsRE.test(mp.fstype) && !excludeRE.test(mp.mountPoint);
-      })
-      .map((ea) => ea.mountPoint),
-  );
+  return filterTypedMountPoints(arr).map((ea) => ea.mountPoint);
 }
 
 /**
  * List all active local and remote mount points on the system
  */
-export async function getVolumeMountPoints(): Promise<string[]> {
-  // TODO: add fs type filtering for windows
-  const arr = isWindows
-    ? await native.getVolumeMountPoints()
-    : await getUnixMountPoints();
-  return (await asyncFilter(arr, exists)).sort();
-}
-
-const uuidRegex = /[a-z0-9-]{10,}/i;
-
-function extractUUID(uuid: string | undefined): string | undefined {
-  return uuid?.match(uuidRegex)?.[0];
+export async function getVolumeMountPoints(
+  config = getConfig(),
+): Promise<string[]> {
+  const arr: string[] = await (isWindows
+    ? native.getVolumeMountPoints()
+    : getUnixMountPoints());
+  return filterMountPoints(arr, config);
 }
 
 /**

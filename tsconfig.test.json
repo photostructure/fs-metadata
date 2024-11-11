@@ -1,14 +1,13 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": ["jest", "node"],
-    // "strict": true,
-    // "module": "commonjs",
-    // "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "sourceMap": true,
-    "outDir": "./dist",
+    "outDir": "./dist/test",
     "noEmit": true,
-    "esModuleInterop": true
+    "allowJs": true
   },
   "include": [
     "src/**/*.spec.ts",

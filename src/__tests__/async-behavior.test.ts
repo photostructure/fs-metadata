@@ -1,7 +1,7 @@
 // src/__tests__/async-behavior.test.ts
 
-import { getVolumeMetadata, getVolumeMountPoints } from "../index";
-import { describePlatform } from "../test-utils/platform";
+import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
+import { describePlatform } from "../test-utils/platform.js";
 
 describe("Filesystem API Async Behavior", () => {
   const describeLinux = describePlatform("linux");

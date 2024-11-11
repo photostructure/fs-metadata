@@ -1,5 +1,5 @@
 // src/test-utils/assert.ts
-import { VolumeMetadata } from "../index";
+import { VolumeMetadata } from "../index.js";
 
 /**
  * Asserts that the given metadata object has valid filesystem metadata

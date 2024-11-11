@@ -1,7 +1,7 @@
 // src/__tests__/unix.test.ts
 
-import { getVolumeMetadata, getVolumeMountPoints } from "../index";
-import { assertMetadata } from "../test-utils/assert";
+import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
+import { assertMetadata } from "../test-utils/assert.js";
 
 const isUnix = process.platform === "linux" || process.platform === "darwin";
 const describeUnix = (name: string, fn: () => void) => {
@@ -183,11 +183,7 @@ describeUnix("Unix (Linux/macOS) File system metadata", () => {
       const arr = await Promise.all(
         mountPoints.map((mp) => getVolumeMetadata(mp)),
       );
-
-      arr.forEach((metadata) => {
-        expect(typeof metadata.fileSystem).toBe("string");
-        expect(metadata.fileSystem?.length).toBeGreaterThan(0);
-      });
+      arr.map(assertMetadata);
     });
   });
 

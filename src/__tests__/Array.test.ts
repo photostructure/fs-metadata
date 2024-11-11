@@ -1,6 +1,6 @@
 // src/__tests__/Array.test.ts
 
-import { asyncFilter, uniq } from "../Array";
+import { asyncFilter, uniq } from "../Array.js";
 
 describe("Array", () => {
   describe("asyncFilter", () => {

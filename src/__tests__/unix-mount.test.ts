@@ -1,8 +1,8 @@
 // src/__tests__/unix-mount.test.ts
 
-import { getVolumeMountPoints } from "../index";
-import { describePlatform } from "../test-utils/platform";
-import { parseMount } from "../unix/mount";
+import { getVolumeMountPoints } from "../index.js";
+import { describePlatform } from "../test-utils/platform.js";
+import { execAndParseMount } from "../unix/mount.js";
 
 const describeUnix = (name: string, fn: () => void) => {
   const isUnix = process.platform === "linux" || process.platform === "darwin";
@@ -15,13 +15,13 @@ const describeDarwin = describePlatform("darwin");
 describeUnix("Unix Mount Points Parser", () => {
   describe("parseMount()", () => {
     it("should return an array of mount points", async () => {
-      const mountPoints = await parseMount();
+      const mountPoints = await execAndParseMount();
       expect(Array.isArray(mountPoints)).toBe(true);
       expect(mountPoints.length).toBeGreaterThan(0);
     });
 
     it("should have valid mount point objects", async () => {
-      const mountPoints = await parseMount();
+      const mountPoints = await execAndParseMount();
 
       for (const mount of mountPoints) {
         expect(mount).toMatchObject({
@@ -32,19 +32,18 @@ describeUnix("Unix Mount Points Parser", () => {
         });
 
         // Mount point should be an absolute path
-        expect(mount.mountPoint.startsWith("/")).toBe(true);
+        expect(mount.mountPoint).toMatch(/^\//);
 
         // Options should be non-empty array of strings
-        expect(Array.isArray(mount.options)).toBe(true);
         mount.options.forEach((option) => {
-          expect(typeof option).toBe("string");
+          expect(option).toBeInstanceOf(String);
           expect(option.length).toBeGreaterThan(0);
         });
       }
     });
 
     it("should match getVolumeMountPoints results", async () => {
-      const mountPoints = await parseMount();
+      const mountPoints = await execAndParseMount();
       const volumeMountPoints = await getVolumeMountPoints();
 
       // All volume mount points should exist in parseMount results
@@ -58,17 +57,17 @@ describeUnix("Unix Mount Points Parser", () => {
 
     describeLinux("Linux-specific tests", () => {
       it("should have expected Linux filesystem types", async () => {
-        const mountPoints = await parseMount();
+        const mountPoints = await execAndParseMount();
         const expectedTypes = ["ext4", "ext3", "xfs", "btrfs", "zfs"];
 
         // Root filesystem should be one of the expected types
         const rootMount = mountPoints.find((mount) => mount.mountPoint === "/");
         expect(rootMount).toBeDefined();
-        expect(expectedTypes).toContain(rootMount?.type);
+        expect(expectedTypes).toContain(rootMount?.fstype);
       });
 
       it("should handle Linux-style mount options", async () => {
-        const mountPoints = await parseMount();
+        const mountPoints = await execAndParseMount();
         const commonOptions = ["rw", "relatime", "defaults"];
 
         mountPoints.forEach((mount) => {
@@ -82,17 +81,17 @@ describeUnix("Unix Mount Points Parser", () => {
 
     describeDarwin("macOS-specific tests", () => {
       it("should have expected macOS filesystem types", async () => {
-        const mountPoints = await parseMount();
+        const mountPoints = await execAndParseMount();
         const expectedTypes = ["apfs", "hfs", "autofs", "devfs"];
 
         // Root filesystem should be one of the expected types
         const rootMount = mountPoints.find((mount) => mount.mountPoint === "/");
         expect(rootMount).toBeDefined();
-        expect(expectedTypes).toContain(rootMount?.type);
+        expect(expectedTypes).toContain(rootMount?.fstype);
       });
 
       it("should handle macOS-style mount options", async () => {
-        const mountPoints = await parseMount();
+        const mountPoints = await execAndParseMount();
         console.log({ mountPoints });
         const commonOptions = [
           "read-only",

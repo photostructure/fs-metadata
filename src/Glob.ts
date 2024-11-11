@@ -14,7 +14,13 @@
  * @param patterns - An array of glob patterns to compile.
  * @returns A `RegExp` object that matches any of the provided patterns.
  */
-export function compileGlob(patterns: string[] | readonly string[]): RegExp {
+export function compileGlob(
+  patterns: string[] | readonly string[] | undefined,
+): RegExp {
+  if (patterns == null || patterns.length === 0) {
+    return NeverMatchRE;
+  }
+
   const regexPatterns = patterns.map((pattern) => {
     let regex = "";
     let i = 0;
@@ -73,7 +79,9 @@ export function compileGlob(patterns: string[] | readonly string[]): RegExp {
   const final = regexPatterns.filter((ea) => ea.length > 0);
   return final.length === 0
     ? // Empty pattern matches nothing
-      /(?!)/
-    : // Case insensitive for Windows paths
-      new RegExp(`^(?:${final.join("|")})$`, "i");
+      NeverMatchRE // Case insensitive for Windows paths
+    : new RegExp(`^(?:${final.join("|")})$`, "i");
 }
+
+export const AlwaysMatchRE = /(?:)/;
+export const NeverMatchRE = /(?!)/;

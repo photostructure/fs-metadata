@@ -2,13 +2,12 @@
 
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { TypedMountPoint } from "../TypedMountPoint.js";
 
 const execAsync = promisify(exec);
 
-interface MountPoint {
-  mountPoint: string;
+interface MountPoint extends TypedMountPoint {
   device: string;
-  type: string;
   options: string[];
 }
 
@@ -18,9 +17,9 @@ const isDarwin = process.platform === "darwin";
 /**
  * Gets the list of mount points using the `mount` command
  *
- * Only for Linux and macOS
+ * Only for Linux and macOS. Included only for tests: use `getVolumeMountPoints` instead.
  */
-export async function parseMount(): Promise<MountPoint[]> {
+export async function execAndParseMount(): Promise<MountPoint[]> {
   if (!isLinux && !isDarwin) throw new Error("Unsupported platform");
 
   try {
@@ -40,8 +39,8 @@ export async function parseMount(): Promise<MountPoint[]> {
           return {
             mountPoint: mountPoint.trim(),
             device: device.trim(),
-            type: type.trim(),
-            options: optionsStr.split(",").map((opt) => opt.trim()),
+            fstype: type.trim(),
+            options: optionsStr?.split(",").map((opt) => opt.trim()) ?? [],
           };
         } else if (isDarwin) {
           // macOS format: device on path (type, options)
@@ -53,8 +52,8 @@ export async function parseMount(): Promise<MountPoint[]> {
           return {
             mountPoint: mountPoint.trim(),
             device: device.trim(),
-            type: type.trim(),
-            options: optionsStr ? optionsStr.split(", ") : [],
+            fstype: type.trim(),
+            options: optionsStr?.split(",").map((opt) => opt.trim()) ?? [],
           };
         } else {
           throw new Error("Unsupported platform");

@@ -22,7 +22,7 @@ Built and supported by [PhotoStructure](https://photostructure.com).
   - Windows (x64, arm64)
   - macOS (x64, arm64)
   - Linux (x64, arm64)
-- Written in modern TypeScript with full type definitions
+- Written in modern TypeScript with full type definitions for both ESM and CommonJS consumers
 - Native async implementation to avoid blocking the event loop
 - Promise-based async API
 - Comprehensive test coverage
@@ -34,6 +34,8 @@ npm install @photostructure/fs-metadata
 ```
 
 ## Usage
+
+### ESM
 
 ```typescript
 import { getVolumeMountPoints, getVolumeMetadata } from "@photostructure/fs-metadata";
@@ -48,6 +50,14 @@ console.dir({ mountPoints });
 const metadata = await getVolumeMetadata("C:\\"); // Windows
 // Or for Unix-like systems:
 // const metadata = await getVolumeMetadata('/');
+```
+
+### CommonJS
+
+```javascript
+const { getVolumeMountPoints, getVolumeMetadata } = require("@photostructure/fs-metadata");
+
+// Usage is the same as ESM
 ```
 
 ## Documentation
@@ -65,7 +75,7 @@ API documentation is available:
 
 Requirements:
 
-- Node.js 18 or later
+- Supported Node.js version
 - Python 3
 - C++ build tools:
   - Windows: Visual Studio Build Tools
@@ -79,12 +89,6 @@ cd fs-metadata
 
 # Install dependencies
 npm install
-
-# Build
-npm run build
-
-# Generate documentation
-npm run docs
 
 # Run tests
 npm test

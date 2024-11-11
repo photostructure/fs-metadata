@@ -2,13 +2,41 @@
   "name": "@photostructure/fs-metadata",
   "version": "0.0.1",
   "description": "Cross-platform native filesystem metadata retrieval for Node.js",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
+    }
+  },
+  "homepage": "https://photostructure.github.io/fs-metadata/",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/photostructure/fs-metadata.git"
+  },
+  "files": [
+    "dist",
+    "build/Release",
+    "binding.gyp",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "license": "MIT",
   "scripts": {
     "install": "node-gyp rebuild",
     "prebuild": "rm -rf dist",
-    "build": "tsc",
+    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
     "docs": "typedoc --out docs src/index.ts",
     "pretest": "npm run build",
     "test": "jest --silent=false",
@@ -16,10 +44,12 @@
     "test:coverage": "jest --coverage",
     "test:clear": "jest --clearCache",
     "test:debug": "node --inspect-brk jest --runInBand",
-    "lint": "eslint",
-    "lint:fix": "eslint --fix",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
     "fmt": "prettier --write \"src/**/*.ts\" && npm run fmt:cpp",
-    "fmt:cpp": "clang-format --style=LLVM -i src/*/*.cpp src/*/*.h"
+    "fmt:cpp": "clang-format --style=LLVM -i src/*/*.cpp src/*/*.h",
+    "prepublishOnly": "npm run test && npm run build",
+    "prepack": "npm run build"
   },
   "gypfile": true,
   "os": [
@@ -31,25 +61,32 @@
     "x64",
     "arm64"
   ],
+  "keywords": [
+    "filesystem",
+    "metadata",
+    "native",
+    "node-addon",
+    "windows",
+    "linux",
+    "macos",
+    "cross-platform"
+  ],
   "dependencies": {
     "bindings": "^1.5.0",
     "node-addon-api": "^8.2.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.14.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.9.0",
     "@typescript-eslint/eslint-plugin": "^8.13.0",
     "@typescript-eslint/parser": "^8.13.0",
     "eslint": "^9.14.0",
-    "globals": "^15.12.0",
     "jest": "^29.7.0",
     "node-gyp": "^10.2.0",
-    "prettier": "^3.3.3",
     "prettier-plugin-organize-imports": "4.1.0",
+    "prettier": "^3.3.3",
     "ts-jest": "^29.2.5",
     "typedoc": "^0.26.11",
-    "typescript": "^5.6.3",
-    "typescript-eslint": "^8.13.0"
+    "typescript": "^5.6.3"
   }
 }

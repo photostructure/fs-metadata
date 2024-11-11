@@ -1,6 +1,6 @@
 // src/__tests__/Octal.test.ts
 
-import { decodeOctalEscapes } from "../Octal";
+import { decodeOctalEscapes } from "../Octal.js";
 
 describe("decodeOctalEscapes", () => {
   it("decodes simple space character \\040", () => {
