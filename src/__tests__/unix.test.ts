@@ -1,5 +1,6 @@
 // src/__tests__/unix.test.ts
 
+import { sortByStr } from "../array.js";
 import {
   ExcludedMountPointGlobsDefault,
   getVolumeMetadata,
@@ -74,7 +75,7 @@ describePlatform("linux", "darwin")(
 
       it("should return sorted mount points", async () => {
         const mountPoints = await getVolumeMountPoints();
-        const sorted = [...mountPoints].sort();
+        const sorted = sortByStr([...mountPoints], (ea) => ea);
         expect(mountPoints).toEqual(sorted);
       });
     });
@@ -199,6 +200,11 @@ describePlatform("linux", "darwin")(
             ...ExcludedMountPointGlobsDefault,
             "/init",
             "/boot",
+            // Avoid: "/System/Volumes/Data", "/System/Volumes/Data/home",
+            // "/System/Volumes/Hardware", "/System/Volumes/Preboot",
+            // "/System/Volumes/Update", "/System/Volumes/VM",
+            // "/System/Volumes/iSCPreboot", "/System/Volumes/xarts",
+            "/System/**",
           ],
         });
         const arr = await Promise.all(

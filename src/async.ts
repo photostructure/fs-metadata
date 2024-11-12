@@ -73,3 +73,12 @@ export function thenOrTimeout<T>(
     timeoutPromise,
   ]);
 }
+
+/**
+ * Delay for the specified number of milliseconds.
+ *
+ * @param ms The number of milliseconds to delay
+ */
+export async function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

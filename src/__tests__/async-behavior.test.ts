@@ -1,7 +1,7 @@
 // src/__tests__/async-behavior.test.ts
 
 import { times } from "../array.js";
-import { TimeoutError } from "../async.js";
+import { delay, TimeoutError } from "../async.js";
 import { defer } from "../defer.js";
 import {
   ExcludedMountPointGlobsDefault,
@@ -88,8 +88,9 @@ describe("Filesystem API Async Behavior", () => {
       // sometimes thenOrTimeout() fails to reject in time
       jest.retryTimes(5);
     });
-    afterEach(() => {
+    afterEach(async () => {
       jest.retryTimes(0);
+      await delay(500);
     });
     it("getVolumeMountPoints() should reject with timeoutMs=1", async () => {
       await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
