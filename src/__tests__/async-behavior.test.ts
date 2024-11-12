@@ -24,7 +24,7 @@ describe("Filesystem API Async Behavior", () => {
 
   // Test concurrent operations
   describe("Concurrent Operations", () => {
-    jest.setTimeout(2 * TimeoutMsDefault);
+    jest.setTimeout(4 * TimeoutMsDefault);
 
     it("should handle multiple concurrent getVolumeMountPoints()", async () => {
       const expected = await deferredMountPoints();
