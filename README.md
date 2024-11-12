@@ -18,7 +18,6 @@ Built and supported by [PhotoStructure](https://photostructure.com).
   - Filesystem type and volume label
   - Volume UUID (when available)
   - Remote/network share information
-  - Device identifiers
 - Cross-platform support:
   - Windows (x64, arm64)
   - macOS (x64, arm64)
