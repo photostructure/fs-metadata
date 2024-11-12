@@ -1,7 +1,9 @@
 // index.ts
+import { Stats } from "node:fs";
 import { stat } from "node:fs/promises";
 import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
+import { WrappedError } from "./error.js";
 import { getLinuxMountPoints } from "./linux/mtab.js";
 import { FsOptions, options } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
@@ -128,10 +130,14 @@ export async function getVolumeMetadata(
 }
 
 async function _getVolumeMetadata(mountPoint: string) {
+  let s: Stats;
   try {
-    await stat(mountPoint);
+    s = await stat(mountPoint);
   } catch (e) {
-    throw new Error(`mountPoint ${mountPoint} is not accessible: ${e}`);
+    throw new WrappedError(`mountPoint ${mountPoint} is not accessible`, e);
+  }
+  if (!s.isDirectory()) {
+    throw new TypeError(`mountPoint ${mountPoint} is not a directory`);
   }
 
   const result: VolumeMetadata = await native.getVolumeMetadata(mountPoint);

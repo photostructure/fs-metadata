@@ -60,6 +60,7 @@ export function thenOrTimeout<T>(
   if (timeoutMs === 0) {
     return promise;
   }
+  const timeoutAt = Date.now() + timeoutMs;
 
   // By creating the error here, we can capture the stack trace up to the caller
   const err = new TimeoutError(`${desc}: timeout after ${timeoutMs}ms`);
@@ -69,7 +70,17 @@ export function thenOrTimeout<T>(
   });
 
   return Promise.race([
-    promise.finally(() => clearTimeout(timeoutId)),
+    promise
+      .then((result) => {
+        // if the event loop is blocked the timeout may have been starved. This
+        // should only happen in extreme cases and tests. 
+        if (Date.now() >= timeoutAt) {
+          throw err;
+        } else {
+          return result;
+        }
+      })
+      .finally(() => clearTimeout(timeoutId)),
     timeoutPromise,
   ]);
 }

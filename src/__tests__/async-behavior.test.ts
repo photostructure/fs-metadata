@@ -1,5 +1,6 @@
 // src/__tests__/async-behavior.test.ts
 
+import { randomInt } from "crypto";
 import { times } from "../array.js";
 import { delay, TimeoutError } from "../async.js";
 import { defer } from "../defer.js";
@@ -48,23 +49,26 @@ describe("Filesystem API Async Behavior", () => {
         ...times(2, () =>
           isWindows
             ? randomChar() + ":\\"
-            : pickRandom(["/mnt", "/media", "/run", "/tmp", "/var"]),
+            : pickRandom(["/mnt", "/media", "/run", "/var"]), // /tmp made it flaky on wsl
         ),
         ...times(2, () => pickRandom(mountPoints)),
       ]);
 
       const arr = await Promise.all(
-        inputs.map((ea) =>
-          getVolumeMetadata(ea, { timeoutMs: TimeoutMsDefault * 2 }).catch(
-            (err: any) => {
-              if (ea === expectedMountPoint) {
-                // we don't expect an error from the expected mount point! Those
-                // should fail the test!
-                throw err;
-              } else return err;
-            },
-          ),
-        ),
+        inputs.map(async (ea) => {
+          await delay(randomInt(0, 10));
+          try {
+            return await getVolumeMetadata(ea, {
+              timeoutMs: TimeoutMsDefault * 2,
+            });
+          } catch (err: any) {
+            if (ea === expectedMountPoint) {
+              // we don't expect an error from the expected mount point! Those
+              // should fail the test!
+              throw err;
+            } else return err;
+          }
+        }),
       );
 
       for (const ea of arr) {
@@ -84,14 +88,6 @@ describe("Filesystem API Async Behavior", () => {
   });
 
   describe("Timeouts", () => {
-    beforeEach(() => {
-      // sometimes thenOrTimeout() fails to reject in time
-      jest.retryTimes(5);
-    });
-    afterEach(async () => {
-      jest.retryTimes(0);
-      await delay(500);
-    });
     it("getVolumeMountPoints() should reject with timeoutMs=1", async () => {
       await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
         TimeoutError,

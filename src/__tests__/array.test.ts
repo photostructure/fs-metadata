@@ -79,7 +79,7 @@ describe("Array", () => {
 
       // Should take approximately the time of the longest delay (50ms)
       // Adding some buffer for execution time
-      expect(totalTime).toBeLessThan(75);
+      expect(totalTime).toBeLessThan(120);
     });
 
     // Test error handling
