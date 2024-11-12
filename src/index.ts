@@ -1,14 +1,21 @@
 // index.ts
 import { stat } from "node:fs/promises";
-import { getConfig } from "./Config.js";
-import { filterMountPoints, filterTypedMountPoints } from "./filter.js";
+import { thenOrTimeout } from "./async.js";
+import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { getLinuxMountPoints } from "./linux/mtab.js";
-import { TypedMountPoint } from "./TypedMountPoint.js";
+import { FsOptions, options } from "./options.js";
+import { isLinux, isWindows } from "./platform.js";
+import { blank } from "./string.js";
+import { TypedMountPoint } from "./typed_mount_point.js";
 import { extractUUID } from "./uuid.js";
 
-export { DefaultConfig, EmptyConfig, getConfig, setConfig } from "./Config.js";
-export type { Config } from "./Config.js";
-export type { DeepReadonly } from "./DeepFreeze.js";
+export {
+  ExcludedFileSystemTypesDefault,
+  ExcludedMountPointGlobsDefault,
+  options,
+  TimeoutMsDefault,
+} from "./options.js";
+export type { FsOptions } from "./options.js";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const native = require("bindings")("node_fs_meta");
@@ -56,13 +63,6 @@ export interface VolumeMetadata {
   remoteShare?: string;
   /**
    * UUID for the volume, like "d46edc85-a030-4dd7-a2a8-68344034e27d".
-   *
-   * Note that (especially on macOS), there may be several applicable UUIDs for
-   * a given volume: the partition UUID, file system UUID, and disk UUID. This
-   * will be the "volume" UUID.
-   *
-   * This value is present for some local volumes, if the operating system
-   * exposes it. This value is never present for network volumes.
    */
   uuid?: string;
   /**
@@ -76,51 +76,65 @@ export interface VolumeMetadata {
   status?: string;
 }
 
-const isLinux = process.platform === "linux";
-const isWindows = process.platform === "win32";
+/**
+ * List all active local and remote mount points on the system
+ *
+ * @param overrides Optional filesystem operation settings to override default values
+ */
+export async function getVolumeMountPoints(
+  overrides: Partial<FsOptions> = {},
+): Promise<string[]> {
+  const o = options(overrides);
 
-async function getUnixMountPoints(): Promise<string[]> {
+  return thenOrTimeout(
+    isWindows ? getWindowsMountPoints(o) : getUnixMountPoints(o),
+    { timeoutMs: o.timeoutMs, desc: "getVolumeMountPoints()" },
+  );
+}
+
+async function getWindowsMountPoints(options: FsOptions) {
+  const arr = await native.getVolumeMountPoints();
+  return filterMountPoints(arr, options);
+}
+
+async function getUnixMountPoints(options: FsOptions) {
   const arr = (await (isLinux
     ? getLinuxMountPoints()
     : native.getVolumeMountPoints())) as TypedMountPoint[];
-  return filterTypedMountPoints(arr).map((ea) => ea.mountPoint);
-}
-
-/**
- * List all active local and remote mount points on the system
- */
-export async function getVolumeMountPoints(
-  config = getConfig(),
-): Promise<string[]> {
-  const arr: string[] = await (isWindows
-    ? native.getVolumeMountPoints()
-    : getUnixMountPoints());
-  return filterMountPoints(arr, config);
+  return (await filterTypedMountPoints(arr, options)).map(
+    (ea) => ea.mountPoint,
+  );
 }
 
 /**
  * Get metadata for the volume at the given mount point.
  *
  * @param mountPoint Must be a non-blank string
+ * @param options Optional filesystem operation settings
  */
 export async function getVolumeMetadata(
   mountPoint: string,
+  overrides: Partial<FsOptions> = {},
 ): Promise<VolumeMetadata> {
-  if (
-    mountPoint == null ||
-    typeof mountPoint !== "string" ||
-    mountPoint.trim().length === 0
-  ) {
-    throw new TypeError("mountPoint is required");
+  if (blank(mountPoint)) {
+    throw new TypeError(
+      "mountPoint is required: got " + JSON.stringify(mountPoint),
+    );
   }
+  return thenOrTimeout(_getVolumeMetadata(mountPoint), {
+    timeoutMs: options(overrides).timeoutMs,
+    desc: "getVolumeMetadata(" + mountPoint + ")",
+  });
+}
 
+async function _getVolumeMetadata(mountPoint: string) {
   try {
     await stat(mountPoint);
   } catch (e) {
     throw new Error(`mountPoint ${mountPoint} is not accessible: ${e}`);
   }
 
-  const result = await native.getVolumeMetadata(mountPoint);
+  const result: VolumeMetadata = await native.getVolumeMetadata(mountPoint);
   result.uuid = extractUUID(result.uuid) ?? result.uuid;
   return result;
 }

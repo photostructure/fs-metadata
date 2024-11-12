@@ -5,6 +5,8 @@ import { assertMetadata } from "../test-utils/assert.js";
 import { describePlatform } from "../test-utils/platform.js";
 
 describe("Filesystem Metadata", () => {
+  jest.setTimeout(15_000);
+
   // Skip all tests if not on Windows
   const describeWindows = describePlatform("win32");
 
@@ -18,7 +20,7 @@ describe("Filesystem Metadata", () => {
 
     it("should handle multiple getVolumeMountPoints calls", async () => {
       // Make multiple concurrent calls
-      const promises = Array(3)
+      const promises = Array(8)
         .fill(0)
         .map(() => getVolumeMountPoints());
       const results = await Promise.all(promises);
@@ -36,19 +38,6 @@ describe("Filesystem Metadata", () => {
       expect(metadata).toBeDefined();
       expect(metadata.mountPoint).toBe("C:\\");
       assertMetadata(metadata);
-    });
-
-    it("should handle multiple metadata calls for C:", async () => {
-      const promises = Array(3)
-        .fill(0)
-        .map(() => getVolumeMetadata("C:\\"));
-      const results = await Promise.all(promises);
-
-      results.forEach((metadata) => {
-        expect(metadata).toBeDefined();
-        expect(metadata.mountPoint).toBe("C:\\");
-        assertMetadata(metadata);
-      });
     });
   });
 

@@ -1,11 +1,9 @@
 // src/windows/fs_meta.cpp
 #include "fs_meta.h"
-
-#include <windows.h>
-
 #include <memory>
 #include <string>
 #include <vector>
+#include <windows.h>
 
 namespace FSMeta {
 
@@ -83,7 +81,7 @@ public:
       }
 
       metadata.size = static_cast<double>(totalBytes.QuadPart);
-      metadata.available = static_cast<double>(totalFreeBytes.QuadPart);
+      metadata.available = static_cast<double>(freeBytes.QuadPart);
       metadata.used = metadata.size - metadata.available;
 
       // Check if drive is remote

@@ -1,7 +1,8 @@
 // src/linux/mtab.ts
 import { readFile } from "node:fs/promises";
-import { decodeOctalEscapes } from "../Octal.js";
-import { TypedMountPoint } from "../TypedMountPoint.js";
+import { WrappedError } from "../error.js";
+import { decodeEscapeSequences } from "../string.js";
+import { TypedMountPoint } from "../typed_mount_point.js";
 
 function hasContent(s: string | undefined | null): s is string {
   return s != null && s.trim().length > 0;
@@ -20,14 +21,13 @@ export async function getLinuxMountPoints(
       const line = ea.trim();
       if (line.length === 0 || line.startsWith("#")) continue;
       const [fstype, mp] = line.split(/\s+/);
-      const mountPoint = decodeOctalEscapes(mp ?? "");
+      const mountPoint = decodeEscapeSequences(mp ?? "");
       if (hasContent(fstype) && hasContent(mountPoint)) {
         result.push({ mountPoint, fstype });
       }
     }
     return result;
   } catch (error) {
-    console.error("Error reading " + input + ":" + error);
-    throw error;
+    throw new WrappedError("Failed to read " + input, error);
   }
 }

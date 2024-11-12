@@ -32,5 +32,8 @@ export default {
       statements: 80
     }
   },
-  verbose: true
+  verbose: true,
+  silent: false,
+  randomize: true,
+  setupFilesAfterEnv: ['jest-extended/all']
 };

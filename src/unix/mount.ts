@@ -2,7 +2,8 @@
 
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { TypedMountPoint } from "../TypedMountPoint.js";
+import { filterTypedMountPoints } from "../config_filters.js";
+import { TypedMountPoint } from "../typed_mount_point.js";
 
 const execAsync = promisify(exec);
 
@@ -25,7 +26,7 @@ export async function execAndParseMount(): Promise<MountPoint[]> {
   try {
     const { stdout } = await execAsync("mount");
 
-    return stdout
+    const arr = stdout
       .trim()
       .split("\n")
       .map((line) => {
@@ -33,7 +34,7 @@ export async function execAndParseMount(): Promise<MountPoint[]> {
           // Linux format: device on path type type (options)
           const regex = /^(.+?) on (.+?) type ([^ ]+) \((.+?)\)$/;
           const match = line.match(regex);
-          if (!match) return null;
+          if (!match) return;
 
           const [, device, mountPoint, type, optionsStr] = match;
           return {
@@ -46,7 +47,7 @@ export async function execAndParseMount(): Promise<MountPoint[]> {
           // macOS format: device on path (type, options)
           const regex = /^(.+?) on (.+?) \(([^,]+?)(,\s*(.+))?\)$/;
           const match = line.match(regex);
-          if (!match) return null;
+          if (!match) return;
 
           const [, device, mountPoint, type, , optionsStr] = match;
           return {
@@ -58,8 +59,8 @@ export async function execAndParseMount(): Promise<MountPoint[]> {
         } else {
           throw new Error("Unsupported platform");
         }
-      })
-      .filter((mount): mount is MountPoint => mount !== null);
+      });
+    return filterTypedMountPoints(arr);
   } catch (error) {
     throw new Error(
       `Failed to get mount points: ${error instanceof Error ? error.message : String(error)}`,

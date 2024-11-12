@@ -1,5 +1,7 @@
 // src/Glob.ts
 
+import { isWindows } from "./platform.js";
+
 /**
  * Compiles an array of glob patterns into a single regular expression.
  *
@@ -57,10 +59,16 @@ export function compileGlob(
       }
 
       // Handle end of directory pattern
-      if (pattern[i] === "/" && i === pattern.length - 1) {
-        regex += "(?:/|$)";
-        i++;
-        continue;
+      if (pattern[i] === "/") {
+        if (i === pattern.length - 1) {
+          regex += "(?:/|$)";
+          i++;
+          continue;
+        } else if (isWindows) {
+          regex += "[\\/\\\\]";
+          i++;
+          continue;
+        }
       }
 
       // Escape other regex special characters

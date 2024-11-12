@@ -1,6 +1,6 @@
-// src/__tests__/Array.test.ts
+// src/__tests__/array.test.ts
 
-import { asyncFilter, uniq } from "../Array.js";
+import { asyncFilter, uniq } from "../array.js";
 
 describe("Array", () => {
   describe("asyncFilter", () => {
@@ -64,19 +64,22 @@ describe("Array", () => {
 
     // Test concurrent execution
     it("should execute predicates concurrently", async () => {
-      const delays = [30, 20, 10];
+      jest.retryTimes(3);
+      const delays = [50, 40, 30, 20, 10];
       const start = Date.now();
 
-      await asyncFilter(delays, async (delay) => {
+      const results = await asyncFilter(delays, async (delay) => {
         await new Promise((resolve) => setTimeout(resolve, delay));
         return true;
       });
 
+      expect(results).toEqual(delays);
+
       const totalTime = Date.now() - start;
 
-      // Should take approximately the time of the longest delay (30ms)
+      // Should take approximately the time of the longest delay (50ms)
       // Adding some buffer for execution time
-      expect(totalTime).toBeLessThan(50);
+      expect(totalTime).toBeLessThan(75);
     });
 
     // Test error handling

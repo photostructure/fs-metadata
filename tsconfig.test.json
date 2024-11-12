@@ -1,7 +1,10 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "types": ["jest", "node"],
+    "types": [
+      "jest",
+      "node"
+    ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "sourceMap": true,
@@ -10,9 +13,13 @@
     "allowJs": true
   },
   "include": [
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts",
-    "src/**/__tests__/**/*.ts"
+    "src/**/*.ts",
+    "global.d.ts"
   ],
-  "exclude": ["node_modules"]
+  "files": [
+    "src/global.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

@@ -7,6 +7,8 @@
 #include <IOKit/IOBSD.h>
 #include <IOKit/storage/IOMedia.h>
 #include <IOKit/storage/IOStorageProtocolCharacteristics.h>
+#include <memory>
+#include <string>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/statvfs.h>
@@ -16,8 +18,9 @@ namespace FSMeta {
 
 // Helper function to convert CFString to std::string
 static std::string CFStringToString(CFStringRef cfString) {
-  if (!cfString)
+  if (!cfString) {
     return "";
+  }
 
   CFIndex length = CFStringGetLength(cfString);
   CFIndex maxSize =
@@ -25,7 +28,7 @@ static std::string CFStringToString(CFStringRef cfString) {
   std::string result(maxSize, '\0');
 
   if (!CFStringGetCString(cfString, &result[0], maxSize,
-                         kCFStringEncodingUTF8)) {
+                          kCFStringEncodingUTF8)) {
     return "";
   }
 
@@ -33,14 +36,28 @@ static std::string CFStringToString(CFStringRef cfString) {
   return result;
 }
 
+// Helper to safely release CF objects
+template <typename T> class CFReleaser {
+  T ref_;
+
+public:
+  explicit CFReleaser(T ref) : ref_(ref) {}
+  ~CFReleaser() {
+    if (ref_)
+      CFRelease(ref_);
+  }
+  operator T() const { return ref_; }
+  T get() const { return ref_; }
+};
+
 class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
 public:
-  GetVolumeMountPointsWorker(const Napi::Promise::Deferred& deferred)
+  GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred)
       : Napi::AsyncWorker(deferred.Env()), deferred_(deferred) {}
 
   void Execute() override {
     try {
-      struct statfs* mntbufp;
+      struct statfs *mntbufp;
       int count = getmntinfo(&mntbufp, MNT_WAIT);
 
       if (count <= 0) {
@@ -53,7 +70,7 @@ public:
         point.fsType = mntbufp[i].f_fstypename;
         mountPoints.push_back(point);
       }
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
       SetError(e.what());
     }
   }
@@ -72,7 +89,7 @@ public:
     deferred_.Resolve(result);
   }
 
-  void OnError(const Napi::Error& error) override {
+  void OnError(const Napi::Error &error) override {
     deferred_.Reject(error.Value());
   }
 
@@ -87,10 +104,9 @@ private:
 
 class GetVolumeMetadataWorker : public Napi::AsyncWorker {
 public:
-  GetVolumeMetadataWorker(const std::string& path,
-                         const Napi::Promise::Deferred& deferred)
-      : Napi::AsyncWorker(deferred.Env()),
-        mountPoint(path),
+  GetVolumeMetadataWorker(const std::string &path,
+                          const Napi::Promise::Deferred &deferred)
+      : Napi::AsyncWorker(deferred.Env()), mountPoint(path),
         deferred_(deferred) {}
 
   void Execute() override {
@@ -108,24 +124,42 @@ public:
         throw std::runtime_error("Failed to get file system information");
       }
 
-      // Store basic volume information
+      // Calculate sizes using uint64_t to prevent overflow
+      uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
+
+      // Calculate total size first
+      metadata.size =
+          static_cast<double>(blockSize) * static_cast<double>(vfs.f_blocks);
+
+      // Calculate available space
+      metadata.available =
+          static_cast<double>(blockSize) * static_cast<double>(vfs.f_bavail);
+
+      // Calculate used space as the difference between total and free
+      double totalFree =
+          static_cast<double>(blockSize) * static_cast<double>(vfs.f_bfree);
+      metadata.used = metadata.size - totalFree;
+
+      // Sanity check to ensure used + available <= size
+      if (metadata.used + metadata.available > metadata.size) {
+        metadata.used = metadata.size - metadata.available;
+      }
+
+      // Store filesystem type
       metadata.fileSystem = fs.f_fstypename;
-      metadata.size = static_cast<double>(vfs.f_blocks) * vfs.f_frsize;
-      metadata.used = static_cast<double>(vfs.f_blocks - vfs.f_bfree) * vfs.f_frsize;
-      metadata.available = static_cast<double>(vfs.f_bavail) * vfs.f_frsize;
 
       // Get additional information using DiskArbitration framework
-      DASessionRef session = DASessionCreate(kCFAllocatorDefault);
-      if (!session) {
+      CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
+      if (!session.get()) {
         throw std::runtime_error("Failed to create DiskArbitration session");
       }
 
-      DADiskRef disk =
-          DADiskCreateFromBSDName(kCFAllocatorDefault, session, fs.f_mntfromname);
-      
-      if (disk) {
-        CFDictionaryRef description = DADiskCopyDescription(disk);
-        if (description) {
+      CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
+          kCFAllocatorDefault, session, fs.f_mntfromname));
+
+      if (disk.get()) {
+        CFReleaser<CFDictionaryRef> description(DADiskCopyDescription(disk));
+        if (description.get()) {
           // Get volume name/label
           CFStringRef volumeName = (CFStringRef)CFDictionaryGetValue(
               description, kDADiskDescriptionVolumeNameKey);
@@ -137,10 +171,10 @@ public:
           CFUUIDRef uuid = (CFUUIDRef)CFDictionaryGetValue(
               description, kDADiskDescriptionVolumeUUIDKey);
           if (uuid) {
-            CFStringRef uuidString = CFUUIDCreateString(kCFAllocatorDefault, uuid);
-            if (uuidString) {
+            CFReleaser<CFStringRef> uuidString(
+                CFUUIDCreateString(kCFAllocatorDefault, uuid));
+            if (uuidString.get()) {
               metadata.uuid = CFStringToString(uuidString);
-              CFRelease(uuidString);
             }
           }
 
@@ -161,30 +195,26 @@ public:
                 // Parse URL for host and share info
                 size_t hostStart = urlStr.find("//") + 2;
                 size_t hostEnd = urlStr.find('/', hostStart);
-                if (hostStart != std::string::npos && hostEnd != std::string::npos) {
-                  metadata.remoteHost = urlStr.substr(hostStart, hostEnd - hostStart);
+                if (hostStart != std::string::npos &&
+                    hostEnd != std::string::npos) {
+                  metadata.remoteHost =
+                      urlStr.substr(hostStart, hostEnd - hostStart);
                   metadata.remoteShare = urlStr.substr(hostEnd + 1);
                 }
               }
             }
           }
-
-          CFRelease(description);
         }
-        CFRelease(disk);
       }
-
-      CFRelease(session);
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
       SetError(e.what());
     }
   }
 
   void OnOK() override {
     Napi::HandleScope scope(Env());
-    Napi::Object result = Napi::Object::New(Env());
 
-    // Set all the metadata properties
+    Napi::Object result = Napi::Object::New(Env());
     result.Set("mountPoint", mountPoint);
     result.Set("fileSystem", metadata.fileSystem);
     result.Set("size", metadata.size);
@@ -210,7 +240,7 @@ public:
     deferred_.Resolve(result);
   }
 
-  void OnError(const Napi::Error& error) override {
+  void OnError(const Napi::Error &error) override {
     deferred_.Reject(error.Value());
   }
 
@@ -230,17 +260,16 @@ private:
   } metadata;
 };
 
-
 Napi::Value GetVolumeMountPoints(Napi::Env env) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto* worker = new GetVolumeMountPointsWorker(deferred);
+  auto *worker = new GetVolumeMountPointsWorker(deferred);
   worker->Queue();
   return deferred.Promise();
 }
 
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string& mountPoint) {
+Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto* worker = new GetVolumeMetadataWorker(mountPoint, deferred);
+  auto *worker = new GetVolumeMetadataWorker(mountPoint, deferred);
   worker->Queue();
   return deferred.Promise();
 }

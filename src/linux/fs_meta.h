@@ -2,36 +2,34 @@
 #pragma once
 #include <napi.h>
 #include <string>
-#include <vector>
 
 namespace FSMeta {
 
 class GetVolumeMetadataWorker : public Napi::AsyncWorker {
 public:
-  GetVolumeMetadataWorker(const std::string& path, const Napi::Promise::Deferred& deferred);
+  GetVolumeMetadataWorker(const std::string &path,
+                          const Napi::Promise::Deferred &deferred);
   void Execute() override;
   void OnOK() override;
 
 private:
-  struct VolumeMetadata {
+  std::string mountPoint;
+  Napi::Promise::Deferred deferred_;
+  struct {
     std::string fileSystem;
     std::string label;
     std::string uuid;
     std::string remoteHost;
     std::string remoteShare;
-    uint64_t size;
-    uint64_t used;
-    uint64_t available;
-    bool remote;
-    bool ok;
     std::string status;
-  };
-
-  std::string mountPoint;
-  VolumeMetadata metadata;
-  Napi::Promise::Deferred deferred_;
+    double size;
+    double used;
+    double available;
+    bool remote = false;
+    bool ok = true;
+  } metadata;
 };
 
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string& mountPoint);
+Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint);
 
 } // namespace FSMeta
