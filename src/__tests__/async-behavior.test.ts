@@ -46,10 +46,12 @@ describe("Filesystem API Async Behavior", () => {
       // not thread-safe.
       const inputs = shuffle([
         ...times(2, () => expectedMountPoint),
-        ...times(2, () =>
-          isWindows
-            ? randomChar() + ":\\"
-            : pickRandom(["/mnt", "/media", "/run", "/var"]), // /tmp made it flaky on wsl
+        ...times(
+          2,
+          () =>
+            isWindows
+              ? randomChar() + ":\\"
+              : pickRandom(["/mnt", "/media", "/run", "/nonexistent"]), // /tmp made it flaky on wsl, /var was flaky on GHA ubuntu
         ),
         ...times(2, () => pickRandom(mountPoints)),
       ]);

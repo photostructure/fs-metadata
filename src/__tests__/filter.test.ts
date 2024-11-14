@@ -13,12 +13,22 @@ jest.mock("node:fs/promises", () => ({
 
 const mockStat = stat as jest.MockedFunction<typeof stat>;
 
+const MockDirectoryStatResult = Promise.resolve({
+  isDirectory: () => true,
+} as any);
+
+const NonExistentPath = "/nonexistent";
+
 describe("filter", () => {
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks();
     // By default, make all paths exist
-    mockStat.mockResolvedValue({} as any);
+    mockStat.mockImplementation((path) => {
+      return path === NonExistentPath
+        ? Promise.reject(new Error("ENOENT"))
+        : MockDirectoryStatResult;
+    });
   });
 
   describe("filterMountPoints", () => {
@@ -71,19 +81,10 @@ describe("filter", () => {
 
     it("should filter out non-existent paths", async () => {
       // Make some paths "not exist"
-      mockStat.mockImplementation((path) => {
-        if (path === "/nonexistent") {
-          return Promise.reject(new Error("ENOENT"));
-        }
-        return Promise.resolve({} as any);
-      });
-
       const input = ["/", "/nonexistent", "/home"];
       const result = await filterMountPoints(input);
 
-      expect(result).not.toContain("/nonexistent");
-      expect(result).toContain("/");
-      expect(result).toContain("/home");
+      expect(result).toEqual(["/", "/home"]);
     });
   });
 
@@ -97,8 +98,7 @@ describe("filter", () => {
         { mountPoint: "/sys", fstype: "sysfs" },
       ];
 
-      const result = await filterTypedMountPoints(input);
-      const resultPoints = result.map((mp) => mp.mountPoint);
+      const resultPoints = await filterTypedMountPoints(input);
 
       expect(resultPoints).toContain("/");
       expect(resultPoints).toContain("/home");
@@ -116,9 +116,7 @@ describe("filter", () => {
 
       const result = await filterTypedMountPoints(input);
 
-      expect(result).toContainEqual({ mountPoint: "/", fstype: "ext4" });
-      expect(result).toContainEqual({ mountPoint: "/home", fstype: "ext4" });
-      expect(result).toHaveLength(2);
+      expect(result).toEqual(["/", "/home"]);
     });
 
     it("should respect empty options", async () => {
@@ -132,7 +130,7 @@ describe("filter", () => {
         excludedFileSystemTypes: [],
         excludedMountPointGlobs: [],
       });
-      expect(result).toEqual(input);
+      expect(result).toEqual(input.map((ea) => ea.mountPoint));
     });
 
     it("should remove duplicates based on mount point", async () => {
@@ -143,10 +141,7 @@ describe("filter", () => {
       ];
 
       const result = await filterTypedMountPoints(input);
-      expect(result).toEqual([
-        { mountPoint: "/", fstype: "ext4" },
-        { mountPoint: "/home", fstype: "ext4" },
-      ]);
+      expect(result).toEqual(["/", "/home"]);
     });
 
     it("should sort results by mount point", async () => {
@@ -157,11 +152,7 @@ describe("filter", () => {
       ];
 
       const result = await filterTypedMountPoints(input);
-      expect(result).toEqual([
-        { mountPoint: "/", fstype: "ext4" },
-        { mountPoint: "/home", fstype: "ext4" },
-        { mountPoint: "/usr", fstype: "ext4" },
-      ]);
+      expect(result).toEqual(["/", "/home", "/usr"]);
     });
 
     it("should handle custom options", async () => {
@@ -176,30 +167,19 @@ describe("filter", () => {
         excludedMountPointGlobs: ["/mnt/**"],
       });
 
-      expect(result).toEqual([{ mountPoint: "/", fstype: "ext4" }]);
+      expect(result).toEqual(["/"]);
     });
 
     it("should filter out non-existent paths", async () => {
-      const nonExistentPath = "/nonexistent";
-      mockStat.mockImplementation((path) => {
-        if (path === nonExistentPath) {
-          return Promise.reject(new Error("ENOENT"));
-        }
-        return Promise.resolve({} as any);
-      });
-
       const input = [
         { mountPoint: "/", fstype: "ext4" },
-        { mountPoint: nonExistentPath, fstype: "ext4" },
+        { mountPoint: NonExistentPath, fstype: "ext4" },
         { mountPoint: "/home", fstype: "ext4" },
       ];
 
       const result = await filterTypedMountPoints(input);
 
-      expect(result).toEqual([
-        { mountPoint: "/", fstype: "ext4" },
-        { mountPoint: "/home", fstype: "ext4" },
-      ]);
+      expect(result).toEqual(["/", "/home"]);
     });
   });
 });

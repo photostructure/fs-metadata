@@ -5,6 +5,9 @@ import { isWindows } from "./platform.js";
 
 /**
  * Configuration options for filesystem operations.
+ *
+ * @see {@link options} for creating an options object with default values
+ * @see {@link FsOptionsDefault} for the default values
  */
 export interface FsOptions {
   /**
@@ -33,6 +36,11 @@ export interface FsOptions {
    * Default values exclude common system directories.
    */
   excludedMountPointGlobs: string[];
+
+  /**
+   * Should only readable directories be included?
+   */
+  onlyDirectories: boolean;
 }
 
 /**
@@ -77,8 +85,21 @@ export const ExcludedMountPointGlobsDefault = Object.freeze([
   "/sys/**",
 ]) as string[];
 
+export const OnlyDirectoriesDefault = true;
+
 /**
- * Create an {@link FsOptions} object with default values.
+ * Default {@link FsOptions} object.
+ */
+export const FsOptionsDefault: FsOptions = Object.freeze({
+  timeoutMs: TimeoutMsDefault,
+  excludedFileSystemTypes: ExcludedFileSystemTypesDefault,
+  excludedMountPointGlobs: ExcludedMountPointGlobsDefault,
+  onlyDirectories: OnlyDirectoriesDefault,
+});
+
+/**
+ * Create an {@link FsOptions} object using default values from
+ * {@link FsOptionsDefault} for missing fields.
  */
 export function options(overrides: Partial<FsOptions> = {}): FsOptions {
   if (!isObject(overrides)) {
@@ -92,9 +113,7 @@ export function options(overrides: Partial<FsOptions> = {}): FsOptions {
 
   return {
     // windows is slower, so give it more time by default.
-    timeoutMs: TimeoutMsDefault,
-    excludedFileSystemTypes: ExcludedFileSystemTypesDefault,
-    excludedMountPointGlobs: ExcludedMountPointGlobsDefault,
+    ...FsOptionsDefault,
     ...overrides,
   };
 }

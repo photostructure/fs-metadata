@@ -2,7 +2,6 @@
 
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { filterTypedMountPoints } from "../config_filters.js";
 import { TypedMountPoint } from "../typed_mount_point.js";
 
 const execAsync = promisify(exec);
@@ -18,7 +17,9 @@ const isDarwin = process.platform === "darwin";
 /**
  * Gets the list of mount points using the `mount` command
  *
- * Only for Linux and macOS. Included only for tests: use `getVolumeMountPoints` instead.
+ * Only for Linux and macOS.
+ *
+ * Included only for tests: use {@link getVolumeMountPoints} instead.
  */
 export async function execAndParseMount(): Promise<MountPoint[]> {
   if (!isLinux && !isDarwin) throw new Error("Unsupported platform");
@@ -60,7 +61,7 @@ export async function execAndParseMount(): Promise<MountPoint[]> {
           throw new Error("Unsupported platform");
         }
       });
-    return filterTypedMountPoints(arr);
+    return arr.filter((ea) => ea != null);
   } catch (error) {
     throw new Error(
       `Failed to get mount points: ${error instanceof Error ? error.message : String(error)}`,

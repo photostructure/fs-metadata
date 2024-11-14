@@ -1,9 +1,9 @@
 // src/config_filters.ts
 
-import { stat } from "node:fs/promises";
-import { asyncFilter, sortByStr, uniq, uniqBy } from "./array.js";
+import { asyncFilter, sortByStr, uniq } from "./array.js";
 import { compileGlob } from "./glob.js";
 import { FsOptions, options } from "./options.js";
+import { isDirectory } from "./stat.js";
 import { TypedMountPoint } from "./typed_mount_point.js";
 
 function notBlank(s: string | undefined | null): boolean {
@@ -16,33 +16,21 @@ function notBlank(s: string | undefined | null): boolean {
 export async function filterTypedMountPoints<T extends TypedMountPoint>(
   arr: (T | undefined)[],
   overrides: Partial<FsOptions> = {},
-): Promise<T[]> {
+): Promise<string[]> {
   const o = options(overrides);
   const excludedMountPoints = compileGlob(o.excludedMountPointGlobs);
   const excludedFsType = compileGlob(o.excludedFileSystemTypes);
-  arr = uniqBy(
-    arr.filter(
-      (mp) =>
-        mp != null &&
-        notBlank(mp.mountPoint) &&
-        !excludedMountPoints.test(mp.mountPoint) &&
-        !excludedFsType.test(mp.fstype),
-    ),
-    (ea) => ea!.mountPoint,
+  const results: T[] = arr.filter(
+    (mp) =>
+      mp != null &&
+      notBlank(mp.mountPoint) &&
+      !excludedMountPoints.test(mp.mountPoint) &&
+      !excludedFsType.test(mp.fstype),
+  ) as T[];
+  return filterMountPoints(
+    results.map((ea) => ea.mountPoint),
+    o,
   );
-  arr = sortByStr(arr, (ea) => ea!.mountPoint);
-  return asyncFilter(arr as T[], (ea) => exists(ea.mountPoint));
-}
-
-/**
- * @return true if `path` exists
- */
-async function exists(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)) != null;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -52,11 +40,13 @@ export async function filterMountPoints(
   mountPoints: string[],
   overrides: Partial<FsOptions> = {},
 ): Promise<string[]> {
-  const excludeRE = compileGlob(options(overrides).excludedMountPointGlobs);
+  const o = options(overrides);
+  const excludeRE = compileGlob(o.excludedMountPointGlobs);
   return asyncFilter(
-    uniq(mountPoints)
-      .sort()
-      .filter((ea) => !excludeRE.test(ea)),
-    exists,
+    sortByStr(
+      uniq(mountPoints.filter((ea) => !excludeRE.test(ea))),
+      (ea) => ea,
+    ),
+    isDirectory,
   );
 }

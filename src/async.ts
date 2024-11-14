@@ -73,7 +73,7 @@ export function thenOrTimeout<T>(
     promise
       .then((result) => {
         // if the event loop is blocked the timeout may have been starved. This
-        // should only happen in extreme cases and tests. 
+        // should only happen in extreme cases and tests.
         if (Date.now() >= timeoutAt) {
           throw err;
         } else {
