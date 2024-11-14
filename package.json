@@ -49,7 +49,7 @@
     "test:debug": "node --inspect-brk jest --runInBand",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "fmt": "prettier --write \"src/**/*.ts\" && npm run fmt:cpp",
+    "fmt": "npm pkg fix && prettier --write \"src/**/*.ts\" && npm run fmt:cpp",
     "fmt:cpp": "clang-format --style=LLVM -i src/*/*.cpp src/*/*.h",
     "prepublishOnly": "npm run test && npm run build",
     "prepack": "npm run build"
