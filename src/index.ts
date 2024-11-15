@@ -72,12 +72,22 @@ export async function getVolumeMetadata(
   mountPoint: string,
   opts: Partial<Pick<FsOptions, "timeoutMs" | "onlyDirectories">> = {},
 ): Promise<VolumeMetadata> {
+  const o = options(opts);
+  return thenOrTimeout(_getVolumeMetadata(mountPoint, o), {
+    timeoutMs: o.timeoutMs,
+    desc: "getVolumeMetadata()",
+  });
+}
+
+async function _getVolumeMetadata(
+  mountPoint: string,
+  o: FsOptions,
+): Promise<VolumeMetadata> {
   if (isBlank(mountPoint)) {
     throw new TypeError(
       "mountPoint is required: got " + JSON.stringify(mountPoint),
     );
   }
-  const o = options(opts);
 
   if (o.onlyDirectories) {
     let s: Stats;
@@ -116,12 +126,9 @@ export async function getVolumeMetadata(
     }
   }
 
-  const metadata = (await thenOrTimeout(
-    native.getVolumeMetadata(mountPoint, o),
-    {
-      timeoutMs: o.timeoutMs,
-      desc: "getVolumeMetadata(" + mountPoint + ")",
-    },
+  const metadata = (await native.getVolumeMetadata(
+    mountPoint,
+    o,
   )) as VolumeMetadata;
 
   return { ...metadata, ...remoteInfo };

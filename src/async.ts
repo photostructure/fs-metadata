@@ -1,4 +1,5 @@
-import { isNumber } from "./number.js";
+import { env } from "node:process";
+import { isNumber, toInt } from "./number.js";
 import { isBlank } from "./string.js";
 
 /**
@@ -69,18 +70,15 @@ export function thenOrTimeout<T>(
     timeoutId = setTimeout(() => reject(err), timeoutMs);
   });
 
+  if (env.NODE_ENV === "test") {
+    const ms = toInt(env.TEST_DELAY);
+    if (ms != null && ms > 0) {
+      promise = delay(ms).then(() => promise);
+    }
+  }
+
   return Promise.race([
-    promise
-      .then((result) => {
-        // if the event loop is blocked the timeout may have been starved. This
-        // should only happen in extreme cases and tests.
-        if (Date.now() >= timeoutAt) {
-          throw err;
-        } else {
-          return result;
-        }
-      })
-      .finally(() => clearTimeout(timeoutId)),
+    promise.finally(() => clearTimeout(timeoutId)),
     timeoutPromise,
   ]);
 }
