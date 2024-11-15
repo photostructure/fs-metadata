@@ -1,3 +1,5 @@
+// src/stat.ts
+
 import { stat } from "node:fs/promises";
 
 /**

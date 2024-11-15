@@ -20,13 +20,14 @@ export async function filterTypedMountPoints<T extends TypedMountPoint>(
   const o = options(overrides);
   const excludedMountPoints = compileGlob(o.excludedMountPointGlobs);
   const excludedFsType = compileGlob(o.excludedFileSystemTypes);
-  const results: T[] = arr.filter(
-    (mp) =>
+  const results: T[] = arr.filter((mp) => {
+    return (
       mp != null &&
       notBlank(mp.mountPoint) &&
       !excludedMountPoints.test(mp.mountPoint) &&
-      !excludedFsType.test(mp.fstype),
-  ) as T[];
+      !excludedFsType.test(mp.fstype)
+    );
+  }) as T[];
   return filterMountPoints(
     results.map((ea) => ea.mountPoint),
     o,
@@ -44,7 +45,11 @@ export async function filterMountPoints(
   const excludeRE = compileGlob(o.excludedMountPointGlobs);
   return asyncFilter(
     sortByStr(
-      uniq(mountPoints.filter((ea) => !excludeRE.test(ea))),
+      uniq(
+        mountPoints.filter((ea) => {
+          return !excludeRE.test(ea);
+        }),
+      ),
       (ea) => ea,
     ),
     isDirectory,

@@ -38,6 +38,11 @@ export interface FsOptions {
   excludedMountPointGlobs: string[];
 
   /**
+   * On Linux, what mount point table should we look at? This defaults to `/proc/mounts`, but `/etc/mtab` is also common.
+   */
+  linuxMountTablePath: string;
+
+  /**
    * Should only readable directories be included?
    */
   onlyDirectories: boolean;
@@ -73,14 +78,16 @@ export const ExcludedFileSystemTypesDefault = Object.freeze([
  * Default excluded mount point globs for {@link FsOptions}.
  */
 export const ExcludedMountPointGlobsDefault = Object.freeze([
+  "/boot",
+  "/boot/efi",
   "/dev",
   "/dev/**",
   "/proc/**",
   "/run",
   "/run/lock",
-  "/run/qemu",
-  "/run/snapd/ns",
-  "/snap",
+  "/run/snapd/**",
+  "/run/user/*/doc",
+  "/run/user/*/gvfs",
   "/snap/**",
   "/sys/**",
 ]) as string[];
@@ -94,6 +101,7 @@ export const FsOptionsDefault: FsOptions = Object.freeze({
   timeoutMs: TimeoutMsDefault,
   excludedFileSystemTypes: ExcludedFileSystemTypesDefault,
   excludedMountPointGlobs: ExcludedMountPointGlobsDefault,
+  linuxMountTablePath: "/proc/mounts",
   onlyDirectories: OnlyDirectoriesDefault,
 });
 

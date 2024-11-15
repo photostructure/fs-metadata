@@ -10,4 +10,4 @@ On macOS:
 
 On Ubuntu/Debian:
 
-    sudo apt-get install clang-format libblkid-dev
+    sudo apt-get install clang-format libglib2.0-dev libblkid-dev uuid-dev

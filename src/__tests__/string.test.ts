@@ -33,7 +33,10 @@ describe("decodeOctalEscapes", () => {
   });
 
   function assertRoundTrip(input: string) {
-    expect(decodeEscapeSequences(encodeEscapeSequences(input))).toEqual(input);
+    const enc = encodeEscapeSequences(input);
+    const dec = decodeEscapeSequences(enc);
+    console.log({ input, enc, dec });
+    expect(dec).toEqual(input);
   }
 
   it("handles the full range of valid octal values", () => {

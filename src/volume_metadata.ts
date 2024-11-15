@@ -1,3 +1,5 @@
+// src/volume_metadata.ts
+
 /**
  * Metadata associated to a volume.
  */

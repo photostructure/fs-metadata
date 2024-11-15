@@ -3,8 +3,12 @@
 /**
  * @return true iff the input is not a string or only has non-whitespace characters
  */
-export function blank(input: unknown): boolean {
+export function isBlank(input: unknown): boolean {
   return typeof input !== "string" || input.trim().length === 0;
+}
+
+export function toNotBlank(input: string): string | undefined {
+  return isBlank(input) ? undefined : input;
 }
 
 function fromCharCode(charCode: number, match: string): string {
@@ -20,7 +24,7 @@ function fromCharCode(charCode: number, match: string): string {
  * @throws Error if an invalid escape sequence is encountered
  */
 export function decodeEscapeSequences(input: string): string {
-  const escapeRegex = /\\(?:([0-7]{2,4})|x([0-9a-fA-F]{2,4}))/g;
+  const escapeRegex = /\\(?:([0-7]{2,6})|x([0-9a-fA-F]{2,4}))/g;
 
   return input.replace(escapeRegex, (match, octal, hex) => {
     // Handle octal escape sequences
@@ -38,20 +42,15 @@ export function decodeEscapeSequences(input: string): string {
   });
 }
 
+const AlphaNumericRE = /[a-z0-9]/gi;
+
 export function encodeEscapeSequences(input: string): string {
   return input
     .split("")
     .map((char) => {
-      const code = char.charCodeAt(0);
-
-      // Keep ASCII characters as-is (0-127 range)
-      if (code < 128) {
-        return char;
-      }
-
-      // Convert to hex and pad with zeros if needed
-      const hex = code.toString(16).toUpperCase();
-      return `\\x${hex.padStart(4, "0")}`;
+      return AlphaNumericRE.test(char)
+        ? char
+        : "\\" + char.charCodeAt(0).toString(8).padStart(2, "0");
     })
     .join("");
 }

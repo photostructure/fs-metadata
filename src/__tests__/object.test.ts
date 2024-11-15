@@ -1,4 +1,4 @@
-// src/__tests__/Object.test.ts
+// src/__tests__/object.test.ts
 
 import { omit, pick } from "../object.js";
 

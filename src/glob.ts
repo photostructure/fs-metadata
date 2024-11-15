@@ -1,4 +1,4 @@
-// src/Glob.ts
+// src/glob.ts
 
 import { isWindows } from "./platform.js";
 

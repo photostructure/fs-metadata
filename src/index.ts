@@ -1,14 +1,19 @@
 // index.ts
 import { Stats } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { WrappedError } from "./error.js";
-import { getLinuxMountPoints } from "./linux/mtab.js";
+import { getLinuxMountPoints } from "./linux/mount_points.js";
+import {
+  isRemoteFS,
+  normalizeLinuxMountPoint,
+  parseMtab,
+  parseRemoteInfo,
+} from "./linux/mtab.js";
 import { FsOptions, options, TimeoutMsDefault } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
-import { blank } from "./string.js";
-import { extractUUID } from "./uuid.js";
+import { isBlank } from "./string.js";
 import { VolumeMetadata } from "./volume_metadata.js";
 
 export {
@@ -67,23 +72,14 @@ export async function getVolumeMetadata(
   mountPoint: string,
   opts: Partial<Pick<FsOptions, "timeoutMs" | "onlyDirectories">> = {},
 ): Promise<VolumeMetadata> {
-  if (blank(mountPoint)) {
+  if (isBlank(mountPoint)) {
     throw new TypeError(
       "mountPoint is required: got " + JSON.stringify(mountPoint),
     );
   }
   const o = options(opts);
-  return thenOrTimeout(_getVolumeMetadata(mountPoint, o), {
-    timeoutMs: o.timeoutMs,
-    desc: "getVolumeMetadata(" + mountPoint + ")",
-  });
-}
 
-async function _getVolumeMetadata(
-  mountPoint: string,
-  opts: Pick<FsOptions, "onlyDirectories">,
-): Promise<VolumeMetadata> {
-  if (opts.onlyDirectories) {
+  if (o.onlyDirectories) {
     let s: Stats;
     try {
       s = await stat(mountPoint);
@@ -94,7 +90,39 @@ async function _getVolumeMetadata(
       throw new TypeError(`mountPoint ${mountPoint} is not a directory`);
     }
   }
-  const result: VolumeMetadata = await native.getVolumeMetadata(mountPoint);
-  result.uuid = extractUUID(result.uuid) ?? result.uuid;
-  return result;
+
+  // Get filesystem info from mtab first on Linux
+  const remoteInfo: Partial<VolumeMetadata> = {};
+
+  if (isLinux) {
+    try {
+      mountPoint = normalizeLinuxMountPoint(mountPoint);
+      const mtab = await readFile(o.linuxMountTablePath, "utf8");
+      const entries = parseMtab(mtab);
+      const entry = entries.find((e) => e.fs_file === mountPoint);
+
+      if (entry != null && !isBlank(entry.fs_spec)) {
+        (o as any).device = entry.fs_spec;
+        remoteInfo.fileSystem = entry.fs_vfstype;
+        if (isRemoteFS(entry.fs_vfstype)) {
+          remoteInfo.remote = true;
+          const { host, share } = parseRemoteInfo(entry.fs_spec);
+          remoteInfo.remoteHost = host;
+          remoteInfo.remoteShare = share;
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to read mount table:", error);
+    }
+  }
+
+  const metadata = (await thenOrTimeout(
+    native.getVolumeMetadata(mountPoint, o),
+    {
+      timeoutMs: o.timeoutMs,
+      desc: "getVolumeMetadata(" + mountPoint + ")",
+    },
+  )) as VolumeMetadata;
+
+  return { ...metadata, ...remoteInfo };
 }

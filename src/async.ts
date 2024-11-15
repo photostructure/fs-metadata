@@ -1,5 +1,5 @@
 import { isNumber } from "./number.js";
-import { blank } from "./string.js";
+import { isBlank } from "./string.js";
 
 /**
  * An error that is thrown when a promise does not resolve within the specified
@@ -37,7 +37,7 @@ export function thenOrTimeout<T>(
 ): Promise<T> {
   let timeoutId: NodeJS.Timeout;
 
-  const desc = blank(opts.desc) ? "thenOrTimeout()" : opts.desc;
+  const desc = isBlank(opts.desc) ? "thenOrTimeout()" : opts.desc;
 
   if (!isNumber(opts.timeoutMs)) {
     throw new TypeError(
