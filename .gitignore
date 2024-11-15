@@ -17,6 +17,7 @@ build/
 compiled/
 stage/
 *.node
+config.gypi
 
 # IDE files
 .vscode/
