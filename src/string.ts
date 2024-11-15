@@ -42,15 +42,16 @@ export function decodeEscapeSequences(input: string): string {
   });
 }
 
-const AlphaNumericRE = /[a-z0-9]/gi;
+const AlphaNumericRE = /[a-z0-9.-_]/i;
 
 export function encodeEscapeSequences(input: string): string {
   return input
     .split("")
     .map((char) => {
-      return AlphaNumericRE.test(char)
+      const encodedChar = AlphaNumericRE.test(char)
         ? char
         : "\\" + char.charCodeAt(0).toString(8).padStart(2, "0");
+      return encodedChar;
     })
     .join("");
 }
