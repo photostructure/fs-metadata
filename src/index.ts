@@ -134,6 +134,6 @@ async function _getVolumeMetadata(
 
   const result = { ...metadata, ...remoteInfo };
   result.uuid = extractUUID(result.uuid) ?? result.uuid;
-  
+
   return result;
 }
