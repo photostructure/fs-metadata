@@ -49,6 +49,7 @@
     "test": "run-s test:*",
     "test:jest": "jest",
     "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc node_modules/jest/bin/jest.js src/__tests__/memory.test.ts",
+    "it": "npm run install && npm run test",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "fmt": "run-p fmt:*",
