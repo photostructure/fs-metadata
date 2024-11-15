@@ -70,6 +70,205 @@ API documentation is available:
   ```bash
   npm run docs
   ```
+  
+## Platform-Specific Behaviors
+
+This document details the behavior differences between Windows, macOS, and Linux when using the filesystem metadata library.
+
+### Mount Points
+
+#### Windows
+
+- Mount points are drive letters with trailing backslash (e.g., `C:\`, `D:\`)
+- Network shares appear as mounted drives with UNC paths
+- Volume GUIDs are available through Windows API
+- Hidden and system volumes may be included
+
+#### macOS
+
+- Uses forward slashes for paths (e.g., `/`, `/Users`)
+- Network shares mounted at `/Volumes/`
+- APFS and HFS+ filesystems supported
+- Volume UUIDs available through DiskArbitration framework
+- Time Machine volumes detected and handled appropriately
+
+#### Linux
+
+- Uses forward slashes for paths (e.g., `/`, `/home`)
+- Network mounts (NFS/CIFS) handled through mount table
+- Multiple mount tables supported (`/proc/mounts`, `/etc/mtab`)
+- UUID detection via libblkid
+- Optional GIO support for additional mount detection
+
+### Volume Metadata
+
+#### Windows
+
+- Size information from GetDiskFreeSpaceEx
+- Volume information (label, filesystem) from GetVolumeInformation
+- Remote status from GetDriveType
+- UNC path parsing for network shares
+
+#### macOS
+
+- Size calculations via statvfs
+- Volume details through DiskArbitration framework
+- Network share detection via volume characteristics
+- Time Machine volume detection
+
+#### Linux
+
+- Size information from statvfs
+- Filesystem type from mount table
+- Block device metadata via libblkid
+- Network filesystem detection from mount options
+- Optional GIO integration for additional metadata
+
+### Filesystem Types
+
+#### Windows
+
+- NTFS
+- FAT32
+- exFAT
+- ReFS
+- Network shares (CIFS/SMB)
+
+#### macOS
+
+- APFS (default since macOS High Sierra)
+- HFS+ (legacy)
+- FAT32
+- exFAT
+- Network shares (AFP, SMB, NFS)
+
+#### Linux
+
+- ext2/3/4
+- XFS
+- Btrfs
+- ZFS
+- Network filesystems (NFS, CIFS)
+- Pseudo filesystems (procfs, sysfs) - excluded by default
+
+### Default Excluded Mount Points
+
+#### Windows
+
+- None by default
+
+#### macOS
+
+- `/dev`
+- `/dev/fd`
+- System volume internal mounts
+
+#### Linux
+
+- `/proc`
+- `/sys`
+- `/dev`
+- `/run`
+- Snap mounts
+- Other virtual filesystems
+
+### Network Share Metadata
+
+#### Windows
+
+- UNC paths parsed for host/share information
+- SMB/CIFS protocol support
+- Network status via GetDriveType
+
+#### macOS
+
+- AFP and SMB protocol support
+- Network status via volume characteristics
+- Host/share parsing from mount URLs
+
+#### Linux
+
+- NFS and CIFS support
+- Network detection from filesystem type
+- Remote info parsed from mount spec
+
+### Performance Considerations
+
+#### Windows
+
+- Default timeout: 15 seconds
+- Longer timeouts needed for network operations
+- Drive letter enumeration is fast
+- Volume metadata queries may block
+
+#### macOS
+
+- Default timeout: 5 seconds
+- DiskArbitration queries are generally fast
+- Network volume operations may be slow
+
+#### Linux
+
+- Default timeout: 5 seconds
+- Mount table parsing is fast
+- Block device operations may block
+- GIO operations are asynchronous
+
+### Error Handling
+
+#### Windows
+
+- Access denied errors for restricted volumes
+- Network timeout errors for disconnected shares
+- Invalid drive letter errors
+
+#### macOS
+
+- DiskArbitration framework errors
+- Network disconnection handling
+- Volume unmount detection
+
+#### Linux
+
+- Mount table parsing errors
+- Block device access errors
+- GIO operation failures
+- Network filesystem timeouts
+
+### Configuration Options
+
+Common options across platforms:
+
+- Timeout duration
+- Excluded mount point patterns
+- Directory-only filter
+
+Platform-specific options:
+
+- Linux: Mount table path selection
+- Linux: GIO support enable/disable
+- Windows: Network share handling
+- macOS: Time Machine volume handling
+
+### Recommendations
+
+#### Windows
+
+- Use default timeout (15s) for network shares
+- Handle access denied errors gracefully
+- Check drive type before operations
+
+#### macOS
+
+- Monitor volume mount/unmount notifications
+- Handle Time Machine volumes appropriately
+- Check network status before operations
+
+#### Linux
+
+- Use default mount table when possible
+- Enable GIO support if available
+- Handle remote filesystem timeouts
 
 ## Building from Source
 
@@ -106,9 +305,7 @@ Please make sure to update tests and documentation as appropriate.
 
 ## Development Tools
 
-This project uses various development tools and technologies to maintain high code quality and productivity. During development, we utilized AI-powered code analysis and generation tools, including GitHub Copilot and Claude, as development aids. These tools helped with tasks like code completion, documentation generation, and test coverage. However, all code was reviewed, tested, and validated by a human developer before inclusion in the project.
-
-The core implementation, architecture decisions, and maintenance remain the responsibility of the human development team. If you're interested in contributing, please see our contributing guidelines above.
+This project uses AI-powered tools like GitHub Copilot and Claude to assist with development, but all code is reviewed, tested, and validated by human developers. The core implementation, architecture, and maintenance remain the responsibility of the human development team.
 
 ## Security
 
