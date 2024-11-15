@@ -140,11 +140,10 @@ Napi::Value GetVolumeMountPoints(Napi::Env env) {
   return deferred.Promise();
 }
 
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint) {
+Napi::Value GetVolumeMetadata(const Napi::Env& env, const std::string& mountPoint, const Napi::Object& options) {
   auto deferred = Napi::Promise::Deferred::New(env);
   auto *worker = new GetVolumeMetadataWorker(mountPoint, deferred);
   worker->Queue();
   return deferred.Promise();
 }
-
 } // namespace FSMeta

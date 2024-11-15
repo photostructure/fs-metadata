@@ -14,6 +14,7 @@ import {
 import { FsOptions, options, TimeoutMsDefault } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
 import { isBlank } from "./string.js";
+import { extractUUID } from "./uuid.js";
 import { VolumeMetadata } from "./volume_metadata.js";
 
 export {
@@ -131,5 +132,8 @@ async function _getVolumeMetadata(
     o,
   )) as VolumeMetadata;
 
-  return { ...metadata, ...remoteInfo };
+  const result = { ...metadata, ...remoteInfo };
+  result.uuid = extractUUID(result.uuid) ?? result.uuid;
+  
+  return result;
 }

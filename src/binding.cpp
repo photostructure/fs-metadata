@@ -1,6 +1,12 @@
 #include <napi.h>
 #include <string>
+#if defined(_WIN32)
+#include "windows/fs_meta.h"
+#elif defined(__APPLE__)
+#include "darwin/fs_meta.h"
+#elif defined(__linux__)
 #include "linux/fs_meta.h"
+#endif
 
 namespace {
 
@@ -40,7 +46,21 @@ Napi::Value GetGioMountPoints(const Napi::CallbackInfo& info) {
 }
 #endif
 
+
+#if defined(_WIN32) || defined(__APPLE__)
+Napi::Value GetVolumeMountPoints(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    return FSMeta::GetVolumeMountPoints(env);
+}
+#endif
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+    
+#if defined(_WIN32) || defined(__APPLE__)
+    exports.Set("getVolumeMountPoints",
+        Napi::Function::New(env, GetVolumeMountPoints));
+#endif
+
     exports.Set("getVolumeMetadata", 
         Napi::Function::New(env, GetVolumeMetadata));
 

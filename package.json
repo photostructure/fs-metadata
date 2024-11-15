@@ -32,7 +32,7 @@
   "license": "MIT",
   "scripts": {
     "install": "npm run build:gyp",
-    "clean": "rm -rf dist build",
+    "clean": "rm -rf dist build && node-gyp clean",
     "prebuild": "npm run clean",
     "build": "run-p build:*",
     "prebuild:gyp": "node scripts/configure.js",
@@ -48,7 +48,7 @@
     "pretest": "tsc -p tsconfig.test.json",
     "test": "run-s test:*",
     "test:jest": "jest",
-    "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc ./node_modules/.bin/jest src/__tests__/memory.test.ts",
+    "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc node_modules/jest/bin/jest.js src/__tests__/memory.test.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "fmt": "run-p fmt:*",
