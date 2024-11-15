@@ -53,6 +53,6 @@ std::vector<TypedMountPoint> getGioMountPoints();
 VolumeMetadataOptions parseOptions(const Napi::Object &options);
 
 Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint,
-                             const Napi::Object &options);
+                              const Napi::Object &options);
 
 } // namespace FSMeta

@@ -3,7 +3,12 @@
 import { platform } from "node:os";
 import { sortByStr } from "../array.js";
 import { TimeoutError } from "../async.js";
-import { ExcludedMountPointGlobsDefault, getVolumeMetadata, getVolumeMountPoints, TimeoutMsDefault } from "../index.js";
+import {
+  ExcludedMountPointGlobsDefault,
+  getVolumeMetadata,
+  getVolumeMountPoints,
+  TimeoutMsDefault,
+} from "../index.js";
 import { assertMetadata } from "../test-utils/assert.js";
 
 const isWindows = platform() === "win32";
@@ -33,13 +38,15 @@ describe("Filesystem Metadata", () => {
     });
 
     it("should handle concurrent mountPoint requests", async () => {
-      const promises = Array(8).fill(0).map(() => getVolumeMountPoints(opts));
+      const promises = Array(8)
+        .fill(0)
+        .map(() => getVolumeMountPoints(opts));
       const results = await Promise.all(promises);
 
       results.forEach((mountPoints) => {
         expect(Array.isArray(mountPoints)).toBe(true);
         expect(mountPoints.length).toBeGreaterThan(0);
-        
+
         if (isWindows) {
           expect(mountPoints).toContain("C:\\");
         } else {
@@ -57,7 +64,7 @@ describe("Filesystem Metadata", () => {
     if (!isWindows) {
       it("should exclude pseudo filesystems", async () => {
         const mountPoints = await getVolumeMountPoints(opts);
-        const pseudoFS = isLinux 
+        const pseudoFS = isLinux
           ? ["/proc", "/sys", "/dev/pts"]
           : ["/dev", "/dev/fd"];
 
@@ -78,7 +85,7 @@ describe("Filesystem Metadata", () => {
     it("should get root filesystem metadata", async () => {
       const rootPath = isWindows ? "C:\\" : "/";
       const metadata = await getVolumeMetadata(rootPath, opts);
-      
+
       expect(metadata.mountPoint).toBe(rootPath);
       assertMetadata(metadata);
 
@@ -88,13 +95,17 @@ describe("Filesystem Metadata", () => {
       } else if (isMacOS) {
         expect(metadata.fileSystem?.toLowerCase()).toMatch(/^(apfs|hfs)$/);
       } else if (isLinux) {
-        expect(metadata.fileSystem?.toLowerCase()).toMatch(/^(ext[234]|xfs|btrfs|zfs)$/);
+        expect(metadata.fileSystem?.toLowerCase()).toMatch(
+          /^(ext[234]|xfs|btrfs|zfs)$/,
+        );
       }
     });
 
     it("should handle concurrent metadata requests", async () => {
       const rootPath = isWindows ? "C:\\" : "/";
-      const promises = Array(3).fill(0).map(() => getVolumeMetadata(rootPath, opts));
+      const promises = Array(3)
+        .fill(0)
+        .map(() => getVolumeMetadata(rootPath, opts));
       const results = await Promise.all(promises);
 
       results.forEach((metadata) => {
@@ -106,8 +117,10 @@ describe("Filesystem Metadata", () => {
     if (isMacOS) {
       it("should handle Time Machine volumes if present", async () => {
         const mountPoints = await getVolumeMountPoints(opts);
-        const backupVolumes = mountPoints.filter(mp => 
-          mp.includes("Backups.backupdb") || mp.includes("Time Machine Backups")
+        const backupVolumes = mountPoints.filter(
+          (mp) =>
+            mp.includes("Backups.backupdb") ||
+            mp.includes("Time Machine Backups"),
         );
 
         for (const volume of backupVolumes) {
@@ -119,19 +132,31 @@ describe("Filesystem Metadata", () => {
     }
   });
 
-  describe("Error Handling", () => {
-    it("should reject with timeoutMs=1", async () => {
-      const rootPath = isWindows ? "C:\\" : "/";
-      await expect(getVolumeMountPoints({ timeoutMs: 1 }))
-        .rejects.toThrow(TimeoutError);
-      await expect(getVolumeMetadata(rootPath, { timeoutMs: 1 }))
-        .rejects.toThrow(TimeoutError);
+  describe("Timeout Handling", () => {
+    beforeEach(() => {
+      process.env.TEST_DELAY = "10";
     });
+    afterEach(() => {
+      delete process.env.TEST_DELAY;
+    });
+    it("should throw TimeoutError if timeoutMs=1", async () => {
+      const rootPath = isWindows ? "C:\\" : "/";
+      await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
+        TimeoutError,
+      );
+      await expect(
+        getVolumeMetadata(rootPath, { timeoutMs: 1 }),
+      ).rejects.toThrow(TimeoutError);
+    });
+  });
 
+  describe("Error Handling", () => {
     it("should handle invalid paths appropriately", async () => {
       const invalidPaths = [
         isWindows ? "Z:\\NonExistentPath" : "/nonexistent",
-        isWindows ? "C:\\Really_Invalid_Path_123456789" : "/really/invalid/path/123456789",
+        isWindows
+          ? "C:\\Really_Invalid_Path_123456789"
+          : "/really/invalid/path/123456789",
         "",
         null,
         undefined,
@@ -148,26 +173,30 @@ describe("Filesystem Metadata", () => {
 
     const hasNetworkFS = async () => {
       const metadata = await Promise.all(
-        (await getVolumeMountPoints(opts)).map(mp => getVolumeMetadata(mp, opts))
+        (await getVolumeMountPoints(opts)).map((mp) =>
+          getVolumeMetadata(mp, opts),
+        ),
       );
-      return metadata.some(m => m.remote);
+      return metadata.some((m) => m.remote);
     };
 
     it("should correctly identify network filesystems", async () => {
       if (!(await hasNetworkFS())) {
-        console.log("Skipping network filesystem test - no network mounts found");
+        console.log(
+          "Skipping network filesystem test - no network mounts found",
+        );
         return;
       }
 
       const mountPoints = await getVolumeMountPoints(opts);
       const metadata = await Promise.all(
-        mountPoints.map(mp => getVolumeMetadata(mp, opts))
+        mountPoints.map((mp) => getVolumeMetadata(mp, opts)),
       );
 
-      const networkFS = metadata.filter(m => m.remote);
-      networkFS.forEach(meta => {
+      const networkFS = metadata.filter((m) => m.remote);
+      networkFS.forEach((meta) => {
         expect(meta.remote).toBe(true);
-        
+
         if (meta.remoteHost) {
           expect(typeof meta.remoteHost).toBe("string");
           expect(meta.remoteHost.length).toBeGreaterThan(0);

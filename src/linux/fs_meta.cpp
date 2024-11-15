@@ -45,13 +45,15 @@ void GetVolumeMetadataWorker::Execute() {
   try {
     struct statvfs vfs;
     if (statvfs(mountPoint.c_str(), &vfs) != 0) {
-      throw std::runtime_error(std::string("Failed to get volume statistics: ") + strerror(errno));
+      throw std::runtime_error(
+          std::string("Failed to get volume statistics: ") + strerror(errno));
     }
 
     uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
     metadata.size = static_cast<double>(blockSize) * vfs.f_blocks;
     metadata.available = static_cast<double>(blockSize) * vfs.f_bavail;
-    metadata.used = metadata.size - (static_cast<double>(blockSize) * vfs.f_bfree);
+    metadata.used =
+        metadata.size - (static_cast<double>(blockSize) * vfs.f_bfree);
     metadata.ok = true;
 
 #ifdef ENABLE_GIO
@@ -112,7 +114,7 @@ VolumeMetadataOptions parseOptions(const Napi::Object &options) {
 }
 
 Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint,
-                             const Napi::Object &options) {
+                              const Napi::Object &options) {
   auto deferred = Napi::Promise::Deferred::New(env);
   auto opts = parseOptions(options);
   auto *worker = new GetVolumeMetadataWorker(mountPoint, opts, deferred);
