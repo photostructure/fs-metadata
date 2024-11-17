@@ -1,5 +1,6 @@
 // src/__tests__/filter.test.ts
 
+import { Stats } from "node:fs";
 import { stat } from "node:fs/promises";
 import {
   filterMountPoints,
@@ -15,7 +16,7 @@ const mockStat = stat as jest.MockedFunction<typeof stat>;
 
 const MockDirectoryStatResult = Promise.resolve({
   isDirectory: () => true,
-} as any);
+} as Stats);
 
 const NonExistentPath = "/nonexistent";
 
@@ -81,10 +82,11 @@ describe("filter", () => {
 
     it("should filter out non-existent paths", async () => {
       // Make some paths "not exist"
-      const input = ["/", "/nonexistent", "/home"];
-      const result = await filterMountPoints(input);
-
-      expect(result).toEqual(["/", "/home"]);
+      const input = ["/", "/home", NonExistentPath];
+      expect(await filterMountPoints(input)).toEqual(["/", "/home"]);
+      expect(
+        await filterMountPoints(input, { onlyDirectories: false }),
+      ).toEqual(input);
     });
   });
 
@@ -171,15 +173,13 @@ describe("filter", () => {
     });
 
     it("should filter out non-existent paths", async () => {
-      const input = [
-        { mountPoint: "/", fstype: "ext4" },
-        { mountPoint: NonExistentPath, fstype: "ext4" },
-        { mountPoint: "/home", fstype: "ext4" },
-      ];
-
-      const result = await filterTypedMountPoints(input);
-
-      expect(result).toEqual(["/", "/home"]);
+      expect(
+        await filterTypedMountPoints([
+          { mountPoint: "/", fstype: "ext4" },
+          { mountPoint: NonExistentPath, fstype: "ext4" },
+          { mountPoint: "/home", fstype: "ext4" },
+        ]),
+      ).toEqual(["/", "/home"]);
     });
   });
 });

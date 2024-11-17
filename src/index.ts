@@ -6,14 +6,15 @@ import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { WrappedError } from "./error.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
 import {
-  isRemoteFS,
+  isRemoteFSInfo,
   normalizeLinuxMountPoint,
   parseMtab,
-  parseRemoteInfo,
 } from "./linux/mtab.js";
-import { FsOptions, options, TimeoutMsDefault } from "./options.js";
+import { GetVolumeMetadataOptions, native } from "./load-native.js";
+import { gt0 } from "./number.js";
+import { FsOptions, options } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
-import { isBlank } from "./string.js";
+import { isBlank, isNotBlank } from "./string.js";
 import { extractUUID } from "./uuid.js";
 import { VolumeMetadata } from "./volume_metadata.js";
 
@@ -25,9 +26,6 @@ export {
 } from "./options.js";
 export type { FsOptions } from "./options.js";
 export type { VolumeMetadata } from "./volume_metadata.js";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const native = require("bindings")("node_fs_meta");
 
 /**
  * List all active local and remote mount points on the system.
@@ -103,8 +101,9 @@ async function _getVolumeMetadata(
   }
 
   // Get filesystem info from mtab first on Linux
-  const remoteInfo: Partial<VolumeMetadata> = {};
+  const mtabInfo: Partial<VolumeMetadata> = {};
 
+  let device: string | undefined;
   if (isLinux) {
     try {
       mountPoint = normalizeLinuxMountPoint(mountPoint);
@@ -112,14 +111,12 @@ async function _getVolumeMetadata(
       const entries = parseMtab(mtab);
       const entry = entries.find((e) => e.fs_file === mountPoint);
 
-      if (entry != null && !isBlank(entry.fs_spec)) {
-        (o as any).device = entry.fs_spec;
-        remoteInfo.fileSystem = entry.fs_vfstype;
-        if (isRemoteFS(entry.fs_vfstype)) {
-          remoteInfo.remote = true;
-          const { host, share } = parseRemoteInfo(entry.fs_spec);
-          remoteInfo.remoteHost = host;
-          remoteInfo.remoteShare = share;
+      if (entry != null) {
+        mtabInfo.fileSystem = entry.fs_vfstype;
+        if (isRemoteFSInfo(entry)) {
+          mtabInfo.remote = true;
+          mtabInfo.remoteHost = entry.remoteHost;
+          mtabInfo.remoteShare = entry.remoteShare;
         }
       }
     } catch (error) {
@@ -127,13 +124,24 @@ async function _getVolumeMetadata(
     }
   }
 
+  const nativeOptions: GetVolumeMetadataOptions = {};
+  if (gt0(o.timeoutMs)) {
+    nativeOptions.timeoutMs = o.timeoutMs;
+  }
+  if (isNotBlank(device)) {
+    nativeOptions.device = device;
+  }
   const metadata = (await native.getVolumeMetadata(
     mountPoint,
-    o,
+    nativeOptions,
   )) as VolumeMetadata;
 
-  const result = { ...metadata, ...remoteInfo };
+  const result = { ...mtabInfo, ...metadata };
   result.uuid = extractUUID(result.uuid) ?? result.uuid;
+  if (isNotBlank(result.remoteShare)) {
+    // It's ok to do this on Windows too:
+    result.remoteShare = normalizeLinuxMountPoint(result.remoteShare);
+  }
 
   return result;
 }

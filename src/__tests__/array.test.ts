@@ -1,6 +1,6 @@
 // src/__tests__/array.test.ts
 
-import { asyncFilter, uniq } from "../array.js";
+import { asyncFilter, times, uniq, uniqBy } from "../array.js";
 
 describe("Array", () => {
   describe("asyncFilter", () => {
@@ -114,22 +114,18 @@ describe("Array", () => {
     // Test with an array of numbers
     it("should return unique numbers", () => {
       const numbers = [1, 2, 2, 3, 4, 4, 5];
-      const result = uniq(numbers);
-      expect(result).toEqual([1, 2, 3, 4, 5]);
+      expect(uniq(numbers)).toEqual([1, 2, 3, 4, 5]);
     });
 
     // Test with an array of strings
     it("should return unique strings", () => {
       const strings = ["a", "b", "b", "c", "a"];
-      const result = uniq(strings);
-      expect(result).toEqual(["a", "b", "c"]);
+      expect(uniq(strings)).toEqual(["a", "b", "c"]);
     });
 
     // Test with an empty array
     it("should return an empty array when input is empty", () => {
-      const emptyArray: any[] = [];
-      const result = uniq(emptyArray);
-      expect(result).toEqual([]);
+      expect(uniq([])).toEqual([]);
     });
 
     // Test with an array of objects
@@ -138,15 +134,58 @@ describe("Array", () => {
       const obj2 = { id: 2 };
       const obj3 = obj1;
       const objects = [obj1, obj2, obj3];
-      const result = uniq(objects);
-      expect(result).toEqual([obj1, obj2]);
+      expect(uniq(objects)).toEqual([obj1, obj2]);
     });
 
     // Test with mixed types
     it("should return unique values for mixed types", () => {
       const mixedArray = [1, "a", 1, "b", "a"];
-      const result = uniq(mixedArray);
-      expect(result).toEqual([1, "a", "b"]);
+      expect(uniq(mixedArray)).toEqual([1, "a", "b"]);
+    });
+  });
+
+  // Tests for uniqBy function
+  describe("uniqBy", () => {
+    it("should return unique objects based on key function", () => {
+      const objects = [
+        { id: 1, name: "Alice" },
+        { id: 2, name: "Bob" },
+        { id: 1, name: "Charlie" },
+      ];
+      const uniqueObjects = uniqBy(objects, (item) => item.id);
+      expect(uniqueObjects).toEqual([
+        { id: 1, name: "Alice" },
+        { id: 2, name: "Bob" },
+      ]);
+    });
+
+    it("should handle array of numbers with key function", () => {
+      const numbers = [1.1, 2.2, 1.2, 2.3, 3.3];
+      const uniqueNumbers = uniqBy(numbers, (num) => Math.floor(num));
+      expect(uniqueNumbers).toEqual([1.1, 2.2, 3.3]);
+    });
+
+    it("should return empty array when input is empty", () => {
+      expect(uniqBy([], (item) => item)).toEqual([]);
+    });
+  });
+
+  // Tests for times function
+  describe("times", () => {
+    it("should create an array of specified length with given value", () => {
+      const result = times(5, () => 42);
+      expect(result).toEqual([42, 42, 42, 42, 42]);
+    });
+
+    it("should return empty array when length is 0", () => {
+      const result = times(0, () => "value");
+      expect(result).toEqual([]);
+    });
+
+    it("should handle functions with side effects", () => {
+      let counter = 0;
+      const result = times(3, () => counter++);
+      expect(result).toEqual([0, 1, 2]);
     });
   });
 });

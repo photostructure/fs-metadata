@@ -1,7 +1,6 @@
 // src/__tests__/fs_metadata.test.ts
 
 import { platform } from "node:os";
-import { sortByStr } from "../array.js";
 import { TimeoutError } from "../async.js";
 import {
   ExcludedMountPointGlobsDefault,
@@ -9,6 +8,7 @@ import {
   getVolumeMountPoints,
   TimeoutMsDefault,
 } from "../index.js";
+import { sortByLocale } from "../string.js";
 import { assertMetadata } from "../test-utils/assert.js";
 
 const isWindows = platform() === "win32";
@@ -76,7 +76,7 @@ describe("Filesystem Metadata", () => {
 
     it("should return sorted mount points", async () => {
       const mountPoints = await getVolumeMountPoints(opts);
-      const sorted = sortByStr([...mountPoints], (ea) => ea);
+      const sorted = sortByLocale(mountPoints);
       expect(mountPoints).toEqual(sorted);
     });
   });
@@ -99,6 +99,20 @@ describe("Filesystem Metadata", () => {
           /^(ext[234]|xfs|btrfs|zfs)$/,
         );
       }
+    });
+
+    it("handles non-existant mount points (from native)", async () => {
+      expect(
+        getVolumeMetadata("/nonexistent", {
+          onlyDirectories: false,
+        }),
+      ).rejects.toThrow(/Failed to get volume statistics/);
+    });
+
+    it("handles non-existant mount points (from js)", async () => {
+      expect(getVolumeMetadata("/nonexistent")).rejects.toThrow(
+        /mountPoint .+ is not accessible:/,
+      );
     });
 
     it("should handle concurrent metadata requests", async () => {
@@ -163,7 +177,7 @@ describe("Filesystem Metadata", () => {
       ];
 
       for (const path of invalidPaths) {
-        await expect(getVolumeMetadata(path as any)).rejects.toThrow();
+        await expect(getVolumeMetadata(path as string)).rejects.toThrow();
       }
     });
   });

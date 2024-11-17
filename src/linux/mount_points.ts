@@ -2,13 +2,11 @@
 
 import { readFile } from "node:fs/promises";
 import { WrappedError } from "../error.js";
+import { native } from "../load-native.js";
 import { FsOptions, options } from "../options.js";
 import { toNotBlank } from "../string.js";
 import { isTypedMountPoint, TypedMountPoint } from "../typed_mount_point.js";
 import { parseMtab } from "./mtab.js";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const native = require("bindings")("node_fs_meta");
 
 export async function getLinuxMountPoints(
   opts?: Pick<FsOptions, "linuxMountTablePath">,

@@ -36,16 +36,14 @@ export function thenOrTimeout<T>(
     desc?: string;
   },
 ): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
+  let node_timeout: NodeJS.Timeout;
 
   const desc = isBlank(opts.desc) ? "thenOrTimeout()" : opts.desc;
 
   if (!isNumber(opts.timeoutMs)) {
     throw new TypeError(
       desc +
-        ": Expected timeoutMs to be > 0, but got " +
-        typeof opts.timeoutMs +
-        ": " +
+        ": Expected timeoutMs to be numeric, but got " +
         JSON.stringify(opts.timeoutMs),
     );
   }
@@ -61,13 +59,12 @@ export function thenOrTimeout<T>(
   if (timeoutMs === 0) {
     return promise;
   }
-  const timeoutAt = Date.now() + timeoutMs;
 
   // By creating the error here, we can capture the stack trace up to the caller
   const err = new TimeoutError(`${desc}: timeout after ${timeoutMs}ms`);
 
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(err), timeoutMs);
+    node_timeout = setTimeout(() => reject(err), timeoutMs);
   });
 
   if (env.NODE_ENV === "test") {
@@ -78,7 +75,7 @@ export function thenOrTimeout<T>(
   }
 
   return Promise.race([
-    promise.finally(() => clearTimeout(timeoutId)),
+    promise.finally(() => clearTimeout(node_timeout)),
     timeoutPromise,
   ]);
 }

@@ -11,7 +11,7 @@ function hasGio() {
   try {
     execSync("pkg-config --exists gio-2.0", { stdio: "ignore" });
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -19,10 +19,9 @@ function hasGio() {
 // Create a gyp config file that node-gyp will read
 const config = {
   variables: {
-    "gio_support%": hasGio() ? "true" : "false",
+    "enable_gio%": hasGio() ? "true" : "false",
   },
 };
 
 const payload = JSON.stringify(config, null, 2);
-console.log(payload);
 writeFileSync("config.gypi", payload);

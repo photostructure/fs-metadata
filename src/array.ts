@@ -40,16 +40,6 @@ export function uniqBy<T, K>(arr: T[], keyFn: (item: T) => K): T[] {
 }
 
 /**
- * Sorts an array of elements based on a key function that extracts a string
- * value from each element using {@link String#localeCompare}.
- *
- * @return a new sorted array
- */
-export function sortByStr<T>(arr: T[], keyFn: (item: T) => string): T[] {
-  return arr.slice().sort((a, b) => keyFn(a).localeCompare(keyFn(b)));
-}
-
-/**
  * @return an array of specified length, with each element created by calling
  * the provided function.
  */

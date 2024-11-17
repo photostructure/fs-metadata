@@ -1,20 +1,22 @@
-// src/tsconfig.base.json
-
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "lib": ["es2023"],
+    "module": "node16",
+    "target": "es2022",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "moduleResolution": "node16",
+
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "rootDir": "./src",
-    "composite": true
+    "composite": true,
+    "outDir": "./dist",
+    "types": ["node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/__tests__/*", "**/*.test.ts", "**/*.spec.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
 }

@@ -1,52 +1,130 @@
 // src/linux/mtab.ts
 
+import { isObject } from "../object.js";
 import {
   decodeEscapeSequences,
   encodeEscapeSequences,
   isBlank,
+  isNotBlank,
 } from "../string.js";
 
+/**
+ * Represents an entry in the mount table.
+ */
 export interface MountEntry {
-  fs_spec: string; // device or remote filesystem
-  fs_file: string; // mount point
-  fs_vfstype: string; // filesystem type
-  fs_mntops: string; // mount options
-  fs_freq: number; // dump frequency
-  fs_passno: number; // fsck pass number
+  /**
+   * Device or remote filesystem
+   */
+  fs_spec: string;
+  /**
+   * Mount point
+   */
+  fs_file: string;
+  /**
+   * Filesystem type
+   */
+  fs_vfstype: string;
+  /**
+   * Mount options
+   */
+  fs_mntops: string;
+  /**
+   * Dump frequency
+   */
+  fs_freq: number;
+  /**
+   * fsck pass number
+   */
+  fs_passno: number;
 }
 
-const NETWORK_FS_TYPES = new Set([
-  "nfs",
-  "nfs4",
-  "cifs",
-  "smb",
-  "smbfs",
-  "ncpfs",
-  "afs",
-  "afp",
-  "ftp",
-  "webdav",
-]);
+// const NETWORK_FS_TYPES = new Set([
+//   "9p",
+//   "afp",
+//   "afs",
+//   "beegfs",
+//   "ceph",
+//   "cifs",
+//   "ftp",
+//   "fuse.cephfs",
+//   "fuse.glusterfs",
+//   "fuse.sshfs",
+//   "fuse",
+//   "gfs2",
+//   "glusterfs",
+//   "lustre",
+//   "ncpfs",
+//   "nfs",
+//   "nfs4",
+//   "smb",
+//   "smbfs",
+//   "sshfs",
+//   "webdav",
+// ]);
 
-export function isRemoteFS(fstype: string): boolean {
-  return NETWORK_FS_TYPES.has(fstype.toLowerCase());
+// export function isRemoteFS(fstype: string): boolean {
+//   return NETWORK_FS_TYPES.has(fstype.toLowerCase());
+// }
+
+/**
+ * Represents remote filesystem information.
+ */
+export interface RemoteFSInfo {
+  /**
+   * Protocol used to access the share.
+   */
+  protocol: string;
+  /**
+   * Hostname or IP address.
+   */
+  remoteHost: string;
+  /**
+   * Share name.
+   */
+  remoteShare: string;
 }
 
-export function parseRemoteInfo(device: string): {
-  host?: string;
-  share?: string;
-} {
-  const urlMatch = device.match(/^(\w+):\/\/([^/]+)(?:\/(.+))?$/);
-  if (urlMatch) {
-    return { host: urlMatch[2], share: urlMatch[3] };
+export function isRemoteFSInfo(obj: unknown): obj is RemoteFSInfo {
+  if (!isObject(obj)) return false;
+  const {
+    protocol,
+    remoteHost: hostname,
+    remoteShare: share,
+  } = obj as Partial<RemoteFSInfo>;
+  return isNotBlank(protocol) && isNotBlank(hostname) && isNotBlank(share);
+}
+
+export function parseFsSpec(fsSpec: string): RemoteFSInfo | undefined {
+  // Regular expression patterns for different protocols
+  const patterns = [
+    // CIFS/SMB pattern: //hostname/share
+    {
+      protocol: "cifs",
+      regex: /^\/\/(?<remoteHost>[^/]+)\/(?<remoteShare>.+)$/,
+    },
+    // NFS pattern: hostname:/share
+    {
+      protocol: "nfs",
+      regex: /^(?<remoteHost>[^:]+):\/(?<remoteShare>.+)$/,
+    },
+    // Generic URL pattern: protocol://hostname/share
+    {
+      protocol: "generic",
+      regex: /^(?<protocol>\w+):\/\/(?<remoteHost>[^/]+)\/(?<remoteShare>.+)$/,
+    },
+  ];
+
+  for (const { protocol, regex } of patterns) {
+    const o = {
+      protocol,
+      ...(fsSpec.match(regex)?.groups ?? {}),
+    } as RemoteFSInfo;
+    if (isNotBlank(o.remoteHost) && isNotBlank(o.remoteShare)) {
+      return o;
+    }
   }
 
-  const uncMatch = device.match(/^\/\/([^/]+)(?:\/(.+))?$/);
-  if (uncMatch) {
-    return { host: uncMatch[1], share: uncMatch[2] };
-  }
-
-  return {};
+  return;
 }
 
 /**
@@ -54,8 +132,10 @@ export function parseRemoteInfo(device: string): {
  * @param content - Raw content of the mtab/fstab file
  * @returns Array of parsed mount entries
  */
-export function parseMtab(content: string): MountEntry[] {
-  const entries: MountEntry[] = [];
+export function parseMtab(
+  content: string,
+): (MountEntry | (MountEntry & RemoteFSInfo))[] {
+  const entries: (MountEntry | (MountEntry & RemoteFSInfo))[] = [];
   const lines = content.split("\n");
 
   for (const line of lines) {
@@ -69,18 +149,25 @@ export function parseMtab(content: string): MountEntry[] {
       .match(/(?:[^\s\\]+|\\.)+/g)
       ?.map(decodeEscapeSequences);
 
-    if (!fields || fields.length < 4) {
+    if (!fields || fields.length < 3) {
       continue; // Skip malformed lines
     }
 
-    entries.push({
+    const mountEntry: MountEntry = {
       fs_spec: fields[0],
       fs_file: normalizeLinuxMountPoint(fields[1] ?? ""),
       fs_vfstype: fields[2],
       fs_mntops: fields[3],
       fs_freq: parseInt(fields[4] || "0", 10),
       fs_passno: parseInt(fields[5] || "0", 10),
-    });
+    };
+
+    const remoteInfo = parseFsSpec(mountEntry.fs_spec);
+    if (remoteInfo) {
+      entries.push({ ...mountEntry, ...remoteInfo });
+    } else {
+      entries.push(mountEntry);
+    }
   }
 
   return entries;

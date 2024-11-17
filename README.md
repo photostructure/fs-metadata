@@ -21,9 +21,9 @@ Built and supported by [PhotoStructure](https://photostructure.com).
 - Cross-platform support:
   - Windows (x64, arm64)
   - macOS (x64, arm64)
-  - Linux (x64, arm64)
-- Written in modern TypeScript with full type definitions for both ESM and CommonJS consumers
-- Native async implementation to avoid blocking the event loop
+  - Linux (x64, arm64) (including Gnome GIO/`GVfs` mounts, if available)
+- Written in modern TypeScript with full type definitions
+- Native async implementations to avoid blocking the event loop
 - Promise-based async API
 - Comprehensive test coverage
 
@@ -35,10 +35,11 @@ npm install @photostructure/fs-metadata
 
 ## Usage
 
-### ESM
-
-```typescript
-import { getVolumeMountPoints, getVolumeMetadata } from "@photostructure/fs-metadata";
+```ts
+import {
+  getVolumeMountPoints,
+  getVolumeMetadata,
+} from "@photostructure/fs-metadata";
 
 // List all mounted volumes
 const mountPoints = await getVolumeMountPoints();
@@ -52,14 +53,6 @@ const metadata = await getVolumeMetadata("C:\\"); // Windows
 // const metadata = await getVolumeMetadata('/');
 ```
 
-### CommonJS
-
-```javascript
-const { getVolumeMountPoints, getVolumeMetadata } = require("@photostructure/fs-metadata");
-
-// Usage is the same as ESM
-```
-
 ## Documentation
 
 API documentation is available:
@@ -70,7 +63,19 @@ API documentation is available:
   ```bash
   npm run docs
   ```
-  
+
+## Why no CommonJS/CJS support?
+
+As of November 2024:
+
+- All supported versions of Node.js [consider ESM to be the official standard format](https://nodejs.org/api/esm.html#introduction)
+
+- Electron.js has (supported ESM since version 28.0)[https://www.electronjs.org/docs/latest/tutorial/esm], released December 2024.
+
+- TypeScript ESM support has been stable for more than a year as well.
+
+- If I add CJS support, I have to run the full test matrix twice (which already has macOS, Linux, and Windows for all supported versions of Node.js: 12 pipelines)
+
 ## Platform-Specific Behaviors
 
 This document details the behavior differences between Windows, macOS, and Linux when using the filesystem metadata library.

@@ -1,18 +1,25 @@
 // src/string.ts
 
+export function isString(input: unknown): input is string {
+  return typeof input === "string";
+}
+
+/**
+ * @return true iff the input is a string and has at least one non-whitespace character
+ */
+export function isNotBlank(input: unknown): input is string {
+  return typeof input === "string" && input.trim().length > 0;
+}
+
 /**
  * @return true iff the input is not a string or only has non-whitespace characters
  */
 export function isBlank(input: unknown): boolean {
-  return typeof input !== "string" || input.trim().length === 0;
+  return !isNotBlank(input);
 }
 
 export function toNotBlank(input: string): string | undefined {
-  return isBlank(input) ? undefined : input;
-}
-
-function fromCharCode(charCode: number, match: string): string {
-  return String.fromCharCode(charCode);
+  return isNotBlank(input) ? input : undefined;
 }
 
 /**
@@ -29,12 +36,12 @@ export function decodeEscapeSequences(input: string): string {
   return input.replace(escapeRegex, (match, octal, hex) => {
     // Handle octal escape sequences
     if (octal != null) {
-      return fromCharCode(parseInt(octal, 8), match);
+      return String.fromCharCode(parseInt(octal, 8));
     }
 
     // Handle hexadecimal escape sequences
     if (hex != null) {
-      return fromCharCode(parseInt(hex, 16), match);
+      return String.fromCharCode(parseInt(hex, 16));
     }
 
     // This should never happen due to the regex pattern
@@ -54,4 +61,18 @@ export function encodeEscapeSequences(input: string): string {
       return encodedChar;
     })
     .join("");
+}
+
+/**
+ * Sort an array of strings using the locale-aware collation algorithm.
+ *
+ * @param arr - The array of strings to sort. The original array **is sorted in
+ * place**.
+ */
+export function sortByLocale(
+  arr: string[],
+  locales?: Intl.LocalesArgument,
+  options?: Intl.CollatorOptions,
+): string[] {
+  return arr.sort((a, b) => a.localeCompare(b, locales, options));
 }

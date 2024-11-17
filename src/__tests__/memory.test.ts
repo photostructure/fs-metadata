@@ -24,7 +24,7 @@ describeMemory("Memory Tests", () => {
 
   // Helper to check if memory usage is stable
   async function checkMemoryUsage(
-    operation: () => Promise<any>,
+    operation: () => Promise<unknown>,
     errorMarginBytes: number = 5_000_000,
   ) {
     const initialMemory = getMemoryUsage();
@@ -64,7 +64,7 @@ describeMemory("Memory Tests", () => {
       await checkMemoryUsage(async () => {
         try {
           await getVolumeMountPoints({ timeoutMs: 1 });
-        } catch (e) {
+        } catch {
           // Expected
         }
       });
@@ -85,7 +85,7 @@ describeMemory("Memory Tests", () => {
       await checkMemoryUsage(async () => {
         try {
           await getVolumeMetadata("nonexistent");
-        } catch (e) {
+        } catch {
           // Expected
         }
       });

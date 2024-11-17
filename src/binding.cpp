@@ -1,11 +1,17 @@
+// src/binding.cpp
+
 #include <napi.h>
 #include <string>
+
 #if defined(_WIN32)
 #include "windows/fs_meta.h"
 #elif defined(__APPLE__)
 #include "darwin/fs_meta.h"
 #elif defined(__linux__)
 #include "linux/fs_meta.h"
+#ifdef ENABLE_GIO
+#include "linux/gio_utils.h"
+#endif
 #endif
 
 namespace {
@@ -28,24 +34,9 @@ Napi::Value GetVolumeMetadata(const Napi::CallbackInfo& info) {
 #ifdef ENABLE_GIO
 Napi::Value GetGioMountPoints(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    try {
-        auto mountPoints = FSMeta::getGioMountPoints();
-        auto result = Napi::Array::New(env, mountPoints.size());
-        
-        for (size_t i = 0; i < mountPoints.size(); i++) {
-            auto point = Napi::Object::New(env);
-            point.Set("mountPoint", mountPoints[i].mountPoint);
-            point.Set("fstype", mountPoints[i].fstype);
-            result[i] = point;
-        }
-        
-        return result;
-    } catch (const std::exception& e) {
-        throw Napi::Error::New(env, e.what());
-    }
+    return FSMeta::gio::GetMountPoints(env);
 }
 #endif
-
 
 #if defined(_WIN32) || defined(__APPLE__)
 Napi::Value GetVolumeMountPoints(const Napi::CallbackInfo& info) {

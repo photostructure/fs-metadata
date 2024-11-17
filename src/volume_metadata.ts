@@ -54,4 +54,9 @@ export interface VolumeMetadata {
    * May be set if !ok
    */
   status?: string;
+
+  /**
+   * If remote, the full URI of the resource (like "smb://server/share")
+   */
+  uri?: string;
 }

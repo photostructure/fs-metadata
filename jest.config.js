@@ -1,39 +1,42 @@
+import { env, platform } from "node:process";
+
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 export default {
-  preset: 'ts-jest/presets/default-esm',
-  testEnvironment: 'node',
-  roots: ['<rootDir>/src'],
-  extensionsToTreatAsEsm: ['.ts'],
+  preset: "ts-jest/presets/default-esm",
+  testEnvironment: "node",
+  roots: ["<rootDir>/src"],
+  extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
+    "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   transform: {
-    '^.+\\.tsx?$': [
-      'ts-jest',
+    "^.+\\.tsx?$": [
+      "ts-jest",
       {
         useESM: true,
-        tsconfig: 'tsconfig.test.json'
-      }
-    ]
+        tsconfig: "tsconfig.test.json",
+        compiler: "typescript",
+        compilerOptions: {
+          module: "ES2022",
+        },
+      },
+    ],
   },
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  collectCoverage: false,
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov'],
-  coveragePathIgnorePatterns: [
-    '/__tests__/',
-    '/test-utils/',
-  ],
+  moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  collectCoverage: platform === "linux" && !env.TEST_MEMORY,
+  coverageDirectory: "coverage",
+  coverageReporters: ["text", "lcov"],
+  coveragePathIgnorePatterns: ["/__tests__/", "/test-utils/"],
   coverageThreshold: {
     global: {
       branches: 80,
       functions: 80,
       lines: 80,
-      statements: 80
-    }
+      statements: 80,
+    },
   },
   verbose: true,
   silent: false,
   randomize: true,
-  setupFilesAfterEnv: ['jest-extended/all']
+  setupFilesAfterEnv: ["jest-extended/all"],
 };

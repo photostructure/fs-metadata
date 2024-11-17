@@ -1,54 +1,26 @@
 // src/linux/fs_meta.cpp
 #include "fs_meta.h"
-#include "blkid_cache.h"
-#include <blkid/blkid.h>
-#include <cerrno>
-#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <sys/statvfs.h>
 
+#include "blkid_cache.h"
+
 #ifdef ENABLE_GIO
 #include "gio_utils.h"
-std::vector<FSMeta::TypedMountPoint> FSMeta::getGioMountPoints() {
-  return FSMeta::gio::getMountPoints();
-}
 #endif
 
 namespace FSMeta {
-namespace {
-
-void addBlkidMetadata(const char *device, VolumeMetadata &metadata) {
-  try {
-    BlkidCache cache;
-
-    char *uuid = blkid_get_tag_value(cache.get(), "UUID", device);
-    if (uuid) {
-      metadata.uuid = uuid;
-      free(uuid);
-    }
-
-    char *label = blkid_get_tag_value(cache.get(), "LABEL", device);
-    if (label) {
-      metadata.label = label;
-      free(label);
-    }
-  } catch (const std::exception &e) {
-    metadata.status = std::string("Warning: ") + e.what();
-  }
-}
-
-} // namespace
 
 void GetVolumeMetadataWorker::Execute() {
   try {
     struct statvfs vfs;
     if (statvfs(mountPoint.c_str(), &vfs) != 0) {
-      throw std::runtime_error(
-          std::string("Failed to get volume statistics: ") + strerror(errno));
+      throw std::runtime_error("Failed to get volume statistics");
     }
 
+    // Basic stats are always available
     uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
     metadata.size = static_cast<double>(blockSize) * vfs.f_blocks;
     metadata.available = static_cast<double>(blockSize) * vfs.f_bavail;
@@ -56,13 +28,37 @@ void GetVolumeMetadataWorker::Execute() {
         metadata.size - (static_cast<double>(blockSize) * vfs.f_bfree);
     metadata.ok = true;
 
+// Optional GIO metadata if available
 #ifdef ENABLE_GIO
-    gio::addMountMetadata(mountPoint, metadata);
+    try {
+      gio::addMountMetadata(mountPoint, metadata);
+    } catch (const std::exception &e) {
+      // Log error but continue - GIO metadata is optional
+      metadata.status = std::string("GIO warning: ") + e.what();
+    }
 #endif
 
-    // Add block device metadata if we have a device path
+    // Optional blkid metadata if available
     if (!options_.device.empty()) {
-      addBlkidMetadata(options_.device.c_str(), metadata);
+      try {
+        BlkidCache cache;
+        char *uuid =
+            blkid_get_tag_value(cache.get(), "UUID", options_.device.c_str());
+        if (uuid) {
+          metadata.uuid = uuid;
+          free(uuid);
+        }
+
+        char *label =
+            blkid_get_tag_value(cache.get(), "LABEL", options_.device.c_str());
+        if (label) {
+          metadata.label = label;
+          free(label);
+        }
+      } catch (const std::exception &e) {
+        // Log error but continue - blkid metadata is optional
+        metadata.status = std::string("Blkid warning: ") + e.what();
+      }
     }
 
   } catch (const std::exception &e) {
@@ -89,34 +85,39 @@ void GetVolumeMetadataWorker::OnOK() {
   if (!metadata.status.empty()) {
     result.Set("status", metadata.status);
   }
+  if (metadata.remote) {
+    result.Set("remote", metadata.remote);
+    if (!metadata.remoteHost.empty()) {
+      result.Set("remoteHost", metadata.remoteHost);
+    }
+    if (!metadata.remoteShare.empty()) {
+      result.Set("remoteShare", metadata.remoteShare);
+    }
+  }
+  if (!metadata.uri.empty()) {
+    result.Set("uri", metadata.uri);
+  }
+
+  if (!metadata.fileSystem.empty()) {
+    result.Set("fileSystem", metadata.fileSystem);
+  }
 
   deferred_.Resolve(result);
 }
 
-void GetVolumeMetadataWorker::OnError(const Napi::Error &error) {
-  deferred_.Reject(error.Value());
-}
-
-VolumeMetadataOptions parseOptions(const Napi::Object &options) {
-  VolumeMetadataOptions opts;
-
-  if (options.Has("timeoutMs")) {
-    opts.timeoutMs = options.Get("timeoutMs").As<Napi::Number>().Uint32Value();
-  } else {
-    opts.timeoutMs = 5000;
-  }
-
-  if (options.Has("device")) {
-    opts.device = options.Get("device").As<Napi::String>().Utf8Value();
-  }
-
-  return opts;
-}
-
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint,
+Napi::Value GetVolumeMetadata(const Napi::Env &env,
+                              const std::string &mountPoint,
                               const Napi::Object &options) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto opts = parseOptions(options);
+  VolumeMetadataOptions opts;
+  opts.timeoutMs =
+      options.Has("timeoutMs")
+          ? options.Get("timeoutMs").As<Napi::Number>().Uint32Value()
+          : 5000;
+  opts.device = options.Has("device")
+                    ? options.Get("device").As<Napi::String>().Utf8Value()
+                    : "";
+
   auto *worker = new GetVolumeMetadataWorker(mountPoint, opts, deferred);
   worker->Queue();
   return deferred.Promise();

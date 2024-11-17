@@ -25,7 +25,7 @@ describe("async", () => {
     describe("Input validation", () => {
       it("should throw TypeError for non-number timeout", async () => {
         const promise = Promise.resolve("test");
-        const invalidTimeouts: any[] = [
+        const invalidTimeouts: unknown[] = [
           null,
           undefined,
           "100",
@@ -37,9 +37,12 @@ describe("async", () => {
         ];
 
         for (const timeoutMs of invalidTimeouts) {
-          expect(() => thenOrTimeout(promise, { timeoutMs })).toThrow(
-            TypeError,
-          );
+          expect(() =>
+            thenOrTimeout(promise, {
+              timeoutMs: timeoutMs as number,
+              desc: "timeoutMs: " + JSON.stringify(timeoutMs),
+            }),
+          ).toThrow(TypeError);
         }
       });
 

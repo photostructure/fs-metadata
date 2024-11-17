@@ -7,19 +7,19 @@
 
 namespace FSMeta {
 
-struct TypedMountPoint {
-  std::string mountPoint;
-  std::string fstype;
-};
-
 struct VolumeMetadata {
-  double size;
-  double used;
-  double available;
+  std::string fileSystem;
   std::string label;
   std::string uuid;
   std::string status;
+  std::string remoteHost;
+  std::string remoteShare;
+  std::string uri;
+  double size;
+  double used;
+  double available;
   bool ok = true;
+  bool remote = false;
 };
 
 struct VolumeMetadataOptions {
@@ -37,7 +37,9 @@ public:
 
   void Execute() override;
   void OnOK() override;
-  void OnError(const Napi::Error &error) override;
+  void OnError(const Napi::Error &error) override {
+    deferred_.Reject(error.Value());
+  }
 
 private:
   std::string mountPoint;
@@ -46,13 +48,8 @@ private:
   VolumeMetadata metadata;
 };
 
-#ifdef ENABLE_GIO
-std::vector<TypedMountPoint> getGioMountPoints();
-#endif
-
-VolumeMetadataOptions parseOptions(const Napi::Object &options);
-
-Napi::Value GetVolumeMetadata(Napi::Env env, const std::string &mountPoint,
+Napi::Value GetVolumeMetadata(const Napi::Env &env,
+                              const std::string &mountPoint,
                               const Napi::Object &options);
 
 } // namespace FSMeta
