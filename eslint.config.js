@@ -6,8 +6,8 @@ export default [
   {
     files: ["src/**/*.ts", "scripts/*.js", "*.js"],
     env: {
-      node: true // < enable Node.js global variables like `console`
-    }
+      node: true, // < enable Node.js global variables like `console`
+    },
   },
   { ignores: [".tsup", "build", "coverage", "dist", "docs"] },
   pluginJs.configs.recommended,
