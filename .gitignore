@@ -2,6 +2,10 @@
 logs
 *.log
 
+# package lockfiles
+package-lock.json
+yarn.lock
+
 # Dependency directories
 node_modules/
 

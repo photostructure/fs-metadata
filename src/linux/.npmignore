@@ -1,0 +1,20 @@
+# no hidden files
+.*
+
+# no configs
+*.json
+*.yml
+*.log
+yarn.lock
+package-lock.json
+
+# no testing artifacts
+*spec*
+*test*
+
+# internal use only:
+
+# no directories except for dist and build
+*/
+!build/
+!dist/
