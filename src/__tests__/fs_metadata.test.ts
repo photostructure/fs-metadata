@@ -153,14 +153,16 @@ describe("Filesystem Metadata", () => {
     afterEach(() => {
       delete process.env.TEST_DELAY;
     });
-    it("should throw TimeoutError if timeoutMs=1", async () => {
-      const rootPath = isWindows ? "C:\\" : "/";
-      await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
+    const rootPath = isWindows ? "C:\\" : "/";
+    it("should handle getVolumeMountPoints() timeout", async () => {
+      expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
         TimeoutError,
       );
-      await expect(
-        getVolumeMetadata(rootPath, { timeoutMs: 1 }),
-      ).rejects.toThrow(TimeoutError);
+    });
+    it("should handle getVolumeMetadata() timeout", async () => {
+      expect(getVolumeMetadata(rootPath, { timeoutMs: 1 })).rejects.toThrow(
+        TimeoutError,
+      );
     });
   });
 
