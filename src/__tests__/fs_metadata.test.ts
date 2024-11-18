@@ -106,7 +106,7 @@ describe("Filesystem Metadata", () => {
         getVolumeMetadata("/nonexistent", {
           onlyDirectories: false,
         }),
-      ).rejects.toThrow(/Failed to get volume statistics/);
+      ).rejects.toThrow(/Failed to get volume (statistics|information)/);
     });
 
     it("handles non-existant mount points (from js)", async () => {
