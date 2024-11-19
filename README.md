@@ -65,21 +65,22 @@ API documentation is available:
   npm run docs
   ```
 
-## Why no CommonJS/CJS support?
+## Why no CommonJS support?
 
 As of November 2024:
 
 - All supported versions of Node.js [consider ESM to be the official standard format](https://nodejs.org/api/esm.html#introduction)
 
-- Electron.js has (supported ESM since version 28.0)[https://www.electronjs.org/docs/latest/tutorial/esm], released December 2024.
+- Electron.js has [supported ESM](https://www.electronjs.org/docs/latest/tutorial/esm) for more than a year.
 
-- TypeScript ESM support has been stable for more than a year as well.
+- TypeScript ESM support has been stable for more than a year.
 
-- If I add CJS support, I have to run the full test matrix twice (which already has macOS, Linux, and Windows for all supported versions of Node.js: 12 pipelines)
+- If I add CJS support, I have to figure out and run the full test matrix twice.
 
 ## Platform-Specific Behaviors
 
-This document details the behavior differences between Windows, macOS, and Linux when using the filesystem metadata library.
+This module's results are inherently platform-specific. Here are some things to
+keep in mind:
 
 ### Mount Points
 

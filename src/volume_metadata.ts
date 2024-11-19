@@ -54,9 +54,16 @@ export interface VolumeMetadata {
    * May be set if !ok
    */
   status?: string;
-
   /**
    * If remote, the full URI of the resource (like "smb://server/share")
    */
   uri?: string;
+  /**
+   * On Windows, we may be able to detect if a volume is a system partition
+   */
+  isSystemPartition?: boolean;
+  /**
+   * On Windows, we may be able to detect if a volume is a hidden partition
+   */
+  isHiddenPartition?: boolean;
 }

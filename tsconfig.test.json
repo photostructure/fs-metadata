@@ -1,11 +1,9 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "node16",
     "types": ["jest", "node"],
-    "noEmit": true,
-    "outDir": "./dist/test"
+    "noEmit": true
   },
   "include": ["src/**/*.ts", "global.d.ts"],
   "files": ["src/global.d.ts"],

@@ -1,0 +1,78 @@
+name: Prebuild Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Prebuild on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+        node: [18]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest  
+            platform: win32
+          - os: macos-latest
+            platform: darwin
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Prebuild
+        run: npm run prebuild:all
+        
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: prebuilds-${{ matrix.platform }}
+          path: prebuilds/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: prebuilds
+          
+      - name: Reorganize prebuilds
+        run: |
+          mkdir -p dist/prebuilds
+          cp -r prebuilds/*/* dist/prebuilds/
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

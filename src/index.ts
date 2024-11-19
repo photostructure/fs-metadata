@@ -10,7 +10,8 @@ import {
   normalizeLinuxMountPoint,
   parseMtab,
 } from "./linux/mtab.js";
-import { GetVolumeMetadataOptions, native } from "./load-native.js";
+import { GetVolumeMetadataOptions } from "./native_bindings.js";
+import { native } from "./native_loader.js";
 import { gt0 } from "./number.js";
 import { FsOptions, options } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
@@ -49,13 +50,13 @@ export async function getVolumeMountPoints(
 }
 
 async function getWindowsMountPoints(options: FsOptions) {
-  const arr = await native.getVolumeMountPoints();
+  const arr = await native().getVolumeMountPoints();
   return filterMountPoints(arr, options);
 }
 
 async function getUnixMountPoints(options: FsOptions) {
   return filterTypedMountPoints(
-    await (isLinux ? getLinuxMountPoints() : native.getVolumeMountPoints()),
+    await (isLinux ? getLinuxMountPoints() : native().getVolumeMountPoints()),
     options,
   );
 }
@@ -131,7 +132,7 @@ async function _getVolumeMetadata(
   if (isNotBlank(device)) {
     nativeOptions.device = device;
   }
-  const metadata = (await native.getVolumeMetadata(
+  const metadata = (await native().getVolumeMetadata(
     mountPoint,
     nativeOptions,
   )) as VolumeMetadata;

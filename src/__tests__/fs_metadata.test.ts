@@ -1,5 +1,6 @@
 // src/__tests__/fs_metadata.test.ts
 
+import { jest } from "@jest/globals";
 import { platform } from "node:os";
 import { TimeoutError } from "../async.js";
 import {

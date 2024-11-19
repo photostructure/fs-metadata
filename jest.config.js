@@ -1,14 +1,14 @@
 import { env, platform } from "node:process";
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
-export default {
-  preset: "ts-jest/presets/default-esm",
-  testEnvironment: "node",
+const config = {
+  displayName: "@photostructure/fs-metadata",
+  testEnvironment: "jest-environment-node",
   roots: ["<rootDir>/src"],
-  extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
+  // setupFiles: ["<rootDir>/.jest-setup.mjs"],
   transform: {
     "^.+\\.tsx?$": [
       "ts-jest",
@@ -17,11 +17,13 @@ export default {
         tsconfig: "tsconfig.test.json",
         compiler: "typescript",
         compilerOptions: {
-          module: "ES2022",
-        },
+          module: "node16",
+          moduleResolution: "node16"  // Add this line
+      },
       },
     ],
   },
+  extensionsToTreatAsEsm: [".ts"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   collectCoverage: platform === "linux" && !env.TEST_MEMORY,
   coverageDirectory: "coverage",
@@ -40,3 +42,5 @@ export default {
   randomize: true,
   setupFilesAfterEnv: ["jest-extended/all"],
 };
+
+export default config;

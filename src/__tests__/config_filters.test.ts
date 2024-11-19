@@ -1,34 +1,38 @@
-// src/__tests__/filter.test.ts
+// src/__tests__/config_filters.test.ts
 
+import { jest } from "@jest/globals";
+import { mock } from "jest-mock-extended";
 import { Stats } from "node:fs";
-import { stat } from "node:fs/promises";
 import {
   filterMountPoints,
   filterTypedMountPoints,
 } from "../config_filters.js";
 
-// Mock fs.promises.stat
-jest.mock("node:fs/promises", () => ({
-  stat: jest.fn(),
-}));
+// Mock the wrapper module
+jest.mock("../fs_promises.js", () => {
+  const fsPromisesMock = mock<typeof import("../fs_promises.js")>();
+  return fsPromisesMock;
+});
 
-const mockStat = stat as jest.MockedFunction<typeof stat>;
-
-const MockDirectoryStatResult = Promise.resolve({
+const MockDirectoryStatResult = {
   isDirectory: () => true,
-} as Stats);
+} as Stats;
+
+// Import the mocked wrapper module
+import { statAsync } from "../fs_promises.js";
+const mockStatAsync = statAsync as jest.MockedFunction<typeof statAsync>;
 
 const NonExistentPath = "/nonexistent";
 
-describe("filter", () => {
+describe("config_filters", () => {
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks();
     // By default, make all paths exist
-    mockStat.mockImplementation((path) => {
+    mockStatAsync.mockImplementation((path) => {
       return path === NonExistentPath
         ? Promise.reject(new Error("ENOENT"))
-        : MockDirectoryStatResult;
+        : Promise.resolve(MockDirectoryStatResult);
     });
   });
 

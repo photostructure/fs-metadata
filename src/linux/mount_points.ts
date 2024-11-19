@@ -2,7 +2,7 @@
 
 import { readFile } from "node:fs/promises";
 import { WrappedError } from "../error.js";
-import { native } from "../load-native.js";
+import { native } from "../native_loader.js";
 import { FsOptions, options } from "../options.js";
 import { toNotBlank } from "../string.js";
 import { isTypedMountPoint, TypedMountPoint } from "../typed_mount_point.js";
@@ -14,10 +14,8 @@ export async function getLinuxMountPoints(
   // Get GIO mounts if available from native module
   const gioMounts: TypedMountPoint[] = [];
   try {
-    if (typeof native.getGioMountPoints === "function") {
-      const points = await native.getGioMountPoints();
-      gioMounts.push(...points.filter(isTypedMountPoint));
-    }
+    const points = await native().getGioMountPoints?.();
+    gioMounts.push(...points.filter(isTypedMountPoint));
   } catch (error) {
     console.warn(error);
     // GIO support not compiled in or failed, continue with just mtab mounts
