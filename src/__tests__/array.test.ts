@@ -1,5 +1,6 @@
 // src/__tests__/array.test.ts
 
+import { jest } from "@jest/globals";
 import { asyncFilter, times, uniq, uniqBy } from "../array.js";
 
 describe("Array", () => {

@@ -1,5 +1,6 @@
 // src/__tests__/async.test.ts
 
+import { jest } from "@jest/globals";
 import { thenOrTimeout, TimeoutError } from "../async.js";
 
 describe("async", () => {
