@@ -14,11 +14,59 @@ public:
 
   void Execute() override {
     try {
-      DWORD drives = GetLogicalDrives();
-      for (char drive = 'A'; drive <= 'Z'; drive++) {
-        if (drives & (1 << (drive - 'A'))) {
-          mountPoints.push_back(std::string(1, drive) + ":\\");
+      // Get required buffer size first
+      DWORD length = GetLogicalDriveStringsA(0, nullptr);
+      if (length == 0) {
+        throw std::runtime_error("Failed to get drive strings length");
+      }
+
+      // Use vector for automatic memory management
+      std::vector<char> driveStrings(length);
+      if (GetLogicalDriveStringsA(length, driveStrings.data()) == 0) {
+        throw std::runtime_error("Failed to get drive strings");
+      }
+
+      // Process drive strings
+      for (const char *drive = driveStrings.data(); *drive;
+           drive += strlen(drive) + 1) {
+        mountPoints.push_back(std::string(drive));
+      }
+
+      // Enumerate network resources
+      HANDLE hEnum;
+      if (WNetOpenEnum(RESOURCE_CONNECTED, RESOURCETYPE_DISK, 0, nullptr,
+                       &hEnum) == NO_ERROR) {
+        std::vector<NETRESOURCE> buffer;
+        buffer.resize(64); // Start with reasonable size
+
+        while (true) {
+          DWORD count = buffer.size();
+          DWORD bufferSize = count * sizeof(NETRESOURCE);
+
+          DWORD result =
+              WNetEnumResource(hEnum, &count, buffer.data(), &bufferSize);
+
+          if (result == ERROR_NO_MORE_ITEMS) {
+            break;
+          }
+
+          if (result == ERROR_MORE_DATA) {
+            buffer.resize(buffer.size() * 2);
+            continue;
+          }
+
+          if (result == NO_ERROR) {
+            for (DWORD i = 0; i < count; i++) {
+              if (buffer[i].lpRemoteName) {
+                mountPoints.push_back(std::string(buffer[i].lpRemoteName));
+              }
+            }
+          } else {
+            break; // Handle other errors
+          }
         }
+
+        WNetCloseEnum(hEnum);
       }
     } catch (const std::exception &e) {
       SetError(e.what());
@@ -44,7 +92,6 @@ private:
   std::vector<std::string> mountPoints;
   Napi::Promise::Deferred deferred_;
 };
-
 class GetVolumeMetadataWorker : public Napi::AsyncWorker {
 public:
   GetVolumeMetadataWorker(const std::string &path,
@@ -87,49 +134,57 @@ public:
       // Check if drive is remote
       metadata.remote = (GetDriveTypeA(mountPoint.c_str()) == DRIVE_REMOTE);
 
-      // Get volume GUID
-      char volumeGuid[50] = {0};
-      HANDLE hVolume = FindFirstVolumeA(volumeGuid, sizeof(volumeGuid));
-      if (hVolume != INVALID_HANDLE_VALUE) {
-        metadata.uuid = volumeGuid;
-        FindVolumeClose(hVolume);
+      // Determine if volume is system partition
+      char systemDrive[MAX_PATH];
+      GetEnvironmentVariableA("SystemDrive", systemDrive, MAX_PATH);
+      if (_stricmp(mountPoint.c_str(), systemDrive) == 0) {
+        metadata.isSystemPartition = true;
+      } else {
+        metadata.isSystemPartition = false;
       }
+
+      // Determine if volume is hidden partition
+      DWORD attributes = GetFileAttributesA(mountPoint.c_str());
+      if (attributes != INVALID_FILE_ATTRIBUTES &&
+          (attributes & FILE_ATTRIBUTE_HIDDEN)) {
+        metadata.isHiddenPartition = true;
+      } else {
+        metadata.isHiddenPartition = false;
+      }
+
     } catch (const std::exception &e) {
       SetError(e.what());
     }
   }
 
   void OnOK() override {
-    Napi::HandleScope scope(Env());
     Napi::Object result = Napi::Object::New(Env());
-
-    result.Set("mountPoint", mountPoint);
-    result.Set("fileSystem", metadata.fileSystem);
     result.Set("label", metadata.label);
-    result.Set("size", metadata.size);
-    result.Set("used", metadata.used);
-    result.Set("available", metadata.available);
-    result.Set("remote", metadata.remote);
-    result.Set("uuid", metadata.uuid);
-
+    result.Set("fileSystem", metadata.fileSystem);
+    result.Set("size", Napi::Number::New(Env(), metadata.size));
+    result.Set("used", Napi::Number::New(Env(), metadata.used));
+    result.Set("available", Napi::Number::New(Env(), metadata.available));
+    result.Set("remote", Napi::Boolean::New(Env(), metadata.remote));
+    result.Set("isSystemPartition",
+               Napi::Boolean::New(Env(), metadata.isSystemPartition));
+    result.Set("isHiddenPartition",
+               Napi::Boolean::New(Env(), metadata.isHiddenPartition));
     deferred_.Resolve(result);
-  }
-
-  void OnError(const Napi::Error &error) override {
-    deferred_.Reject(error.Value());
   }
 
 private:
   std::string mountPoint;
   Napi::Promise::Deferred deferred_;
-  struct {
-    std::string fileSystem;
+
+  struct VolumeMetadata {
     std::string label;
-    std::string uuid;
+    std::string fileSystem;
     double size;
     double used;
     double available;
     bool remote;
+    bool isSystemPartition;
+    bool isHiddenPartition;
   } metadata;
 };
 
