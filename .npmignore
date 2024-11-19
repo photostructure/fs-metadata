@@ -1,0 +1,37 @@
+# no hidden files
+.*
+
+# no configs, docs, logs, or typescript
+*.config.js
+*.json
+*.log
+*.md
+*.ts
+*.txt
+*.yml
+yarn.lock
+package-lock.json
+
+# no testing artifacts
+src/**/*.ts
+
+# ignore specific directories
+*/
+docs/
+build/
+
+# This is rebuilt by scripts/configure.js:
+config.gypi
+
+# include scripts directory
+!scripts/
+!scripts/*.js
+
+!dist/**/*.js
+!dist/**/*.js.map
+!dist/**/*.d.ts
+
+!src/**/*.cpp
+!src/**/*.h
+
+!prebuilds/**
