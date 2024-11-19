@@ -1,12 +1,15 @@
 import pluginJs from "@eslint/js";
+import globals from "globals";
 import ts_eslint from "typescript-eslint";
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
     files: ["src/**/*.ts", "scripts/*.js", "*.js"],
-    env: {
-      node: true, // < enable Node.js global variables like `console`
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
     },
   },
   { ignores: [".tsup", "build", "coverage", "dist", "docs"] },
