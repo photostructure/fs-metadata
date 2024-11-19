@@ -64,6 +64,9 @@
             "sources": [
               "src/windows/fs_meta.cpp"
             ],
+            "libraries": [
+              "-lMpr.lib"
+            ],
             "msvs_settings": {
               "VCCLCompilerTool": {
                 "ExceptionHandling": 1,
@@ -83,8 +86,12 @@
               "CLANG_CXX_LIBRARY": "libc++",
               "MACOSX_DEPLOYMENT_TARGET": "10.15"
             },
-            "cflags!": [ "-fno-exceptions" ],
-            "cflags_cc!": [ "-fno-exceptions" ],
+            "cflags!": [
+              "-fno-exceptions"
+            ],
+            "cflags_cc!": [
+              "-fno-exceptions"
+            ],
             "cflags": [
               "-fexceptions",
               "-fPIC"
