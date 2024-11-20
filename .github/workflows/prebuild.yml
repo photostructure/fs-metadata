@@ -18,7 +18,7 @@ jobs:
             platform: linux
           - os: windows-latest  
             platform: win32
-          - os: macos-latest
+          - os: macos-14
             platform: darwin
 
     steps:

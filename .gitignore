@@ -2,9 +2,9 @@
 logs
 *.log
 
-# package lockfiles
-package-lock.json
-yarn.lock
+# 20241120: we *do* want to commit the lockfiles. See https://github.com/nodejs/package-maintenance/blob/main/docs/dependency-management-guidelines.md#using-lockfiles
+# yarn.lock
+# package-lock.json
 
 # Dependency directories
 node_modules/
