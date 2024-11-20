@@ -1,11 +1,8 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "node16",
     "types": ["jest", "node"],
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "global.d.ts"],
-  "files": ["src/global.d.ts"],
   "exclude": ["node_modules"]
 }

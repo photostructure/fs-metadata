@@ -3,8 +3,21 @@
   "version": "0.0.1",
   "description": "Cross-platform native filesystem metadata retrieval for Node.js",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "dist/cjs/index.cjs",
+  "module": "dist/esm/index.mjs",
+  "// exports": "https://nodejs.org/api/packages.html#conditional-exports",
+  "exports": {
+    ".": {
+      "require": {
+        "default": "./lib/cjs/index.cjs",
+        "types": "./lib/cjs/index.d.ts"
+      },
+      "import": {
+        "default": "./lib/esm/index.js",
+        "types": "./lib/esm/index.d.ts"
+      }
+    }
+  },
   "homepage": "https://photostructure.github.io/fs-metadata/",
   "repository": {
     "type": "git",
@@ -15,33 +28,34 @@
   },
   "license": "MIT",
   "scripts": {
-    "install": "node scripts/install.js",
+    "install": "node-gyp-build",
     "clean": "run-p clean:*",
-    "clean:dist": "rm -rf dist build",
+    "clean:dist": "rm -rf dist",
     "clean:gyp": "node-gyp clean",
     "// scripts/configure.js checks if gio is installed": "",
-    "precompile": "node scripts/configure.js",
-    "compile": "prebuildify --napi --strip",
-    "compile:all": "npm run prebuild -- --arch x64 --arch arm64",
-    "build": "run-p compile tsup",
-    "tsup": "tsup",
+    "prebuild": "node scripts/configure.mjs",
+    "build": "run-p build:*",
+    "tsc": "run-p build:tsc:*",
+    "build:prebuildify": "prebuildify --napi --strip",
+    "build:tsc:esm": "tsc -p tsconfig.json",
+    "build:tsc:cjs": "tsc -p tsconfig.cjs.json",
+    "build:tsc:tests": "tsc -p tsconfig.test.json",
     "watch": "tsc -p tsconfig.test.json --watch",
     "docs": "typedoc --out docs src/index.ts",
     "jest:coverage": "jest --coverage",
-    "jest:clear": "jest --clearCache",
     "jest:watch": "jest --watch",
-    "pretest": "tsc -p tsconfig.test.json",
-    "test": "run-s jest:clear test:*",
-    "test:jest": "jest",
-    "// test:jest": "cross-env NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest",
-    "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc node_modules/jest/bin/jest.js src/__tests__/memory.test.ts",
-    "it": "run-s clean fmt lint build test",
+    "pretest": "tsc -p tsconfig.test.json & jest --clearCache",
+    "tests": "run-s test test:memory",
+    "test": "cross-env NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest",
+    "// test:memory:todo": "set up valgrind or similar",
+    "test:memory": "cross-env TEST_MEMORY=1 NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules --expose-gc\" jest src/__tests__/memory.test.ts",
+    "it": "run-s clean fmt lint compile test",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "fmt": "run-p fmt:*",
     "// fmt:cpp": "on ubuntu: `sudo apt install clang-format`",
     "fmt:cpp": "clang-format --style=LLVM -i src/*/*.cpp src/*/*.h || true",
-    "fmt:js": "prettier --write \"scripts/**/*.js\" \"*.js\"",
+    "fmt:js": "prettier --write \"scripts/**/*.?js\" \"*.?js\"",
     "fmt:json": "prettier --write \"**/*.json\"",
     "fmt:pkg": "npm pkg fix",
     "fmt:ts": "prettier --write \"src/**/*.ts\"",
@@ -79,12 +93,12 @@
     }
   },
   "dependencies": {
-    "node-addon-api": "^8.2.2"
+    "node-addon-api": "^8.2.2",
+    "node-gyp-build": "^4.8.4"
   },
   "why-eslint-9.14.0": "https://github.com/typescript-eslint/typescript-eslint/issues/10338",
   "devDependencies": {
     "@eslint/js": "^9.15.0",
-    "@microsoft/api-extractor": "^7.47.11",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.9.0",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
@@ -95,7 +109,6 @@
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
     "jest-extended": "^4.0.2",
-    "jest-mock-extended": "^4.0.0-beta1",
     "node-gyp": "^10.2.0",
     "npm-run-all": "4.1.5",
     "prebuildify": "^6.0.1",
@@ -104,7 +117,6 @@
     "release-it": "^17.10.0",
     "terser": "^5.36.0",
     "ts-jest": "^29.2.5",
-    "tsup": "^8.3.5",
     "typedoc": "^0.26.11",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.15.0"

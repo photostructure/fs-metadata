@@ -196,7 +196,7 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
     it("should handle edge cases with missing fields", () => {
       const mtabContent = `
 # Missing fs_vfstype
-/dev/sda1 / ext4 0 1
+/dev/sda1 / ext4 opts 1
 # Missing fs_mntops
 /dev/sda2 /home ext4
 # Valid line
@@ -208,28 +208,28 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
       const entries = parseMtab(mtabContent);
       expect(entries).toEqual([
         {
-          fs_spec: "/dev/sda1",
           fs_file: "/",
-          fs_vfstype: "ext4",
-          fs_mntops: "0",
           fs_freq: 1,
-          fs_passno: 0,
+          fs_mntops: "opts",
+          fs_passno: undefined,
+          fs_spec: "/dev/sda1",
+          fs_vfstype: "ext4",
         },
         {
           fs_file: "/home",
-          fs_freq: 0,
+          fs_freq: undefined,
           fs_mntops: undefined,
-          fs_passno: 0,
+          fs_passno: undefined,
           fs_spec: "/dev/sda2",
           fs_vfstype: "ext4",
         },
         {
-          fs_spec: "tmpfs",
           fs_file: "/run",
-          fs_vfstype: "tmpfs",
-          fs_mntops: "rw,nosuid,nodev,mode=755",
           fs_freq: 0,
+          fs_mntops: "rw,nosuid,nodev,mode=755",
           fs_passno: 0,
+          fs_spec: "tmpfs",
+          fs_vfstype: "tmpfs",
         },
       ]);
     });
@@ -264,9 +264,9 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
 
       expect(entries.length).toBe(3);
 
-      expect(entries[0].fs_file).toBe("/");
-      expect(entries[1].fs_file).toBe("/home");
-      expect(entries[2].fs_file).toBe("/var/log");
+      expect(entries[0]?.fs_file).toBe("/");
+      expect(entries[1]?.fs_file).toBe("/home");
+      expect(entries[2]?.fs_file).toBe("/var/log");
     });
   });
 

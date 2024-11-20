@@ -1,12 +1,11 @@
 // __tests__/options.test.ts
 
-import { FsOptionsDefault, options } from "../options.js";
-import { isWindows } from "../platform.js";
+import { OptionsDefault, options } from "../options.js";
 
 describe("options()", () => {
   it("should return default FsOptions when no overrides are provided", () => {
     const result = options();
-    expect(result).toEqual(FsOptionsDefault);
+    expect(result).toEqual(OptionsDefault);
   });
 
   it("should override timeoutMs when provided", () => {
@@ -14,7 +13,7 @@ describe("options()", () => {
     const result = options(override);
     expect(result.timeoutMs).toBe(override.timeoutMs);
     expect(result.excludedFileSystemTypes).toEqual(
-      FsOptionsDefault.excludedFileSystemTypes,
+      OptionsDefault.excludedFileSystemTypes,
     );
   });
 
@@ -24,7 +23,7 @@ describe("options()", () => {
     expect(result.excludedFileSystemTypes).toEqual(
       override.excludedFileSystemTypes,
     );
-    expect(result.timeoutMs).toBe(FsOptionsDefault.timeoutMs);
+    expect(result.timeoutMs).toBe(OptionsDefault.timeoutMs);
   });
 
   it("should override multiple fields when provided", () => {
@@ -48,8 +47,7 @@ describe("options()", () => {
 
   it("should use correct default timeout based on platform", () => {
     const result = options();
-    const expectedTimeout = isWindows ? 15000 : 5000;
-    expect(result.timeoutMs).toBe(expectedTimeout);
+    expect(result.timeoutMs).toBe(7_000);
   });
 
   it("should preserve default values for fields not overridden", () => {
@@ -58,6 +56,6 @@ describe("options()", () => {
     expect(result.excludedMountPointGlobs).toEqual(
       override.excludedMountPointGlobs,
     );
-    expect(result.onlyDirectories).toBe(FsOptionsDefault.onlyDirectories);
+    expect(result.onlyDirectories).toBe(OptionsDefault.onlyDirectories);
   });
 });

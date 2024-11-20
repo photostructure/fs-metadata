@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// scripts/configure.js
+// scripts/configure.mjs
 
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";

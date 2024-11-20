@@ -1,5 +1,6 @@
 // src/linux/mtab.ts
 
+import { toInt } from "../number.js";
 import { isObject } from "../object.js";
 import {
   decodeEscapeSequences,
@@ -31,11 +32,11 @@ export interface MountEntry {
   /**
    * Dump frequency
    */
-  fs_freq: number;
+  fs_freq: number | undefined;
   /**
    * fsck pass number
    */
-  fs_passno: number;
+  fs_passno: number | undefined;
 }
 
 // const NETWORK_FS_TYPES = new Set([
@@ -154,12 +155,12 @@ export function parseMtab(
     }
 
     const mountEntry: MountEntry = {
-      fs_spec: fields[0],
+      fs_spec: fields[0]!,
       fs_file: normalizeLinuxMountPoint(fields[1] ?? ""),
-      fs_vfstype: fields[2],
-      fs_mntops: fields[3],
-      fs_freq: parseInt(fields[4] || "0", 10),
-      fs_passno: parseInt(fields[5] || "0", 10),
+      fs_vfstype: fields[2]!,
+      fs_mntops: fields[3]!,
+      fs_freq: toInt(fields[4]),
+      fs_passno: toInt(fields[5]),
     };
 
     const remoteInfo = parseFsSpec(mountEntry.fs_spec);
@@ -194,8 +195,8 @@ export function formatMtab(entries: MountEntry[]): string {
         encodeEscapeSequences(entry.fs_file),
         entry.fs_vfstype,
         entry.fs_mntops,
-        entry.fs_freq.toString(),
-        entry.fs_passno.toString(),
+        entry.fs_freq?.toString(),
+        entry.fs_passno?.toString(),
       ];
       return fields.join("\t");
     })

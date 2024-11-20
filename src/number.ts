@@ -6,7 +6,8 @@ export function isNumber(value: unknown): value is number {
 
 export function toInt(value: unknown): number | undefined {
   try {
-    return parseInt(String(value), 10);
+    const i = parseInt(String(value), 10);
+    return isNumber(i) ? i : undefined;
   } catch {
     return;
   }

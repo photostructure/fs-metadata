@@ -7,31 +7,31 @@
 *.log
 *.md
 *.ts
+*.cts
+*.mts
 *.txt
 *.yml
 yarn.lock
 package-lock.json
 
-# no testing artifacts
-src/**/*.ts
-
-# ignore specific directories
+# ignore all directories by default
 */
-docs/
-build/
 
 # This is rebuilt by scripts/configure.js:
 config.gypi
 
-# include scripts directory
+# include scripts directory (for configure.cjs)
 !scripts/
-!scripts/*.js
+!scripts/*js
 
-!dist/**/*.js
-!dist/**/*.js.map
+# include dist js
+!dist/**/*js
+!dist/**/*js.map
 !dist/**/*.d.ts
 
+# include native code for rebuilds
 !src/**/*.cpp
 !src/**/*.h
 
+# include prebuilds
 !prebuilds/**

@@ -15,11 +15,6 @@ const config = {
       {
         useESM: true,
         tsconfig: "tsconfig.test.json",
-        compiler: "typescript",
-        compilerOptions: {
-          module: "node16",
-          moduleResolution: "node16"  // Add this line
-      },
       },
     ],
   },

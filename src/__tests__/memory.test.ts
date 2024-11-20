@@ -1,4 +1,6 @@
 // src/__tests__/memory.test.ts
+
+import { jest } from "@jest/globals";
 import { delay } from "../async.js";
 import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
 import { isWindows } from "../platform.js";
@@ -9,7 +11,7 @@ declare const global: {
 } & typeof globalThis;
 
 // Skip all tests unless TEST_MEMORY env var is set
-const shouldRunMemoryTests = !!process.env.TEST_MEMORY;
+const shouldRunMemoryTests = !!process.env["TEST_MEMORY"];
 const describeMemory = shouldRunMemoryTests ? describe : describe.skip;
 
 describeMemory("Memory Tests", () => {

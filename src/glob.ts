@@ -72,7 +72,7 @@ export function compileGlob(
       }
 
       // Escape other regex special characters
-      if (/[+^${}()|[\]\\]/.test(pattern[i])) {
+      if (/[+^${}()|[\]\\]/.test(pattern[i]!)) {
         regex += "\\" + pattern[i];
         i++;
         continue;

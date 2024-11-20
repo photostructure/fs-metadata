@@ -44,26 +44,18 @@ export interface VolumeMetadata {
   /**
    * UUID for the volume, like "d46edc85-a030-4dd7-a2a8-68344034e27d".
    */
-  uuid?: string;
+  uuid?: string | undefined;
   /**
    * We may be able to tell if a mountpoint is "Connected and OK", "degraded",
    * "disconnected", or otherwise unknown.
    */
-  ok?: boolean;
+  ok?: boolean | undefined;
   /**
    * May be set if !ok
    */
-  status?: string;
+  status?: string | undefined;
   /**
    * If remote, the full URI of the resource (like "smb://server/share")
    */
-  uri?: string;
-  /**
-   * On Windows, we may be able to detect if a volume is a system partition
-   */
-  isSystemPartition?: boolean;
-  /**
-   * On Windows, we may be able to detect if a volume is a hidden partition
-   */
-  isHiddenPartition?: boolean;
+  uri?: string | undefined;
 }

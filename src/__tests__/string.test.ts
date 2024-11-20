@@ -35,7 +35,6 @@ describe("decodeOctalEscapes", () => {
   function assertRoundTrip(input: string) {
     const enc = encodeEscapeSequences(input);
     const dec = decodeEscapeSequences(enc);
-    console.log({ input, enc, dec });
     expect(dec).toEqual(input);
   }
 

@@ -1,27 +1,23 @@
 // src/__tests__/config_filters.test.ts
 
 import { jest } from "@jest/globals";
-import { mock } from "jest-mock-extended";
 import { Stats } from "node:fs";
 import {
   filterMountPoints,
   filterTypedMountPoints,
 } from "../config_filters.js";
 
-// Mock the wrapper module
-jest.mock("../fs_promises.js", () => {
-  const fsPromisesMock = mock<typeof import("../fs_promises.js")>();
-  return fsPromisesMock;
-});
+const mockStatAsync = jest.fn();
+
+jest.mock("../fs_promises.js", () => ({
+  statAsync: mockStatAsync,
+}));
 
 const MockDirectoryStatResult = {
   isDirectory: () => true,
 } as Stats;
 
 // Import the mocked wrapper module
-import { statAsync } from "../fs_promises.js";
-const mockStatAsync = statAsync as jest.MockedFunction<typeof statAsync>;
-
 const NonExistentPath = "/nonexistent";
 
 describe("config_filters", () => {

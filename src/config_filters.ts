@@ -2,17 +2,20 @@
 
 import { asyncFilter, uniq } from "./array.js";
 import { compileGlob } from "./glob.js";
-import { FsOptions, options } from "./options.js";
+import { type Options, options } from "./options.js";
 import { isDirectory } from "./stat.js";
 import { isNotBlank, isString, sortByLocale } from "./string.js";
-import { isTypedMountPoint, TypedMountPoint } from "./typed_mount_point.js";
+import {
+  isTypedMountPoint,
+  type TypedMountPoint,
+} from "./typed_mount_point.js";
 
 /**
  * Filter out mount points that are excluded by the configuration.
  */
 export async function filterTypedMountPoints<T extends TypedMountPoint>(
   arr: (T | string | undefined)[],
-  overrides: Partial<FsOptions> = {},
+  overrides: Partial<Options> = {},
 ): Promise<string[]> {
   const o = options(overrides);
   const excludedFsType = compileGlob(o.excludedFileSystemTypes);
@@ -31,7 +34,7 @@ export async function filterTypedMountPoints<T extends TypedMountPoint>(
  */
 export async function filterMountPoints(
   arr: (TypedMountPoint | string | undefined)[],
-  overrides: Partial<FsOptions> = {},
+  overrides: Partial<Options> = {},
 ): Promise<string[]> {
   const o = options(overrides);
   const excludeRE = compileGlob(o.excludedMountPointGlobs);

@@ -1,0 +1,24 @@
+{
+  "cSpell.words": [
+    "blkid",
+    "buildify",
+    "fstype",
+    "gvfs",
+    "mntops",
+    "napi",
+    "passno",
+    "preprebuildify",
+    "tsup",
+    "vfstype"
+  ],
+  "json.schemas": [
+    {
+      "url": "https://json.schemastore.org/tsconfig",
+      "fileMatch": ["tsconfig.json", "tsconfig.*.json"]
+    },
+    {
+      "fileMatch": ["package.json", "tsup.config.json"],
+      "url": "https://cdn.jsdelivr.net/npm/tsup/schema.json"
+    }
+  ]
+}

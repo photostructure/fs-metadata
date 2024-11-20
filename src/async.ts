@@ -67,8 +67,8 @@ export function thenOrTimeout<T>(
     node_timeout = setTimeout(() => reject(err), timeoutMs);
   });
 
-  if (env.NODE_ENV === "test") {
-    const ms = toInt(env.TEST_DELAY);
+  if (env["NODE_ENV"] === "test") {
+    const ms = toInt(env["TEST_DELAY"]);
     if (ms != null && ms > 0) {
       promise = delay(ms).then(() => promise);
     }

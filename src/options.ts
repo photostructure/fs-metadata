@@ -1,21 +1,22 @@
 // src/options.ts
 
 import { isObject } from "./object.js";
-import { isWindows } from "./platform.js";
 
 /**
  * Configuration options for filesystem operations.
  *
  * @see {@link options} for creating an options object with default values
- * @see {@link FsOptionsDefault} for the default values
+ * @see {@link OptionsDefault} for the default values
  */
-export interface FsOptions {
+export interface Options {
   /**
    * Timeout in milliseconds for filesystem operations. Disable timeouts by
    * setting this to 0.
    *
    * Default is 5000ms (5 seconds) on macOS and Linux, and 15000ms (15 seconds)
    * on Windows.
+   *
+   * @see {@link TimeoutMsDefault} for the default value
    */
   timeoutMs: number;
 
@@ -23,8 +24,7 @@ export interface FsOptions {
    * File system types to exclude when listing mount points. Only applied on
    * Linux and macOS systems.
    *
-   * Default values exclude "proc", "cgroup", and other non-physical
-   * filesystems.
+   * @see {@link ExcludedFileSystemTypesDefault} for the default values
    */
   excludedFileSystemTypes: string[];
 
@@ -33,7 +33,7 @@ export interface FsOptions {
    *
    * POSIX forward-slashed pathnames will work on all platforms.
    *
-   * Default values exclude common system directories.
+   * @see {@link ExcludedMountPointGlobsDefault} for the default values
    */
   excludedMountPointGlobs: string[];
 
@@ -44,21 +44,26 @@ export interface FsOptions {
 
   /**
    * Should only readable directories be included?
+   *
+   * @default true
    */
   onlyDirectories: boolean;
 }
 
 /**
- * Default timeout in milliseconds for {@link FsOptions}.
+ * Default timeout in milliseconds for {@link Options}.
+ *
+ * Note that this timeout may be insufficient for some devices, like spun-down
+ * optical drives.
  */
-export const TimeoutMsDefault = isWindows ? 15_000 : 5_000;
+export const TimeoutMsDefault = 7_000;
 
 /**
- * Default excluded file system types for {@link FsOptions}.
+ * Default excluded file system types for {@link Options}.
  *
  * Note that these are only applied on Linux and macOS systems.
  */
-export const ExcludedFileSystemTypesDefault = Object.freeze([
+export const ExcludedFileSystemTypesDefault = [
   "cgroup",
   "cgroup2",
   "configfs",
@@ -72,12 +77,12 @@ export const ExcludedFileSystemTypesDefault = Object.freeze([
   "snap*",
   "sysfs",
   "tmpfs",
-]) as string[];
+] as const;
 
 /**
- * Default excluded mount point globs for {@link FsOptions}.
+ * Default excluded mount point globs for {@link Options}.
  */
-export const ExcludedMountPointGlobsDefault = Object.freeze([
+export const ExcludedMountPointGlobsDefault = [
   "/boot",
   "/boot/efi",
   "/dev",
@@ -90,26 +95,28 @@ export const ExcludedMountPointGlobsDefault = Object.freeze([
   "/run/user/*/gvfs",
   "/snap/**",
   "/sys/**",
-]) as string[];
+] as const;
 
 export const OnlyDirectoriesDefault = true;
 
 /**
- * Default {@link FsOptions} object.
+ * Default {@link Options} object.
+ *
+ * @see {@link options} for creating an options object with default values
  */
-export const FsOptionsDefault: FsOptions = Object.freeze({
+export const OptionsDefault: Options = {
   timeoutMs: TimeoutMsDefault,
-  excludedFileSystemTypes: ExcludedFileSystemTypesDefault,
-  excludedMountPointGlobs: ExcludedMountPointGlobsDefault,
+  excludedFileSystemTypes: [...ExcludedFileSystemTypesDefault],
+  excludedMountPointGlobs: [...ExcludedMountPointGlobsDefault],
   linuxMountTablePath: "/proc/mounts",
   onlyDirectories: OnlyDirectoriesDefault,
-});
+} as const;
 
 /**
- * Create an {@link FsOptions} object using default values from
- * {@link FsOptionsDefault} for missing fields.
+ * Create an {@link Options} object using default values from
+ * {@link OptionsDefault} for missing fields.
  */
-export function options(overrides: Partial<FsOptions> = {}): FsOptions {
+export function options(overrides: Partial<Options> = {}): Options {
   if (!isObject(overrides)) {
     throw new TypeError(
       "options(): expected an object, got " +
@@ -120,8 +127,7 @@ export function options(overrides: Partial<FsOptions> = {}): FsOptions {
   }
 
   return {
-    // windows is slower, so give it more time by default.
-    ...FsOptionsDefault,
+    ...OptionsDefault,
     ...overrides,
   };
 }

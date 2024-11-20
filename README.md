@@ -24,8 +24,8 @@ Built and supported by [PhotoStructure](https://photostructure.com).
   - macOS (x64, arm64)
   - Linux (x64, arm64) (including Gnome GIO/`GVfs` mounts, if available)
 - Written in modern TypeScript with full type definitions
-- Native async implementations to avoid blocking the event loop
-- Promise-based async API
+- Native async implementations avoid blocking the event loop
+- Support for both ESM and CJS consumers
 - Comprehensive test coverage
 
 ## Installation
@@ -54,28 +54,42 @@ const metadata = await getVolumeMetadata("C:\\"); // Windows
 // const metadata = await getVolumeMetadata('/');
 ```
 
+If you're using CommonJS:
+
+```js
+const {
+  getVolumeMountPoints,
+  getVolumeMetadata,
+} = require("@photostructure/fs-metadata");
+
+// Usage is the same as the ESM example above
+```
+
 ## Documentation
 
-API documentation is available:
+[Read the API here](https://photostructure.github.io/fs-metadata/modules.html)
 
-- On [GitHub Pages](https://photostructure.github.io/fs-metadata)
-- In the repository after running:
+## Options
 
-  ```bash
-  npm run docs
-  ```
+### Timeouts
 
-## Why no CommonJS support?
+There is a [default timeout](https://photostructure.github.io/fs-metadata/variables/TimeoutMsDefault.html) applied to all operations. This may not be sufficient for some OSes and volumes--especially powered-down optical drives (which may take 10s of seconds to wake up). Disable timeouts by setting `{timeoutMs: 0}`.
 
-As of November 2024:
+### Filtering
 
-- All supported versions of Node.js [consider ESM to be the official standard format](https://nodejs.org/api/esm.html#introduction)
+Linux and macOS have a (surprisingly large) number of mountpoints that are for internal use (especially if your Linux distribution uses `snap` and/or other loopback ~~hacks~~ systems).
 
-- Electron.js has [supported ESM](https://www.electronjs.org/docs/latest/tutorial/esm) for more than a year.
+This library tries to avoid those with a bunch of exclusion patterns--see the [Options](https://photostructure.github.io/fs-metadata/interfaces/Options.html) interface for details.
 
-- TypeScript ESM support has been stable for more than a year.
+To disable these filters, provide an empty array for these `excluded*` fields, like so:
 
-- If I add CJS support, I have to figure out and run the full test matrix twice.
+```ts
+const allMountPoints = await getVolumeMountPoints({
+  excludedFileSystemTypes: [],
+  excludedMountPointGlobs: [],
+  onlyDirectories: false,
+});
+```
 
 ## Platform-Specific Behaviors
 
@@ -94,18 +108,16 @@ keep in mind:
 #### macOS
 
 - Uses forward slashes for paths (e.g., `/`, `/Users`)
-- Network shares mounted at `/Volumes/`
-- APFS and HFS+ filesystems supported
-- Volume UUIDs available through DiskArbitration framework
-- Time Machine volumes detected and handled appropriately
+- Volume UUIDs may be available through the DiskArbitration framework
+- Time Machine volumes should be detected and handled appropriately
 
 #### Linux
 
 - Uses forward slashes for paths (e.g., `/`, `/home`)
 - Network mounts (NFS/CIFS) handled through mount table
-- Multiple mount tables supported (`/proc/mounts`, `/etc/mtab`)
-- UUID detection via libblkid
-- Optional GIO support for additional mount detection
+- If `GIO` support is installed, it will be queried for additional mountpoints and volume metadata
+- Depending on your distribution, you may want to use `{ linuxMountTablePath: "/etc/mtab" }` instead of the default, `/proc/mounts`.
+- UUID detection is via `libblkid`, which must be installed.
 
 ### Volume Metadata
 
@@ -203,20 +215,16 @@ keep in mind:
 
 #### Windows
 
-- Default timeout: 15 seconds
-- Longer timeouts needed for network operations
 - Drive letter enumeration is fast
 - Volume metadata queries may block
 
 #### macOS
 
-- Default timeout: 5 seconds
 - DiskArbitration queries are generally fast
 - Network volume operations may be slow
 
 #### Linux
 
-- Default timeout: 5 seconds
 - Mount table parsing is fast
 - Block device operations may block
 - GIO operations are asynchronous
@@ -261,7 +269,6 @@ Platform-specific options:
 
 #### Windows
 
-- Use default timeout (15s) for network shares
 - Handle access denied errors gracefully
 - Check drive type before operations
 
@@ -288,18 +295,6 @@ Requirements:
   - macOS: Xcode Command Line Tools
   - Linux: GCC and development headers
 
-```bash
-# Clone the repository
-git clone https://github.com/photostructure/fs-metadata.git
-cd fs-metadata
-
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-```
-
 ## License
 
 MIT
@@ -309,10 +304,6 @@ MIT
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 Please make sure to update tests and documentation as appropriate.
-
-## Development Tools
-
-This project uses AI-powered tools like GitHub Copilot and Claude to assist with development, but all code is reviewed, tested, and validated by human developers. The core implementation, architecture, and maintenance remain the responsibility of the human development team.
 
 ## Security
 

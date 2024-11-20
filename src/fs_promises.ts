@@ -1,6 +1,6 @@
 // src/fs_promises.ts
 
-import { PathLike, StatOptions, Stats } from "node:fs";
+import { type PathLike, type StatOptions, Stats } from "node:fs";
 import { stat } from "node:fs/promises";
 
 /**

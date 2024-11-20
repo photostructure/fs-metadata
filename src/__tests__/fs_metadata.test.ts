@@ -149,10 +149,10 @@ describe("Filesystem Metadata", () => {
 
   describe("Timeout Handling", () => {
     beforeEach(() => {
-      process.env.TEST_DELAY = "10";
+      process.env["TEST_DELAY"] = "10";
     });
     afterEach(() => {
-      delete process.env.TEST_DELAY;
+      delete process.env["TEST_DELAY"];
     });
     const rootPath = isWindows ? "C:\\" : "/";
     it("should handle getVolumeMountPoints() timeout", async () => {

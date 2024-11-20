@@ -1,6 +1,6 @@
-import { FsOptions } from "./options.js";
-import { TypedMountPoint } from "./typed_mount_point.js";
-import { VolumeMetadata } from "./volume_metadata.js";
+import type { Options } from "./options.js";
+import type { TypedMountPoint } from "./typed_mount_point.js";
+import type { VolumeMetadata } from "./volume_metadata.js";
 
 export interface NativeBindings {
   getVolumeMountPoints(): Promise<(string | TypedMountPoint)[]>;
@@ -8,11 +8,16 @@ export interface NativeBindings {
     mountPoint: string,
     options?: GetVolumeMetadataOptions,
   ): Promise<VolumeMetadata>;
+  /**
+   * This is only available on Linux, and only if libglib-2.0 is installed.
+   */
   getGioMountPoints?(): Promise<TypedMountPoint[]>;
 }
 
 export type GetVolumeMetadataOptions = Partial<
-  Pick<FsOptions, "timeoutMs"> & {
+  Pick<Options, "timeoutMs"> & {
     device: string;
   }
 >;
+
+export type NativeBindingsFn = () => NativeBindings | Promise<NativeBindings>;
