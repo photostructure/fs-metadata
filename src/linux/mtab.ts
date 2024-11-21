@@ -105,7 +105,7 @@ export function isRemoteFSInfo(obj: unknown): obj is RemoteFSInfo {
 export function parseFsSpec(
   fsSpec: string | undefined,
 ): RemoteFSInfo | undefined {
-  if (isBlank(fsSpec)) return;
+  if (fsSpec == null || isBlank(fsSpec)) return;
 
   // Let's try URL first, as it's the most robust:
   try {
