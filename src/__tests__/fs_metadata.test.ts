@@ -4,14 +4,9 @@ import { jest } from "@jest/globals";
 import { platform } from "node:os";
 import { times } from "../array.js";
 import { TimeoutError } from "../async.js";
-import {
-  ExcludedMountPointGlobsDefault,
-  getVolumeMetadata,
-  getVolumeMountPoints,
-  TimeoutMsDefault,
-} from "../index.js";
+import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
 import { omit } from "../object.js";
-import { pickRandom, randomChar, shuffle } from "../random.js";
+import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
 import { sortByLocale } from "../string.js";
 import { assertMetadata } from "../test-utils/assert.js";
 
@@ -22,14 +17,8 @@ const isLinux = platform() === "linux";
 describe("Filesystem Metadata", () => {
   jest.setTimeout(15_000);
 
-  const opts = {
-    timeoutMs: TimeoutMsDefault * 2,
-    excludedMountPointGlobs: [...ExcludedMountPointGlobsDefault, "**/wsl*/**"],
-  };
-
   describe("Mount Points", () => {
-    it("should list mount points without errors", async () => {
-      const mountPoints = await getVolumeMountPoints(opts);
+    function assertMountPoints(mountPoints: string[]) {
       expect(Array.isArray(mountPoints)).toBe(true);
       expect(mountPoints.length).toBeGreaterThan(0);
 
@@ -39,35 +28,24 @@ describe("Filesystem Metadata", () => {
       } else {
         expect(mountPoints).toContain("/");
       }
+    }
+
+    it("should list mount points without errors", async () => {
+      const mountPoints = await getVolumeMountPoints();
+      assertMountPoints(mountPoints);
     });
 
     it("should handle concurrent mountPoint requests", async () => {
-      const promises = Array(8)
-        .fill(0)
-        .map(() => getVolumeMountPoints(opts));
-      const results = await Promise.all(promises);
-
-      results.forEach((mountPoints) => {
-        expect(Array.isArray(mountPoints)).toBe(true);
-        expect(mountPoints.length).toBeGreaterThan(0);
-
-        if (isWindows) {
-          expect(mountPoints).toContain("C:\\");
-        } else {
-          expect(mountPoints).toContain("/");
-        }
-      });
-
-      // All results should be identical
-      const [first, ...rest] = results;
-      for (const arr of rest) {
-        expect(arr).toEqual(first);
+      const expected = await getVolumeMountPoints();
+      assertMountPoints(expected);
+      for (const ea of await Promise.all(times(8, getVolumeMountPoints))) {
+        expect(ea).toEqual(expected);
       }
     });
 
     if (!isWindows) {
       it("should exclude pseudo filesystems", async () => {
-        const mountPoints = await getVolumeMountPoints(opts);
+        const mountPoints = await getVolumeMountPoints();
         const pseudoFS = isLinux
           ? ["/proc", "/sys", "/dev/pts"]
           : ["/dev", "/dev/fd"];
@@ -79,7 +57,7 @@ describe("Filesystem Metadata", () => {
     }
 
     it("should return sorted mount points", async () => {
-      const mountPoints = await getVolumeMountPoints(opts);
+      const mountPoints = await getVolumeMountPoints();
       const sorted = sortByLocale(mountPoints);
       expect(mountPoints).toEqual(sorted);
     });
@@ -88,7 +66,7 @@ describe("Filesystem Metadata", () => {
   describe("Volume Metadata", () => {
     it("should get root filesystem metadata", async () => {
       const rootPath = isWindows ? "C:\\" : "/";
-      const metadata = await getVolumeMetadata(rootPath, opts);
+      const metadata = await getVolumeMetadata(rootPath);
 
       expect(metadata.mountPoint).toBe(rootPath);
       assertMetadata(metadata);
@@ -126,27 +104,23 @@ describe("Filesystem Metadata", () => {
       const expectedMountPoint = mountPoints[0]!;
       const expected = await getVolumeMetadata(expectedMountPoint);
 
+      const samples = 12;
+
       // interleaved calls to getVolumeMetadata to expose intra-thread data
       // leaks: if the metadata is not consistent, then the implementation is
       // not thread-safe.
       const inputs = shuffle([
-        ...times(4, () => expectedMountPoint),
-        ...times(
-          4,
-          () =>
-            isWindows
-              ? randomChar() + ":\\"
-              : pickRandom(["/mnt", "/media", "/run", "/nonexistent"])!, // /tmp made it flaky on wsl, /var was flaky on GHA ubuntu
+        ...times(samples, () => expectedMountPoint),
+        ...times(samples, () =>
+          isWindows ? randomLetter() + ":\\" : "/" + randomLetters(12),
         ),
-        ...times(4, () => pickRandom(mountPoints)!),
+        ...times(samples, () => pickRandom(mountPoints)!),
       ]);
 
       const arr = await Promise.all(
         inputs.map(async (ea) => {
           try {
-            return await getVolumeMetadata(ea, {
-              timeoutMs: TimeoutMsDefault * 2,
-            });
+            return await getVolumeMetadata(ea);
           } catch (err) {
             if (ea === expectedMountPoint) {
               // we don't expect an error from the expected mount point! Those
@@ -174,7 +148,7 @@ describe("Filesystem Metadata", () => {
 
     if (isMacOS) {
       it("should handle Time Machine volumes if present", async () => {
-        const mountPoints = await getVolumeMountPoints(opts);
+        const mountPoints = await getVolumeMountPoints();
         const backupVolumes = mountPoints.filter(
           (mp) =>
             mp.includes("Backups.backupdb") ||
@@ -182,7 +156,7 @@ describe("Filesystem Metadata", () => {
         );
 
         for (const volume of backupVolumes) {
-          const metadata = await getVolumeMetadata(volume, opts);
+          const metadata = await getVolumeMetadata(volume);
           assertMetadata(metadata);
           expect(metadata.fileSystem?.toLowerCase()).toMatch(/^(apfs|hfs)$/);
         }
@@ -233,9 +207,7 @@ describe("Filesystem Metadata", () => {
 
     const hasNetworkFS = async () => {
       const metadata = await Promise.all(
-        (await getVolumeMountPoints(opts)).map((mp) =>
-          getVolumeMetadata(mp, opts),
-        ),
+        (await getVolumeMountPoints()).map((mp) => getVolumeMetadata(mp)),
       );
       return metadata.some((m) => m.remote);
     };
@@ -248,9 +220,9 @@ describe("Filesystem Metadata", () => {
         return;
       }
 
-      const mountPoints = await getVolumeMountPoints(opts);
+      const mountPoints = await getVolumeMountPoints();
       const metadata = await Promise.all(
-        mountPoints.map((mp) => getVolumeMetadata(mp, opts)),
+        mountPoints.map((mp) => getVolumeMetadata(mp)),
       );
 
       const networkFS = metadata.filter((m) => m.remote);

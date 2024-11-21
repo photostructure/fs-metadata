@@ -41,34 +41,6 @@ export interface MountEntry {
   fs_passno: number | undefined;
 }
 
-// const NETWORK_FS_TYPES = new Set([
-//   "9p",
-//   "afp",
-//   "afs",
-//   "beegfs",
-//   "ceph",
-//   "cifs",
-//   "ftp",
-//   "fuse.cephfs",
-//   "fuse.glusterfs",
-//   "fuse.sshfs",
-//   "fuse",
-//   "gfs2",
-//   "glusterfs",
-//   "lustre",
-//   "ncpfs",
-//   "nfs",
-//   "nfs4",
-//   "smb",
-//   "smbfs",
-//   "sshfs",
-//   "webdav",
-// ]);
-
-// export function isRemoteFS(fstype: string): boolean {
-//   return NETWORK_FS_TYPES.has(fstype.toLowerCase());
-// }
-
 /**
  * Represents remote filesystem information.
  */

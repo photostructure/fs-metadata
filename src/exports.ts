@@ -6,6 +6,7 @@ import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { defer } from "./defer.js";
 import { WrappedError } from "./error.js";
+import { isRemoteFsType } from "./fs_type.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
 import { isRemoteFSInfo, parseFsSpec, parseMtab } from "./linux/mtab.js";
 import { normalizeMountPoint } from "./mount_point.js";
@@ -154,16 +155,24 @@ export class ExportsImpl {
       await this.#nativeFn()
     ).getVolumeMetadata(mountPoint, nativeOptions)) as VolumeMetadata;
 
+    let remote = metadata.remote ?? false;
+
+    // backstop for macOS:
+    if (!remote && isRemoteFsType(metadata.fileSystem)) {
+      remote = true;
+    }
+
     // Some implementations leave it up to us to extract remote info:
     const remoteInfo =
       parseFsSpec(metadata.mountFrom) ??
       parseFsSpec(metadata.uri) ??
       (isWindows ? parseUNCPath(mountPoint) : undefined);
     const result = {
-      mountPoint,
       ...mtabInfo,
       ...compactValues(remoteInfo),
       ...compactValues(metadata),
+      mountPoint,
+      remote,
     } as VolumeMetadata;
     result.uuid = extractUUID(result.uuid) ?? result.uuid;
     if (isNotBlank(result.remoteShare)) {

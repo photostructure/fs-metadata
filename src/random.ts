@@ -6,8 +6,12 @@ const CharCode_a = "a".charCodeAt(0);
 /**
  * @return a random character `[a-z]`
  */
-export function randomChar(): string {
+export function randomLetter(): string {
   return String.fromCharCode(CharCode_a + randomInt(0, 26));
+}
+
+export function randomLetters(length: number): string {
+  return Array.from({ length }, randomLetter).join("");
 }
 
 /**
