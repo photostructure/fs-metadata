@@ -2,6 +2,7 @@
 
 import { jest } from "@jest/globals";
 import { platform } from "node:os";
+import { times } from "../array.js";
 import { TimeoutError } from "../async.js";
 import {
   ExcludedMountPointGlobsDefault,
@@ -9,6 +10,8 @@ import {
   getVolumeMountPoints,
   TimeoutMsDefault,
 } from "../index.js";
+import { omit } from "../object.js";
+import { pickRandom, randomChar, shuffle } from "../random.js";
 import { sortByLocale } from "../string.js";
 import { assertMetadata } from "../test-utils/assert.js";
 
@@ -92,13 +95,11 @@ describe("Filesystem Metadata", () => {
 
       // Platform-specific filesystem checks
       if (isWindows) {
-        expect(metadata.fileSystem?.toLowerCase()).toMatch(/^(ntfs|refs)$/);
+        expect(metadata.fileSystem).toMatch(/^(ntfs|refs)$/i);
       } else if (isMacOS) {
-        expect(metadata.fileSystem?.toLowerCase()).toMatch(/^(apfs|hfs)$/);
+        expect(metadata.fileSystem).toMatch(/^(apfs|hfs)$/i);
       } else if (isLinux) {
-        expect(metadata.fileSystem?.toLowerCase()).toMatch(
-          /^(ext[234]|xfs|btrfs|zfs)$/,
-        );
+        expect(metadata.fileSystem).toMatch(/^(ext[234]|xfs|btrfs|zfs)$/i);
       }
     });
 
@@ -107,7 +108,11 @@ describe("Filesystem Metadata", () => {
         getVolumeMetadata("/nonexistent", {
           onlyDirectories: false,
         }),
-      ).rejects.toThrow(/Failed to get volume (statistics|information)/);
+      ).rejects.toThrow(
+        isWindows
+          ? /ENOENT: no such file or directory/
+          : /Failed to get volume (statistics|information)/,
+      );
     });
 
     it("handles non-existant mount points (from js)", async () => {
@@ -116,17 +121,55 @@ describe("Filesystem Metadata", () => {
       );
     });
 
-    it("should handle concurrent metadata requests", async () => {
-      const rootPath = isWindows ? "C:\\" : "/";
-      const promises = Array(3)
-        .fill(0)
-        .map(() => getVolumeMetadata(rootPath, opts));
-      const results = await Promise.all(promises);
+    it("should handle concurrent getVolumeMetadata() calls", async () => {
+      const mountPoints = await getVolumeMountPoints();
+      const expectedMountPoint = mountPoints[0]!;
+      const expected = await getVolumeMetadata(expectedMountPoint);
 
-      results.forEach((metadata) => {
-        expect(metadata.mountPoint).toBe(rootPath);
-        assertMetadata(metadata);
-      });
+      // interleaved calls to getVolumeMetadata to expose intra-thread data
+      // leaks: if the metadata is not consistent, then the implementation is
+      // not thread-safe.
+      const inputs = shuffle([
+        ...times(4, () => expectedMountPoint),
+        ...times(
+          4,
+          () =>
+            isWindows
+              ? randomChar() + ":\\"
+              : pickRandom(["/mnt", "/media", "/run", "/nonexistent"])!, // /tmp made it flaky on wsl, /var was flaky on GHA ubuntu
+        ),
+        ...times(4, () => pickRandom(mountPoints)!),
+      ]);
+
+      const arr = await Promise.all(
+        inputs.map(async (ea) => {
+          try {
+            return await getVolumeMetadata(ea, {
+              timeoutMs: TimeoutMsDefault * 2,
+            });
+          } catch (err) {
+            if (ea === expectedMountPoint) {
+              // we don't expect an error from the expected mount point! Those
+              // should fail the test!
+              throw err;
+            } else return err as Error;
+          }
+        }),
+      );
+
+      for (const ea of arr) {
+        if (ea instanceof Error) {
+          expect(ea.message).toMatch(/not accessible/i);
+        } else if (ea.mountPoint === expectedMountPoint) {
+          // it's true that some metadata (like free space) can change between
+          // calls. We don't expect it, but by omitting these fields, we don't
+          // have to resort to retrying the test (which can hide actual bugs,
+          // especially from multithreading).
+          expect(omit(ea, "available", "used")).toEqual(
+            omit(expected, "available", "used"),
+          );
+        }
+      }
     });
 
     if (isMacOS) {
@@ -170,7 +213,7 @@ describe("Filesystem Metadata", () => {
   describe("Error Handling", () => {
     it("should handle invalid paths appropriately", async () => {
       const invalidPaths = [
-        isWindows ? "Z:\\NonExistentPath" : "/nonexistent",
+        isWindows ? "A:\\" : "/nonexistent",
         isWindows
           ? "C:\\Really_Invalid_Path_123456789"
           : "/really/invalid/path/123456789",

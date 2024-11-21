@@ -2,6 +2,7 @@
 import NodeGypBuild from "node-gyp-build";
 import { Stats } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
+import { resolve } from "node:path";
 import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { defer } from "./defer.js";
@@ -23,6 +24,7 @@ import { type Options, options } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
 import { findAncestorDir } from "./stat.js";
 import { isBlank, isNotBlank } from "./string.js";
+import { parseUNCPath } from "./unc.js";
 import { extractUUID } from "./uuid.js";
 import type { VolumeMetadata } from "./volume_metadata.js";
 
@@ -109,7 +111,15 @@ export class ExportsImpl {
       );
     }
 
-    if (o.onlyDirectories) {
+    if (isWindows) {
+      // Terrible things happen if we give syscalls "C:" instead of "C:\"
+      if (/^[a-z]:$/i.test(mountPoint)) {
+        mountPoint += "\\";
+      }
+    }
+    mountPoint = resolve(mountPoint);
+
+    if (o.onlyDirectories || isWindows) {
       let s: Stats;
       try {
         s = await stat(mountPoint);
@@ -158,8 +168,11 @@ export class ExportsImpl {
 
     // Some implementations leave it up to us to extract remote info:
     const remoteInfo =
-      parseFsSpec(metadata.mountFrom) ?? parseFsSpec(metadata.uri);
+      parseFsSpec(metadata.mountFrom) ??
+      parseFsSpec(metadata.uri) ??
+      (isWindows ? parseUNCPath(mountPoint) : undefined);
     const result = {
+      mountPoint,
       ...mtabInfo,
       ...compactValues(remoteInfo),
       ...compactValues(metadata),

@@ -25,3 +25,7 @@ export function shuffle<T>(a: T[]): T[] {
   }
   return a;
 }
+
+export function pickRandom<T>(a: T[]): T | undefined {
+  return a[randomInt(0, a.length)];
+}

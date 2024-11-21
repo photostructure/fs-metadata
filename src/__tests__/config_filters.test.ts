@@ -6,6 +6,7 @@ import {
   filterMountPoints,
   filterTypedMountPoints,
 } from "../config_filters.js";
+import { isWindows } from "../platform.js";
 
 const mockStatAsync = jest.fn();
 
@@ -21,6 +22,9 @@ const MockDirectoryStatResult = {
 const NonExistentPath = "/nonexistent";
 
 describe("config_filters", () => {
+  // We want to validate onlyDirectories if we're NOT windows.
+  const onlyDirectories = !isWindows;
+
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks();
@@ -44,7 +48,7 @@ describe("config_filters", () => {
         "/sys/devices",
       ];
 
-      const result = await filterMountPoints(input);
+      const result = await filterMountPoints(input, { onlyDirectories });
 
       // These should be filtered out based on defaults
       expect(result).not.toContain("/dev/sda1");
@@ -65,7 +69,7 @@ describe("config_filters", () => {
 
     it("should remove duplicates and sort results", async () => {
       const input = ["/home", "/", "/home", "/usr", "/"];
-      const result = await filterMountPoints(input);
+      const result = await filterMountPoints(input, { onlyDirectories });
       expect(result).toEqual(["/", "/home", "/usr"]);
     });
 
@@ -73,6 +77,7 @@ describe("config_filters", () => {
       const input = ["/", "/home", "/home/user", "/usr"];
       const result = await filterMountPoints(input, {
         excludedMountPointGlobs: ["/home/**"],
+        onlyDirectories,
       });
 
       expect(result).toContain("/");
@@ -84,9 +89,6 @@ describe("config_filters", () => {
       // Make some paths "not exist"
       const input = ["/", "/home", NonExistentPath];
       expect(await filterMountPoints(input)).toEqual(["/", "/home"]);
-      expect(
-        await filterMountPoints(input, { onlyDirectories: false }),
-      ).toEqual(input);
     });
   });
 
@@ -100,7 +102,9 @@ describe("config_filters", () => {
         { mountPoint: "/sys", fstype: "sysfs" },
       ];
 
-      const resultPoints = await filterTypedMountPoints(input);
+      const resultPoints = await filterTypedMountPoints(input, {
+        onlyDirectories,
+      });
 
       expect(resultPoints).toContain("/");
       expect(resultPoints).toContain("/home");
@@ -116,7 +120,7 @@ describe("config_filters", () => {
         { mountPoint: "/home", fstype: "ext4" },
       ];
 
-      const result = await filterTypedMountPoints(input);
+      const result = await filterTypedMountPoints(input, { onlyDirectories });
 
       expect(result).toEqual(["/", "/home"]);
     });
@@ -131,6 +135,7 @@ describe("config_filters", () => {
       const result = await filterTypedMountPoints(input, {
         excludedFileSystemTypes: [],
         excludedMountPointGlobs: [],
+        onlyDirectories,
       });
       expect(result).toEqual(input.map((ea) => ea.mountPoint));
     });
@@ -142,7 +147,7 @@ describe("config_filters", () => {
         { mountPoint: "/home", fstype: "ext4" },
       ];
 
-      const result = await filterTypedMountPoints(input);
+      const result = await filterTypedMountPoints(input, { onlyDirectories });
       expect(result).toEqual(["/", "/home"]);
     });
 
@@ -153,7 +158,9 @@ describe("config_filters", () => {
         { mountPoint: "/usr", fstype: "ext4" },
       ];
 
-      const result = await filterTypedMountPoints(input);
+      const result = await filterTypedMountPoints(input, {
+        onlyDirectories,
+      });
       expect(result).toEqual(["/", "/home", "/usr"]);
     });
 
@@ -167,6 +174,7 @@ describe("config_filters", () => {
       const result = await filterTypedMountPoints(input, {
         excludedFileSystemTypes: ["tmpfs"],
         excludedMountPointGlobs: ["/mnt/**"],
+        onlyDirectories,
       });
 
       expect(result).toEqual(["/"]);

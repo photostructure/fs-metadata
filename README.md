@@ -126,7 +126,8 @@ keep in mind:
 - Size information from GetDiskFreeSpaceEx
 - Volume information (label, filesystem) from GetVolumeInformation
 - Remote status from GetDriveType
-- UNC path parsing for network shares
+- `fileSystem` will be `NTFS` for remote filesystems, as that's how Windows presents the local volume. Fixing this to be more accurate requires additional heuristics that have diminshing returns.
+- The UUID is the volume serial number that the operating system assigns when a hard disk is formatted, and **not the physical UUID assigned by the manufacturer**. This lets us avoid one more syscall (and it's a doozy, the Windows Management Instrumentation (WMI) Win32_PhysicalMedia function loves to hang).
 
 #### macOS
 

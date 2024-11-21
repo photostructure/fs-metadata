@@ -33,7 +33,7 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
 
   if (metadata.uuid !== undefined) {
     expect(typeof metadata.uuid).toBe("string");
-    expect(metadata.uuid).toMatch(/^[0-9a-z-]{10,}$/i);
+    expect(metadata.uuid).toMatch(/^[0-9a-z-]{8,}$/i);
   }
 
   if (metadata.remote !== undefined) {

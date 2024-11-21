@@ -2,6 +2,7 @@
 
 import { toInt } from "../number.js";
 import { isObject } from "../object.js";
+import { isWindows } from "../platform.js";
 import {
   decodeEscapeSequences,
   encodeEscapeSequences,
@@ -91,12 +92,8 @@ export interface RemoteFSInfo {
 
 export function isRemoteFSInfo(obj: unknown): obj is RemoteFSInfo {
   if (!isObject(obj)) return false;
-  const {
-    protocol,
-    remoteHost: hostname,
-    remoteShare: share,
-  } = obj as Partial<RemoteFSInfo>;
-  return isNotBlank(protocol) && isNotBlank(hostname) && isNotBlank(share);
+  const { remoteHost, remoteShare } = obj as Partial<RemoteFSInfo>;
+  return isNotBlank(remoteHost) && isNotBlank(remoteShare);
 }
 
 /**
@@ -124,10 +121,13 @@ export function parseFsSpec(
     // ignore
   }
 
+  if (isWindows) {
+    fsSpec = fsSpec.replace(/\\/g, "/");
+  }
+
   const patterns = [
     // CIFS/SMB pattern: //hostname/share or //user@host/share
     {
-      protocol: "cifs",
       regex:
         /^\/\/(?:(?<remoteUser>[^/@]+)@)?(?<remoteHost>[^/@]+)\/(?<remoteShare>.+)$/,
     },
