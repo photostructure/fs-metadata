@@ -61,7 +61,7 @@
     "fmt:pkg": "npm pkg fix",
     "fmt:ts": "prettier --write \"src/**/*.ts\"",
     "// precommit": "is called manually before committing",
-    "precommit": "run-s clean fmt lint prebuild tsc tests",
+    "precommit": "run-s clean fmt lint prebuild tsc tests"
   },
   "gypfile": true,
   "os": [
