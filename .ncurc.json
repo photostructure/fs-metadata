@@ -1,0 +1,6 @@
+{
+  "reject": [
+    "rimraf",
+    "rimraf-why: https://github.com/isaacs/rimraf/issues/313 💩"
+  ]
+}
