@@ -47,7 +47,7 @@
     "jest:watch": "jest --watch",
     "jest:clear": "jest --clearCache",
     "// tests": "is called by .github/workflows/test.yml",
-    "pretest": "run-s clean jest:clear tsc lint",
+    "pretests": "run-s clean jest:clear fmt tsc lint",
     "tests": "run-s test test:memory",
     "test": "node --experimental-vm-modules --trace-warnings node_modules/jest/bin/jest.js",
     "// test:memory:todo": "set up valgrind or similar",

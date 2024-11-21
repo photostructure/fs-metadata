@@ -2,18 +2,13 @@
 import NodeGypBuild from "node-gyp-build";
 import { Stats } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
-import { resolve } from "node:path";
 import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { defer } from "./defer.js";
 import { WrappedError } from "./error.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
-import {
-  isRemoteFSInfo,
-  normalizeLinuxMountPoint,
-  parseFsSpec,
-  parseMtab,
-} from "./linux/mtab.js";
+import { isRemoteFSInfo, parseFsSpec, parseMtab } from "./linux/mtab.js";
+import { normalizeMountPoint } from "./mount_point.js";
 import type {
   GetVolumeMetadataOptions,
   NativeBindings,
@@ -111,13 +106,7 @@ export class ExportsImpl {
       );
     }
 
-    if (isWindows) {
-      // Terrible things happen if we give syscalls "C:" instead of "C:\"
-      if (/^[a-z]:$/i.test(mountPoint)) {
-        mountPoint += "\\";
-      }
-    }
-    mountPoint = resolve(mountPoint);
+    mountPoint = normalizeMountPoint(mountPoint);
 
     if (o.onlyDirectories || isWindows) {
       let s: Stats;
@@ -137,7 +126,6 @@ export class ExportsImpl {
     let device: string | undefined;
     if (isLinux) {
       try {
-        mountPoint = normalizeLinuxMountPoint(mountPoint);
         const mtab = await readFile(o.linuxMountTablePath, "utf8");
         const entries = parseMtab(mtab);
         const entry = entries.find((e) => e.fs_file === mountPoint);
@@ -179,8 +167,7 @@ export class ExportsImpl {
     } as VolumeMetadata;
     result.uuid = extractUUID(result.uuid) ?? result.uuid;
     if (isNotBlank(result.remoteShare)) {
-      // It's ok to do this on Windows too:
-      result.remoteShare = normalizeLinuxMountPoint(result.remoteShare);
+      result.remoteShare = normalizeMountPoint(result.remoteShare);
     }
 
     return result;

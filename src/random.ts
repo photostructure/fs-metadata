@@ -11,12 +11,13 @@ export function randomChar(): string {
 }
 
 /**
- * Shuffle an array in place using the Fisher-Yates (Knuth) algorithm.
+ * Shuffle an array using the Fisher-Yates (Knuth) algorithm.
  * @param a The array to shuffle
- * @returns The same array, shuffled in place
+ * @returns A shallow shuffled copy of `a`
  */
 export function shuffle<T>(a: T[]): T[] {
   if (a.length <= 1) return a;
+  a = [...a]; // Copy the array
   for (let i = a.length - 1; i > 0; i--) {
     // Pick a random index from 0 to i
     const j = Math.floor(Math.random() * (i + 1));

@@ -1,5 +1,6 @@
 // src/stat.ts
 
+import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { statAsync } from "./fs_promises.js";
 
@@ -30,4 +31,8 @@ export async function findAncestorDir(
   }
   const parent = resolve(dir, "..");
   return parent === dir ? undefined : findAncestorDir(parent, file);
+}
+
+export function existsSync(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false }) != null;
 }

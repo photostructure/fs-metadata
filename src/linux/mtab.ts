@@ -1,5 +1,6 @@
 // src/linux/mtab.ts
 
+import { normalizeLinuxMountPoint } from "../mount_point.js";
 import { toInt } from "../number.js";
 import { isObject } from "../object.js";
 import { isWindows } from "../platform.js";
@@ -193,14 +194,6 @@ export function parseMtab(
   }
 
   return entries;
-}
-
-/**
- * Normalizes a Linux mount point by removing any trailing slashes. This is a
- * no-op for root mount points.
- */
-export function normalizeLinuxMountPoint(mountPoint: string): string {
-  return mountPoint.replace(/(?<=[^/])\/$/, "");
 }
 
 /**
