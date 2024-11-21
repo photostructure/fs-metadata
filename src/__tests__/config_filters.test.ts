@@ -103,9 +103,9 @@ describe("config_filters", () => {
     });
 
     it("should filter out non-existent paths", async () => {
-      // Make some paths "not exist"
-      const input = ["/", "/home", NonExistentPath];
-      expect(await filterMountPoints(input)).toEqual(["/", "/home"]);
+      expect(
+        await filterMountPoints([NonExistentPath, ...ExistingPaths]),
+      ).toEqual(ExistingPaths);
     });
   });
 
