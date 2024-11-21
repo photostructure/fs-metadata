@@ -47,12 +47,10 @@
     "jest:watch": "jest --watch",
     "jest:clear": "jest --clearCache",
     "// tests": "is called by .github/workflows/test.yml",
-    "pretests": "run-s clean jest:clear fmt tsc lint",
     "tests": "run-s test test:memory",
     "test": "node --experimental-vm-modules --trace-warnings node_modules/jest/bin/jest.js",
     "// test:memory:todo": "set up valgrind or similar",
     "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/memory.test.ts",
-    "it": "run-s clean fmt lint prebuild tsc tests",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "fmt": "run-p fmt:*",
@@ -62,8 +60,8 @@
     "fmt:json": "prettier --write \"**/*.json\"",
     "fmt:pkg": "npm pkg fix",
     "fmt:ts": "prettier --write \"src/**/*.ts\"",
-    "prepack": "npm run build",
-    "// prepublishOnly": "could be `npm test`, but instead we look to GHA for full a matrix pass instead."
+    "// precommit": "is called manually before committing",
+    "precommit": "run-s clean fmt lint prebuild tsc tests",
   },
   "gypfile": true,
   "os": [
