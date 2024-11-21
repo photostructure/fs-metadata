@@ -30,6 +30,12 @@ export interface VolumeMetadata {
    */
   available: number;
   /**
+   * Device or service that the mountpoint is from. May be `/dev/sda1`,
+   * `nfs-server:/export`, `//username@remoteHost/remoteShare`, or
+   * `//cifs-server/share`
+   */
+  mountFrom: string;
+  /**
    * Remote/network volume?
    */
   remote?: boolean;

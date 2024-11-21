@@ -76,6 +76,10 @@ export interface RemoteFSInfo {
    */
   protocol: string;
   /**
+   * Username used to access the share. May be undefined.
+   */
+  remoteUser?: string;
+  /**
    * Hostname or IP address.
    */
   remoteHost: string;
@@ -95,23 +99,42 @@ export function isRemoteFSInfo(obj: unknown): obj is RemoteFSInfo {
   return isNotBlank(protocol) && isNotBlank(hostname) && isNotBlank(share);
 }
 
-export function parseFsSpec(fsSpec: string): RemoteFSInfo | undefined {
-  // Regular expression patterns for different protocols
+/**
+ * Given a stat.fs_spec or `mountFrom`, try to extract a RemoteFSInfo object.
+ */
+export function parseFsSpec(
+  fsSpec: string | undefined,
+): RemoteFSInfo | undefined {
+  if (isBlank(fsSpec)) return;
+
+  // Let's try URL first, as it's the most robust:
+  try {
+    // try to parse fsSpec as a uri:
+    const url = new URL(fsSpec);
+    if (url != null) {
+      const o = {
+        protocol: url.protocol,
+        remoteUser: url.username,
+        remoteHost: url.hostname,
+        remoteShare: url.pathname,
+      };
+      if (isRemoteFSInfo(o)) return o;
+    }
+  } catch {
+    // ignore
+  }
+
   const patterns = [
-    // CIFS/SMB pattern: //hostname/share
+    // CIFS/SMB pattern: //hostname/share or //user@host/share
     {
       protocol: "cifs",
-      regex: /^\/\/(?<remoteHost>[^/]+)\/(?<remoteShare>.+)$/,
+      regex:
+        /^\/\/(?:(?<remoteUser>[^/@]+)@)?(?<remoteHost>[^/@]+)\/(?<remoteShare>.+)$/,
     },
     // NFS pattern: hostname:/share
     {
       protocol: "nfs",
       regex: /^(?<remoteHost>[^:]+):\/(?<remoteShare>.+)$/,
-    },
-    // Generic URL pattern: protocol://hostname/share
-    {
-      protocol: "generic",
-      regex: /^(?<protocol>\w+):\/\/(?<remoteHost>[^/]+)\/(?<remoteShare>.+)$/,
     },
   ];
 
@@ -120,9 +143,7 @@ export function parseFsSpec(fsSpec: string): RemoteFSInfo | undefined {
       protocol,
       ...(fsSpec.match(regex)?.groups ?? {}),
     } as RemoteFSInfo;
-    if (isNotBlank(o.remoteHost) && isNotBlank(o.remoteShare)) {
-      return o;
-    }
+    if (isRemoteFSInfo(o)) return o;
   }
 
   return;

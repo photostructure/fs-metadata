@@ -35,3 +35,13 @@ export function pick<T extends object, K extends keyof T>(
   }
   return copy;
 }
+
+export function compactValues(obj: unknown): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj ?? {})) {
+    if (value != null) {
+      result[key] = value;
+    }
+  }
+  return result;
+}

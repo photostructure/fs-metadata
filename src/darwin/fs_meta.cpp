@@ -145,8 +145,8 @@ public:
         metadata.used = metadata.size - metadata.available;
       }
 
-      // Store filesystem type
       metadata.fileSystem = fs.f_fstypename;
+      metadata.mountFrom = fs.f_mntfromname;
 
       // Get additional information using DiskArbitration framework
       CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
@@ -227,6 +227,9 @@ public:
     if (!metadata.uuid.empty()) {
       result.Set("uuid", metadata.uuid);
     }
+    if (!metadata.mountFrom.empty()) {
+      result.Set("mountFrom", metadata.mountFrom);
+    }
     if (metadata.remote) {
       result.Set("remote", metadata.remote);
       if (!metadata.remoteHost.empty()) {
@@ -251,6 +254,7 @@ private:
     std::string fileSystem;
     std::string label;
     std::string uuid;
+    std::string mountFrom;
     std::string remoteHost;
     std::string remoteShare;
     double size;

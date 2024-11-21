@@ -12,6 +12,7 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
 nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
 192.168.0.216:/mnt/HDD1 /media/freenas/ nfs rw,bg,soft,intr,nosuid 0 0
 //cifs-server/share /mnt/cifs cifs rw,credentials=/path/to/credentials 0 0
+//guest@SERVER._smb._tcp.local/share /mnt/cifs2 smb rw,credentials=/path/to/guest/credentials 0 0
 `;
 
       const entries = parseMtab(mtabContent);
@@ -80,6 +81,18 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
           fs_vfstype: "cifs",
           protocol: "cifs",
           remoteHost: "cifs-server",
+          remoteShare: "share",
+        },
+        {
+          fs_file: "/mnt/cifs2",
+          fs_freq: 0,
+          fs_mntops: "rw,credentials=/path/to/guest/credentials",
+          fs_passno: 0,
+          fs_spec: "//guest@SERVER._smb._tcp.local/share",
+          fs_vfstype: "smb",
+          protocol: "cifs",
+          remoteUser: "guest",
+          remoteHost: "SERVER._smb._tcp.local",
           remoteShare: "share",
         },
       ]);

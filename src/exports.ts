@@ -10,6 +10,7 @@ import { getLinuxMountPoints } from "./linux/mount_points.js";
 import {
   isRemoteFSInfo,
   normalizeLinuxMountPoint,
+  parseFsSpec,
   parseMtab,
 } from "./linux/mtab.js";
 import type {
@@ -17,6 +18,7 @@ import type {
   NativeBindings,
 } from "./native_bindings.js";
 import { gt0 } from "./number.js";
+import { compactValues } from "./object.js";
 import { type Options, options } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
 import { findAncestorDir } from "./stat.js";
@@ -154,7 +156,14 @@ export class ExportsImpl {
       await this.#nativeFn()
     ).getVolumeMetadata(mountPoint, nativeOptions)) as VolumeMetadata;
 
-    const result = { ...mtabInfo, ...metadata };
+    // Some implementations leave it up to us to extract remote info:
+    const remoteInfo =
+      parseFsSpec(metadata.mountFrom) ?? parseFsSpec(metadata.uri);
+    const result = {
+      ...mtabInfo,
+      ...compactValues(remoteInfo),
+      ...compactValues(metadata),
+    } as VolumeMetadata;
     result.uuid = extractUUID(result.uuid) ?? result.uuid;
     if (isNotBlank(result.remoteShare)) {
       // It's ok to do this on Windows too:
