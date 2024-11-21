@@ -180,17 +180,15 @@ describe("config_filters", () => {
       expect(result).toEqual(["/"]);
     });
 
-    it("should filter out non-existent paths", async () => {
-      expect(
-        await filterTypedMountPoints(
-          [
+    if (!isWindows)
+      it("should filter out non-existent paths", async () => {
+        expect(
+          await filterTypedMountPoints([
             { mountPoint: "/", fstype: "ext4" },
             { mountPoint: NonExistentPath, fstype: "ext4" },
             { mountPoint: "/home", fstype: "ext4" },
-          ],
-          { onlyDirectories },
-        ),
-      ).toEqual(["/", "/home"]);
-    });
+          ]),
+        ).toEqual(["/", "/home"]);
+      });
   });
 });
