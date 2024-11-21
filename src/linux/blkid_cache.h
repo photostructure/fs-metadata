@@ -15,7 +15,9 @@ public:
   BlkidCache();
   ~BlkidCache();
 
-  blkid_cache get() { return cache_; }
+  // Returns the blkid cache pointer
+  blkid_cache get();
+
   operator bool() const { return cache_ != nullptr; }
 
   BlkidCache(const BlkidCache &) = delete;
