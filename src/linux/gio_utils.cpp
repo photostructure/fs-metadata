@@ -48,10 +48,7 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
     return;
   }
 
-  int mount_count = 0;
-
   for (GList *l = mounts; l != nullptr; l = l->next) {
-    mount_count++;
     GMount *mount = G_MOUNT(l->data);
     if (!mount) {
       continue;
@@ -135,14 +132,11 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
           char *unix_device = g_drive_get_identifier(
               drive, G_DRIVE_IDENTIFIER_KIND_UNIX_DEVICE);
           if (unix_device) {
-            // std::cout << "  Unix device path: " << unix_device << std::endl;
             g_free(unix_device);
           }
           g_object_unref(drive);
         }
       }
-
-      g_object_unref(root);
       break;
     }
     g_object_unref(root);
