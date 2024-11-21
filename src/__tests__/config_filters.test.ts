@@ -182,11 +182,14 @@ describe("config_filters", () => {
 
     it("should filter out non-existent paths", async () => {
       expect(
-        await filterTypedMountPoints([
-          { mountPoint: "/", fstype: "ext4" },
-          { mountPoint: NonExistentPath, fstype: "ext4" },
-          { mountPoint: "/home", fstype: "ext4" },
-        ]),
+        await filterTypedMountPoints(
+          [
+            { mountPoint: "/", fstype: "ext4" },
+            { mountPoint: NonExistentPath, fstype: "ext4" },
+            { mountPoint: "/home", fstype: "ext4" },
+          ],
+          { onlyDirectories },
+        ),
       ).toEqual(["/", "/home"]);
     });
   });
