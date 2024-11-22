@@ -1,15 +1,16 @@
 name: Release
-on: workflow_dispatch
-inputs:
-  bump:
-    description: 'Version bump type (patch|minor|major)'
-    required: true
-    type: choice
-    options:
-    - patch
-    - minor
-    - major
-    default: 'minor'
+on: 
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type (patch|minor|major)'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: 'minor'
 
 jobs:
   build:
