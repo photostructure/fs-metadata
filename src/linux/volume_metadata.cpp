@@ -27,6 +27,7 @@ public:
       }
 
       uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
+      metadata.remote = false;
       metadata.size = static_cast<double>(blockSize) * vfs.f_blocks;
       metadata.available = static_cast<double>(blockSize) * vfs.f_bavail;
       metadata.used =
@@ -60,13 +61,10 @@ public:
           metadata.status = std::string("Blkid warning: ") + e.what();
         }
       }
-
     } catch (const std::exception &e) {
       SetError(e.what());
     }
   }
-
-  void OnOK() override { deferred_.Resolve(CreateResultObject()); }
 
 private:
   VolumeMetadataOptions options_;

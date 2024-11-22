@@ -7,6 +7,7 @@ import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { defer } from "./defer.js";
 import { WrappedError } from "./error.js";
 import { isRemoteFsType } from "./fs_type.js";
+import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
 import { isRemoteFSInfo, parseFsSpec, parseMtab } from "./linux/mtab.js";
 import { normalizeMountPoint } from "./mount_point.js";
@@ -132,11 +133,13 @@ export class ExportsImpl {
         const entry = entries.find((e) => e.fs_file === mountPoint);
 
         if (entry != null) {
+          device = entry.fs_spec;
           mtabInfo.fileSystem = entry.fs_vfstype;
           if (isRemoteFSInfo(entry)) {
             mtabInfo.remote = true;
             mtabInfo.remoteHost = entry.remoteHost;
             mtabInfo.remoteShare = entry.remoteShare;
+            console.log("mtab found remote", { mountPoint, entry });
           }
         }
       } catch (error) {
@@ -174,11 +177,27 @@ export class ExportsImpl {
       mountPoint,
       remote,
     }) as unknown as VolumeMetadata;
+
+    // Backfill if blkid or gio failed us:
+    if (isLinux && isNotBlank(device)) {
+      if (isBlank(result.uuid)) {
+        // Sometimes blkid doesn't have the UUID in cache. Try to get it from
+        // /dev/disk/by-uuid:
+        result.uuid = await getUuidFromDevDisk(device);
+      }
+      if (isBlank(result.label)) {
+        result.label = await getLabelFromDevDisk(device);
+      }
+    }
+
+    // Fix microsoft UUID format:
     result.uuid = extractUUID(result.uuid) ?? result.uuid;
+
+    // Normalize remote share path
     if (isNotBlank(result.remoteShare)) {
       result.remoteShare = normalizeMountPoint(result.remoteShare);
     }
 
-    return result;
+    return compactValues(result) as unknown as VolumeMetadata;
   }
 }

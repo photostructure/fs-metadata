@@ -45,7 +45,10 @@ protected:
                           ? env.Null()
                           : Napi::String::New(env, metadata.uri));
     result.Set("status", Napi::String::New(env, metadata.status));
-    result.Set("remote", Napi::Boolean::New(env, metadata.remote));
+
+    if (metadata.remote) {
+      result.Set("remote", Napi::Boolean::New(env, metadata.remote));
+    }
     result.Set("remoteHost", metadata.remoteHost.empty()
                                  ? env.Null()
                                  : Napi::String::New(env, metadata.remoteHost));
@@ -59,4 +62,5 @@ protected:
 
   void OnOK() override { deferred_.Resolve(CreateResultObject()); }
 }; // class MetadataWorkerBase
+
 } // namespace FSMeta

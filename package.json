@@ -44,7 +44,7 @@
     "watch": "tsc -p tsconfig.test.json --watch",
     "docs": "typedoc --out docs src/index.ts",
     "jest:coverage": "jest --coverage",
-    "jest:watch": "jest --watch",
+    "jest:watch": "npm t -- --watch",
     "jest:clear": "jest --clearCache",
     "// tests": "is called by .github/workflows/test.yml",
     "tests": "run-s test test:memory",

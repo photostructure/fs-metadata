@@ -1,4 +1,4 @@
-// src/__tests__/mtab.test.ts
+// src/__tests__/linux_mtab.test.ts
 import { formatMtab, parseMtab } from "../linux/mtab.js";
 
 describe("mtab", () => {

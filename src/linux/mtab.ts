@@ -1,5 +1,6 @@
 // src/linux/mtab.ts
 
+import { isRemoteFsType } from "../fs_type.js";
 import { normalizeLinuxMountPoint } from "../mount_point.js";
 import { toInt } from "../number.js";
 import { isObject } from "../object.js";
@@ -148,7 +149,7 @@ export function parseMtab(
       continue; // Skip malformed lines
     }
 
-    const mountEntry: MountEntry = {
+    const entry: MountEntry = {
       fs_spec: fields[0]!,
       fs_file: normalizeLinuxMountPoint(fields[1] ?? ""),
       fs_vfstype: fields[2]!,
@@ -157,11 +158,13 @@ export function parseMtab(
       fs_passno: toInt(fields[5]),
     };
 
-    const remoteInfo = parseFsSpec(mountEntry.fs_spec);
+    const remoteInfo = isRemoteFsType(entry.fs_vfstype)
+      ? parseFsSpec(entry.fs_spec)
+      : undefined;
     if (remoteInfo) {
-      entries.push({ ...mountEntry, ...remoteInfo });
+      entries.push({ ...entry, ...remoteInfo });
     } else {
-      entries.push(mountEntry);
+      entries.push(entry);
     }
   }
 

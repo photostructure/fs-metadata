@@ -16,7 +16,7 @@ export interface VolumeMetadata {
   /**
    * The name of the partition
    */
-  label?: string;
+  label?: string | undefined;
   /**
    * Total size in bytes
    */
