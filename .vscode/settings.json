@@ -15,10 +15,6 @@
     {
       "url": "https://json.schemastore.org/tsconfig",
       "fileMatch": ["tsconfig.json", "tsconfig.*.json"]
-    },
-    {
-      "fileMatch": ["package.json", "tsup.config.json"],
-      "url": "https://cdn.jsdelivr.net/npm/tsup/schema.json"
     }
   ],
   "files.associations": {
