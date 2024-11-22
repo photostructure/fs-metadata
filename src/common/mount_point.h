@@ -10,6 +10,4 @@ struct MountPoint {
   std::string fstype;
 };
 
-Napi::Value GetVolumeMountPoints(Napi::Env env);
-
 } // namespace FSMeta

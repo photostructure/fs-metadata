@@ -1,41 +1,14 @@
-#include "fs_meta.h"
+// src/windows/volume_metadata.cpp
+#include "../common/metadata_worker.h"
+#include "../common/mount_point.h"
+#include "./error_utils.h"
+#include "./fs_meta.h"
 #include <iomanip>
-#include <memory>
 #include <sstream>
-#include <string>
-#include <vector>
 #include <windows.h>
 #include <winnetwk.h>
 
 namespace FSMeta {
-
-// Constants
-constexpr size_t ERROR_BUFFER_SIZE = 256;
-constexpr DWORD BUFFER_SIZE = MAX_PATH + 1;
-
-// Drive status enumeration - keeping as basic enum for performance
-enum DriveStatus {
-  Unknown,
-  Unavailable,
-  Healthy,
-  Disconnected,
-  Error,
-  NoMedia
-};
-
-// Exception class for filesystem operations
-class FSException : public std::runtime_error {
-public:
-  explicit FSException(const std::string &message)
-      : std::runtime_error(message) {}
-};
-
-// Helper functions
-inline std::string CreateErrorMessage(const char *operation, DWORD error) {
-  std::ostringstream oss;
-  oss << operation << " failed with error: " << error;
-  return oss.str();
-}
 
 inline std::string FormatVolumeUUID(DWORD serialNumber) {
   std::stringstream ss;
@@ -47,25 +20,6 @@ inline std::string FormatVolumeUUID(DWORD serialNumber) {
 inline void ValidatePath(const std::string &path) {
   if (path.empty() || path.length() >= MAX_PATH) {
     throw FSException("Invalid path length");
-  }
-}
-
-inline const char *DriveStatusToString(DriveStatus status) {
-  switch (status) {
-  case Unknown:
-    return "unknown";
-  case Unavailable:
-    return "unavailable";
-  case Healthy:
-    return "healthy";
-  case Disconnected:
-    return "disconnected";
-  case Error:
-    return "error";
-  case NoMedia:
-    return "no_media";
-  default:
-    return "unknown";
   }
 }
 
@@ -115,72 +69,14 @@ DriveStatus GetDriveStatus(const std::string &path) {
   }
 }
 
-// Volume metadata structure
-struct VolumeMetadata {
-  VolumeMetadata() : size(0), used(0), available(0), remote(false) {}
-
-  std::string label;
-  std::string fileSystem;
-  double size;
-  double used;
-  double available;
-  std::string uuid;
-  std::string mountFrom;
-  DriveStatus status;
-  bool remote;
-};
-
-class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
+class GetVolumeMetadataWorker : public FSMeta::MetadataWorkerBase {
 public:
-  explicit GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred)
-      : Napi::AsyncWorker(deferred.Env()), deferred_(deferred) {}
-
-  void Execute() override {
-    try {
-      DWORD length = GetLogicalDriveStringsA(0, nullptr);
-      if (length == 0) {
-        throw FSException(
-            CreateErrorMessage("GetLogicalDriveStrings", GetLastError()));
-      }
-
-      std::vector<char> driveStrings(length);
-      if (GetLogicalDriveStringsA(length, driveStrings.data()) == 0) {
-        throw FSException(
-            CreateErrorMessage("GetLogicalDriveStrings data", GetLastError()));
-      }
-
-      for (const char *drive = driveStrings.data(); *drive;
-           drive += strlen(drive) + 1) {
-        mountPoints.push_back(std::string(drive));
-      }
-    } catch (const std::exception &e) {
-      SetError(e.what());
-    }
-  }
-
-  void OnOK() override {
-    Napi::HandleScope scope(Env());
-    auto result = Napi::Array::New(Env(), mountPoints.size());
-
-    for (size_t i = 0; i < mountPoints.size(); i++) {
-      result.Set(i, Napi::String::New(Env(), mountPoints[i]));
-    }
-
-    deferred_.Resolve(result);
-  }
-
-private:
-  Napi::Promise::Deferred deferred_;
-  std::vector<std::string> mountPoints;
-};
-
-class GetVolumeMetadataWorker : public Napi::AsyncWorker {
-public:
-  GetVolumeMetadataWorker(const std::string &path,
+  GetVolumeMetadataWorker(const std::string &mountPoint,
                           const Napi::Promise::Deferred &deferred)
-      : Napi::AsyncWorker(deferred.Env()), mountPoint(path),
-        deferred_(deferred) {
-    ValidatePath(path);
+      : MetadataWorkerBase(mountPoint, deferred), mountPoint(mountPoint),
+        deferred_(deferred) // Initialize deferred_ member
+  {
+    ValidatePath(mountPoint); // Use mountPoint instead of path
   }
 
   void Execute() override {
@@ -191,7 +87,8 @@ public:
       // If drive is not accessible, skip further checks
       if (metadata.status == Disconnected || metadata.status == Unavailable ||
           metadata.status == Error || metadata.status == NoMedia) {
-        return;
+        throw FSException("Unhealthy drive status: " +
+                          std::string(DriveStatusToString(metadata.status)));
       }
 
       // Use stack-allocated arrays for better performance
@@ -246,29 +143,34 @@ public:
     }
   }
 
-  void OnOK() override {
-    Napi::HandleScope scope(Env());
-    Napi::Object result = Napi::Object::New(Env());
+  void OnOK() override
+
+  // TODO: use the base worker's OnOK instead (but currently that results in
+  // incorrect numerical values)
+  {
+    auto env = Env();
+
+    Napi::HandleScope scope(env);
+    Napi::Object result = Napi::Object::New(env);
 
     result.Set("label", metadata.label.empty()
-                            ? Env().Null()
-                            : Napi::String::New(Env(), metadata.label));
-    result.Set("fileSystem",
-               metadata.fileSystem.empty()
-                   ? Env().Null()
-                   : Napi::String::New(Env(), metadata.fileSystem));
-    result.Set("size", Napi::Number::New(Env(), metadata.size));
-    result.Set("used", Napi::Number::New(Env(), metadata.used));
-    result.Set("available", Napi::Number::New(Env(), metadata.available));
+                            ? env.Null()
+                            : Napi::String::New(env, metadata.label));
+    result.Set("fileSystem", metadata.fileSystem.empty()
+                                 ? env.Null()
+                                 : Napi::String::New(env, metadata.fileSystem));
+    result.Set("size", Napi::Number::New(env, metadata.size));
+    result.Set("used", Napi::Number::New(env, metadata.used));
+    result.Set("available", Napi::Number::New(env, metadata.available));
     result.Set("uuid", metadata.uuid.empty()
-                           ? Env().Null()
-                           : Napi::String::New(Env(), metadata.uuid));
-    result.Set("remote", Napi::Boolean::New(Env(), metadata.remote));
+                           ? env.Null()
+                           : Napi::String::New(env, metadata.uuid));
+    result.Set("remote", Napi::Boolean::New(env, metadata.remote));
     result.Set("status",
-               Napi::String::New(Env(), DriveStatusToString(metadata.status)));
+               Napi::String::New(env, DriveStatusToString(metadata.status)));
 
-    if (metadata.remote && !metadata.mountFrom.empty()) {
-      result.Set("mountFrom", Napi::String::New(Env(), metadata.mountFrom));
+    if (!metadata.mountFrom.empty()) {
+      result.Set("mountFrom", Napi::String::New(env, metadata.mountFrom));
     }
 
     deferred_.Resolve(result);
@@ -279,13 +181,6 @@ private:
   Napi::Promise::Deferred deferred_;
   VolumeMetadata metadata;
 };
-
-Napi::Value GetVolumeMountPoints(Napi::Env env) {
-  auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new GetVolumeMountPointsWorker(deferred);
-  worker->Queue();
-  return deferred.Promise();
-}
 
 Napi::Value GetVolumeMetadata(const Napi::Env &env,
                               const std::string &mountPoint,

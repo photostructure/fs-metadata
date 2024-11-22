@@ -62,7 +62,8 @@
           "OS=='win'",
           {
             "sources": [
-              "src/windows/fs_meta.cpp"
+              "src/windows/volume_mount_points.cpp",
+              "src/windows/volume_metadata.cpp"
             ],
             "libraries": [
               "-lMpr.lib"
