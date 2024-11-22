@@ -59,9 +59,11 @@ export interface VolumeMetadata {
    */
   uuid?: string | undefined;
   /**
-   * May be set if !ok--either a message from an exception (say, from blkid or
-   * gio), or a windows drive status, like `Unknown`, `Unavailable`, `Healthy`,
-   * `Disconnected`, `Error`, or `NoMedia`
+   * If there are non-critical errors while extracting metadata, those error
+   * messages may be added to this field (say, from blkid or gio).
+   *
+   * Windows volumes may set this field to `Unknown`, `Unavailable`, `Healthy`,
+   * `Disconnected`, `Error`, or `NoMedia`.
    */
   status?: string | undefined;
   /**
