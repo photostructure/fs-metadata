@@ -99,8 +99,12 @@ export const ExcludedMountPointGlobsDefault = [
   "/sys/**",
 
   // APFS stuff:
+  "/System/Volumes/Hardware",
+  "/System/Volumes/iSCPreboot",
   "/System/Volumes/Preboot",
   "/System/Volumes/Recovery",
+  "/System/Volumes/Reserved",
+  "/System/Volumes/Update",
   "/System/Volumes/VM",
   "/System/Volumes/xarts",
 ] as const;
