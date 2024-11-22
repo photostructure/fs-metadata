@@ -17,6 +17,7 @@ jobs:
     name: Prebuild on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-14, alpine-latest]
         node: [20.x]
@@ -68,7 +69,7 @@ jobs:
         run: npm run prebuild
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ steps.platform.outputs.platform }}-${{ matrix.arch }}
           path: prebuilds/
@@ -86,7 +87,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: prebuilds
 
