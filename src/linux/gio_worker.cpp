@@ -13,6 +13,8 @@ GioMountPointsWorker::GioMountPointsWorker(
     const Napi::Promise::Deferred &deferred)
     : Napi::AsyncWorker(deferred.Env()), deferred_(deferred) {}
 
+GioMountPointsWorker::~GioMountPointsWorker() { mountPoints.clear(); }
+
 void GioMountPointsWorker::Execute() {
   try {
     GVolumeMonitor *monitor = g_volume_monitor_get();
@@ -22,30 +24,24 @@ void GioMountPointsWorker::Execute() {
 
     std::unique_ptr<GVolumeMonitor, decltype(&g_object_unref)> monitor_guard(
         monitor, g_object_unref);
-    GList *mounts = g_volume_monitor_get_mounts(monitor);
 
+    GList *mounts = g_volume_monitor_get_mounts(monitor);
     if (!mounts) {
-      return; // No mounts is not an error
+      return;
     }
 
-    std::unique_ptr<GList, decltype(&g_list_free)> mounts_guard(mounts,
-                                                                g_list_free);
-
+    // Process the mounts and free the list afterward
     for (GList *l = mounts; l != nullptr; l = l->next) {
       GMount *mount = G_MOUNT(l->data);
       if (!G_IS_MOUNT(mount)) {
         continue;
       }
 
-      std::unique_ptr<GMount, decltype(&g_object_unref)> mount_guard(
-          mount, g_object_unref);
       GFile *root = g_mount_get_root(mount);
       if (!G_IS_FILE(root)) {
         continue;
       }
 
-      std::unique_ptr<GFile, decltype(&g_object_unref)> root_guard(
-          root, g_object_unref);
       char *path = g_file_get_path(root);
       char *fs_type = g_mount_get_name(mount);
 
@@ -57,7 +53,13 @@ void GioMountPointsWorker::Execute() {
         g_free(path);
         g_free(fs_type);
       }
+
+      g_object_unref(root);
     }
+
+    // Clean up the mounts list
+    g_list_free_full(mounts, g_object_unref);
+
   } catch (const std::exception &e) {
     SetError(e.what());
   }

@@ -1,4 +1,5 @@
 // src/linux/gio_worker.h
+
 #pragma once
 
 #ifdef ENABLE_GIO
@@ -14,6 +15,7 @@ namespace gio {
 class GioMountPointsWorker : public Napi::AsyncWorker {
 public:
   explicit GioMountPointsWorker(const Napi::Promise::Deferred &deferred);
+  ~GioMountPointsWorker() override; // Add override specifier
 
   void Execute() override;
   void OnOK() override;
