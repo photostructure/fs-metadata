@@ -3,8 +3,7 @@
 
 #ifdef ENABLE_GIO
 
-#include "fs_meta.h"
-#include "typed_mount_point.h"
+#include "../common/volume_metadata.h"
 #include <napi.h>
 #include <string>
 #include <vector>

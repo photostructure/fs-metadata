@@ -50,7 +50,7 @@ void GioMountPointsWorker::Execute() {
       char *fs_type = g_mount_get_name(mount);
 
       if (path && fs_type) {
-        TypedMountPoint point{};
+        MountPoint point{};
         point.mountPoint = path;
         point.fstype = fs_type;
         mountPoints.push_back(point);

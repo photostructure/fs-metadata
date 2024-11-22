@@ -167,13 +167,13 @@ export class ExportsImpl {
       parseFsSpec(metadata.mountFrom) ??
       parseFsSpec(metadata.uri) ??
       (isWindows ? parseUNCPath(mountPoint) : undefined);
-    const result = {
+    const result = compactValues({
       ...mtabInfo,
       ...compactValues(remoteInfo),
       ...compactValues(metadata),
       mountPoint,
       remote,
-    } as VolumeMetadata;
+    }) as unknown as VolumeMetadata;
     result.uuid = extractUUID(result.uuid) ?? result.uuid;
     if (isNotBlank(result.remoteShare)) {
       result.remoteShare = normalizeMountPoint(result.remoteShare);

@@ -8,7 +8,7 @@
 #elif defined(__APPLE__)
 #include "darwin/fs_meta.h"
 #elif defined(__linux__)
-#include "linux/fs_meta.h"
+#include "common/volume_metadata.h"
 #ifdef ENABLE_GIO
 #include "linux/gio_utils.h"
 #endif

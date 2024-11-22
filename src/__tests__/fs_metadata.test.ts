@@ -89,7 +89,7 @@ describe("Filesystem Metadata", () => {
       ).rejects.toThrow(
         isWindows
           ? /ENOENT: no such file or directory/
-          : /Failed to get volume (statistics|information)/,
+          : /statvfs|Failed to get volume (statistics|information)/,
       );
     });
 

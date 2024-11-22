@@ -1,7 +1,6 @@
 #ifdef ENABLE_GIO
 
 #include "gio_utils.h"
-#include "fs_meta.h"
 #include "gio_worker.h"
 #include <gio/gio.h>
 #include <iostream>

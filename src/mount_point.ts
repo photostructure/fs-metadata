@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { isWindows } from "./platform.js";
 import { toNotBlank } from "./string.js";
 
@@ -6,8 +7,8 @@ export function normalizeMountPoint(mountPoint: string): string {
     ? normalizeWindowsMountPoint(mountPoint)
     : normalizeLinuxMountPoint(mountPoint);
 
-  // We DO NOT resolve() this path here -- that's too clever by half.
-  return result;
+  // Make sure the native code doesn't see anything weird:
+  return resolve(result);
 }
 
 /**

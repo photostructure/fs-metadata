@@ -24,7 +24,7 @@
           {
             "sources": [
               "src/linux/blkid_cache.cpp",
-              "src/linux/fs_meta.cpp"
+              "src/linux/volume_metadata.cpp"
             ],
             "libraries": [
               "-lblkid"

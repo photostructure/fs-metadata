@@ -1,5 +1,7 @@
 // src/object.js
 
+import { isNotBlank, isString } from "./string.js";
+
 /**
  * Check if a value is an object
  */
@@ -39,7 +41,8 @@ export function pick<T extends object, K extends keyof T>(
 export function compactValues(obj: unknown): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj ?? {})) {
-    if (value != null) {
+    // skip blank strings and nullish values:
+    if (value != null && (!isString(value) || isNotBlank(value))) {
       result[key] = value;
     }
   }

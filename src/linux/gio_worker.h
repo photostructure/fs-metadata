@@ -3,7 +3,7 @@
 
 #ifdef ENABLE_GIO
 
-#include "typed_mount_point.h"
+#include "../common/mount_point.h"
 #include <napi.h>
 #include <string>
 #include <vector>
@@ -20,7 +20,7 @@ public:
   void OnError(const Napi::Error &error) override;
 
 private:
-  std::vector<TypedMountPoint> mountPoints;
+  std::vector<MountPoint> mountPoints;
   Napi::Promise::Deferred deferred_;
 };
 
