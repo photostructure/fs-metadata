@@ -16,44 +16,51 @@ on:
 jobs:
   build:
     name: Prebuild on ${{ matrix.os }} (${{ matrix.arch }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
       matrix:
-        # See https://github.com/actions/runner-images?tab=readme-ov-file#available-images
-        # and https://github.com/actions/runner-images/issues/8439
-        
         include:
-          # Ubuntu builds
+          # Ubuntu x64 build
           - os: ubuntu-latest
+            runs-on: ubuntu-latest
             node: 20.x
             arch: x64
-          - os: ubuntu-latest
+
+          # Ubuntu arm64 build
+          - os: ubuntu-22.04-arm64
+            runs-on: ubuntu-22.04-arm64
             node: 20.x
             arch: arm64
-            
-          # Windows builds  
+
+          # Windows x64 build
           - os: windows-latest
+            runs-on: windows-latest
             node: 20.x
             arch: x64
-          - os: windows-latest
-            node: 20.x
-            arch: arm64
-            
-          # macOS builds
-          - os: macos-14
+
+          # macOS x64 build
+          - os: macos-13
+            runs-on: macos-13
             node: 20.x
             arch: x64
-          - os: macos-14
+
+          # macOS arm64 build
+          - os: macos-13
+            runs-on: macos-13
             node: 20.x
             arch: arm64
-            
-          # Alpine builds
+
+          # Alpine x64 build
           - os: ubuntu-latest
+            runs-on: ubuntu-latest
             node: 20.x
             arch: x64
             platform: alpine
-          - os: ubuntu-latest
+
+          # Alpine arm64 build
+          - os: ubuntu-22.04-arm64
+            runs-on: ubuntu-22.04-arm64
             node: 20.x
             arch: arm64
             platform: alpine
@@ -61,30 +68,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        if: matrix.arch == 'arm64'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
       - name: Set platform
         id: platform
         shell: bash
         run: |
-          case "${{ matrix.os }}" in
-            ubuntu-latest)
-              echo "platform=linux" >> $GITHUB_OUTPUT
-              ;;
-            windows-*)
-              echo "platform=win32" >> $GITHUB_OUTPUT
-              ;;
-            macos-*)
-              echo "platform=darwin" >> $GITHUB_OUTPUT
-              ;;
-            alpine-latest)
-              echo "platform=linux-musl" >> $GITHUB_OUTPUT
-              ;;
-          esac
+          if [ "${{ matrix.platform }}" == "alpine" ]; then
+            echo "platform=linux-musl" >> $GITHUB_OUTPUT
+          else
+            case "${{ matrix.os }}" in
+              ubuntu-*)
+                echo "platform=linux" >> $GITHUB_OUTPUT
+                ;;
+              windows-*)
+                echo "platform=win32" >> $GITHUB_OUTPUT
+                ;;
+              macos-*)
+                echo "platform=darwin" >> $GITHUB_OUTPUT
+                ;;
+            esac
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -99,20 +101,20 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        
-      - name: git config
+
+      - name: Git configuration
         run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-        
-      - name: npm config
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: NPM configuration
         run: |
           npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
         env:
-          NPM_TOKEN: ${{secrets.NPM_TOKEN}}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
-        run: npm run release --ci -- ${{ github.event.inputs.bump }}
+        run: npm run release --ci -- ${{ github.event.inputs.version }}
         env:
-          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
