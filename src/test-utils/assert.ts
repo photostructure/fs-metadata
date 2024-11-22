@@ -1,4 +1,5 @@
 // src/test-utils/assert.ts
+import { isMacOS } from "../platform.js";
 import type { VolumeMetadata } from "../volume_metadata.js";
 
 /**
@@ -21,12 +22,16 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
     }
 
     // Size checks
-    expect(metadata.size).toBeGreaterThan(0);
-    expect(metadata.used).toBeGreaterThanOrEqual(0);
-    expect(metadata.available).toBeGreaterThanOrEqual(0);
-    expect(metadata.used + metadata.available).toBeLessThanOrEqual(
-      metadata.size,
-    );
+    if (isMacOS && metadata.mountPoint === "/System/Volumes/Data/home") {
+      // skip size checks for this path on macOS, it's for the legacy /home mount which may be empty
+    } else {
+      expect(metadata.size).toBeGreaterThan(0);
+      expect(metadata.used).toBeGreaterThanOrEqual(0);
+      expect(metadata.available).toBeGreaterThanOrEqual(0);
+      expect(metadata.used + metadata.available).toBeLessThanOrEqual(
+        metadata.size,
+      );
+    }
 
     // Optional fields with type checking
     if (metadata.label !== undefined) {

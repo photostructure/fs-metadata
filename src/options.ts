@@ -93,6 +93,7 @@ export const ExcludedMountPointGlobsDefault = [
   "/run/snapd/**",
   "/run/user/*/doc",
   "/run/user/*/gvfs",
+  "/run/credentials/**",
   "/snap/**",
   "/sys/**",
 ] as const;
