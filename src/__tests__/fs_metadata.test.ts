@@ -142,8 +142,8 @@ describe("Filesystem Metadata", () => {
           expect(omit(ea, "available", "used")).toEqual(
             omit(expected, "available", "used"),
           );
-          expect(ea.available).toBeCloseTo(expected.available, 1e5);
-          expect(ea.used).toBeCloseTo(expected.used, 1e5);
+          expect(ea.available).toBeCloseTo(expected.available, 5);
+          expect(ea.used).toBeCloseTo(expected.used, 5);
         }
       }
     });
