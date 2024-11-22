@@ -1,0 +1,100 @@
+name: Prebuild & Publish to NPM
+on: workflow_dispatch
+
+jobs:
+  build:
+    name: Prebuild on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14, alpine-latest]
+        node: [18]
+        arch: [x64, arm64]
+
+    steps:
+      - name: Set platform
+        id: platform
+        shell: bash
+        run: |
+          case "${{ matrix.os }}" in
+            ubuntu-latest)
+              echo "platform=linux" >> $GITHUB_OUTPUT
+              ;;
+            windows-latest)
+              echo "platform=win32" >> $GITHUB_OUTPUT
+              ;;
+            macos-*)
+              echo "platform=darwin" >> $GITHUB_OUTPUT
+              ;;
+            alpine-latest)
+              echo "platform=linux-musl" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          architecture: ${{ matrix.arch }}
+
+      - name: Install Ubuntu dependencies
+        if: runner.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
+
+      - name: Install Alpine dependencies
+        if: matrix.os == 'alpine-latest'
+        run: |
+          apk add --no-cache build-base libblkid-dev e2fsprogs-dev
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild
+        run: npm run prebuild
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: prebuilds-${{ steps.platform.outputs.platform }}-${{ matrix.arch }}
+          path: prebuilds/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: prebuilds
+
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: git config
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+        
+      - name: npm config
+        run: |
+          npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+        env:
+          NPM_TOKEN: ${{secrets.NPM_TOKEN}}
+
+      - name: Publish to npm
+        run: npm run release --ci
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

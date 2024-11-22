@@ -3,6 +3,7 @@
 
 # no configs, docs, logs, or typescript
 *.config.js
+*.config.mjs
 *.json
 *.log
 *.md

@@ -38,3 +38,6 @@ config.gypi
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Config files written during publishing
+.npmrc
