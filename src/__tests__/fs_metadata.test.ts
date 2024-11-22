@@ -3,7 +3,11 @@
 import { jest } from "@jest/globals";
 import { times } from "../array.js";
 import { TimeoutError } from "../async.js";
-import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
+import {
+  getAllVolumeMetadata,
+  getVolumeMetadata,
+  getVolumeMountPoints,
+} from "../index.js";
 import { omit } from "../object.js";
 import { isLinux, isMacOS, isWindows } from "../platform.js";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
@@ -165,6 +169,17 @@ describe("Filesystem Metadata", () => {
         }
       });
     }
+  });
+
+  describe("getAllVolumeMetadata()", () => {
+    it("should get metadata for all volumes", async () => {
+      const expectedMountPoints = await getVolumeMountPoints();
+      const all = await getAllVolumeMetadata();
+      expect(expectedMountPoints).toEqual(all.map((m) => m.mountPoint));
+      for (const ea of all) {
+        assertMetadata(ea);
+      }
+    });
   });
 
   describe("Timeout Handling", () => {

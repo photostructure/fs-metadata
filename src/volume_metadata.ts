@@ -1,14 +1,20 @@
 // src/volume_metadata.ts
 
+import { RemoteInfo } from "./remote_info.js";
+
 /**
  * Metadata associated to a volume.
  */
-export interface VolumeMetadata {
+export interface VolumeMetadata extends RemoteInfo {
   /**
    * Mount location (like "/home" or "C:\"). May be a unique key at any given
    * time, unless there are file system shenanigans (like from `mergefs`)
    */
   mountPoint: string;
+  /**
+   * The name of the mount (only provided on some linux GIO mounts)
+   */
+  mountName?: string;
   /**
    * This is the file system type (like "ext4" or "apfs")
    */
@@ -16,7 +22,7 @@ export interface VolumeMetadata {
   /**
    * The name of the partition
    */
-  label?: string | undefined;
+  label?: string;
   /**
    * Total size in bytes
    */
@@ -35,29 +41,11 @@ export interface VolumeMetadata {
    * `//cifs-server/share`
    */
   mountFrom: string;
-  /**
-   * Remote/network volume?
-   */
-  remote?: boolean;
-  /**
-   * If remote, may include the username used to access the share.
-   *
-   * This will be undefined on NFS and other remote filesystem types that do
-   * authentication out of band.
-   */
-  remoteUser?: string;
-  /**
-   * If remote, the ip or hostname hosting the share (like "rusty" or "10.1.1.3")
-   */
-  remoteHost?: string;
-  /**
-   * If remote, the name of the share (like "homes")
-   */
-  remoteShare?: string;
+
   /**
    * UUID for the volume, like "d46edc85-a030-4dd7-a2a8-68344034e27d".
    */
-  uuid?: string | undefined;
+  uuid?: string;
   /**
    * If there are non-critical errors while extracting metadata, those error
    * messages may be added to this field (say, from blkid or gio).
@@ -65,9 +53,5 @@ export interface VolumeMetadata {
    * Windows volumes may set this field to `Unknown`, `Unavailable`, `Healthy`,
    * `Disconnected`, `Error`, or `NoMedia`.
    */
-  status?: string | undefined;
-  /**
-   * If remote, the full URI of the resource (like "smb://server/share")
-   */
-  uri?: string | undefined;
+  status?: string;
 }

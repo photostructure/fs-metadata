@@ -2,8 +2,11 @@
 
 import { jest } from "@jest/globals";
 import { delay } from "../async.js";
-import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
-import { isWindows } from "../platform.js";
+import {
+  getAllVolumeMetadata,
+  getVolumeMetadata,
+  getVolumeMountPoints,
+} from "../index.js";
 
 // Enable garbage collection access
 declare const global: {
@@ -15,7 +18,7 @@ const shouldRunMemoryTests = !!process.env["TEST_MEMORY"];
 const describeMemory = shouldRunMemoryTests ? describe : describe.skip;
 
 describeMemory("Memory Tests", () => {
-  jest.setTimeout(30_000);
+  jest.setTimeout(60_000);
   const iterations = 200;
 
   // Helper to get memory usage after GC
@@ -73,13 +76,11 @@ describeMemory("Memory Tests", () => {
     });
   });
 
-  describe("getVolumeMetadata", () => {
-    const testMountPoint = isWindows ? "C:\\" : "/";
-
+  describe("getAllVolumeMetadata", () => {
     it("should not leak memory under repeated calls", async () => {
       await checkMemoryUsage(async () => {
-        const metadata = await getVolumeMetadata(testMountPoint);
-        expect(metadata.size).toBeGreaterThan(0);
+        const metadata = await getAllVolumeMetadata();
+        expect(metadata.length).toBeGreaterThan(0);
       });
     });
 

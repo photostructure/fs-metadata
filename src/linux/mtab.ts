@@ -1,15 +1,16 @@
 // src/linux/mtab.ts
 
-import { isRemoteFsType } from "../fs_type.js";
 import { normalizeLinuxMountPoint } from "../mount_point.js";
 import { toInt } from "../number.js";
-import { isObject } from "../object.js";
-import { isWindows } from "../platform.js";
+import {
+  extractRemoteInfo,
+  isRemoteFsType,
+  RemoteInfo,
+} from "../remote_info.js";
 import {
   decodeEscapeSequences,
   encodeEscapeSequences,
   isBlank,
-  isNotBlank,
 } from "../string.js";
 
 /**
@@ -43,95 +44,14 @@ export interface MountEntry {
 }
 
 /**
- * Represents remote filesystem information.
- */
-export interface RemoteFSInfo {
-  /**
-   * Protocol used to access the share.
-   */
-  protocol: string;
-  /**
-   * Username used to access the share. May be undefined.
-   */
-  remoteUser?: string;
-  /**
-   * Hostname or IP address.
-   */
-  remoteHost: string;
-  /**
-   * Share name.
-   */
-  remoteShare: string;
-}
-
-export function isRemoteFSInfo(obj: unknown): obj is RemoteFSInfo {
-  if (!isObject(obj)) return false;
-  const { remoteHost, remoteShare } = obj as Partial<RemoteFSInfo>;
-  return isNotBlank(remoteHost) && isNotBlank(remoteShare);
-}
-
-/**
- * Given a stat.fs_spec or `mountFrom`, try to extract a RemoteFSInfo object.
- */
-export function parseFsSpec(
-  fsSpec: string | undefined,
-): RemoteFSInfo | undefined {
-  if (fsSpec == null || isBlank(fsSpec)) return;
-
-  // Let's try URL first, as it's the most robust:
-  try {
-    // try to parse fsSpec as a uri:
-    const url = new URL(fsSpec);
-    if (url != null) {
-      const o = {
-        protocol: url.protocol,
-        remoteUser: url.username,
-        remoteHost: url.hostname,
-        remoteShare: url.pathname,
-      };
-      if (isRemoteFSInfo(o)) return o;
-    }
-  } catch {
-    // ignore
-  }
-
-  if (isWindows) {
-    fsSpec = fsSpec.replace(/\\/g, "/");
-  }
-
-  const patterns = [
-    // CIFS/SMB pattern: //hostname/share or //user@host/share
-    {
-      regex:
-        /^\/\/(?:(?<remoteUser>[^/@]+)@)?(?<remoteHost>[^/@]+)\/(?<remoteShare>.+)$/,
-    },
-    // NFS pattern: hostname:/share
-    {
-      protocol: "nfs",
-      regex: /^(?<remoteHost>[^:]+):\/(?<remoteShare>.+)$/,
-    },
-  ];
-
-  for (const { protocol, regex } of patterns) {
-    const o = {
-      protocol,
-      ...(fsSpec.match(regex)?.groups ?? {}),
-    } as RemoteFSInfo;
-    if (isRemoteFSInfo(o)) return o;
-  }
-
-  return;
-}
-
-/**
  * Parses an mtab/fstab file content into structured mount entries
  * @param content - Raw content of the mtab/fstab file
  * @returns Array of parsed mount entries
  */
 export function parseMtab(
   content: string,
-): (MountEntry | (MountEntry & RemoteFSInfo))[] {
-  const entries: (MountEntry | (MountEntry & RemoteFSInfo))[] = [];
+): (MountEntry | (MountEntry & RemoteInfo))[] {
+  const entries: (MountEntry | (MountEntry & RemoteInfo))[] = [];
   const lines = content.split("\n");
 
   for (const line of lines) {
@@ -159,7 +79,7 @@ export function parseMtab(
     };
 
     const remoteInfo = isRemoteFsType(entry.fs_vfstype)
-      ? parseFsSpec(entry.fs_spec)
+      ? extractRemoteInfo(entry.fs_spec)
       : undefined;
     if (remoteInfo) {
       entries.push({ ...entry, ...remoteInfo });

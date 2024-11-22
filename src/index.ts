@@ -21,3 +21,4 @@ const impl = new ExportsImpl(dirname(fileURLToPath(import.meta.url)));
 
 export const getVolumeMountPoints = impl.getVolumeMountPoints;
 export const getVolumeMetadata = impl.getVolumeMetadata;
+export const getAllVolumeMetadata = impl.getAllVolumeMetadata;

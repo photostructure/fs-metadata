@@ -6,10 +6,9 @@ import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { defer } from "./defer.js";
 import { WrappedError } from "./error.js";
-import { isRemoteFsType } from "./fs_type.js";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
-import { isRemoteFSInfo, parseFsSpec, parseMtab } from "./linux/mtab.js";
+import { parseMtab } from "./linux/mtab.js";
 import { normalizeMountPoint } from "./mount_point.js";
 import type {
   GetVolumeMetadataOptions,
@@ -19,6 +18,11 @@ import { gt0 } from "./number.js";
 import { compactValues } from "./object.js";
 import { type Options, options } from "./options.js";
 import { isLinux, isWindows } from "./platform.js";
+import {
+  extractRemoteInfo,
+  isRemoteFsType,
+  isRemoteInfo,
+} from "./remote_info.js";
 import { findAncestorDir } from "./stat.js";
 import { isBlank, isNotBlank } from "./string.js";
 import { parseUNCPath } from "./unc.js";
@@ -135,7 +139,7 @@ export class ExportsImpl {
         if (entry != null) {
           mtabInfo.mountFrom = device = entry.fs_spec;
           mtabInfo.fileSystem = entry.fs_vfstype;
-          if (isRemoteFSInfo(entry)) {
+          if (isRemoteInfo(entry)) {
             mtabInfo.remote = true;
             mtabInfo.remoteHost = entry.remoteHost;
             mtabInfo.remoteShare = entry.remoteShare;
@@ -167,9 +171,12 @@ export class ExportsImpl {
 
     // Some implementations leave it up to us to extract remote info:
     const remoteInfo =
-      parseFsSpec(metadata.mountFrom) ??
-      parseFsSpec(metadata.uri) ??
+      extractRemoteInfo(metadata.uri) ??
+      extractRemoteInfo(metadata.mountFrom) ??
       (isWindows ? parseUNCPath(mountPoint) : undefined);
+
+    if (remoteInfo?.remote != null) remote = remoteInfo.remote;
+
     const result = compactValues({
       ...mtabInfo,
       ...compactValues(remoteInfo),
@@ -183,15 +190,15 @@ export class ExportsImpl {
       if (isBlank(result.uuid)) {
         // Sometimes blkid doesn't have the UUID in cache. Try to get it from
         // /dev/disk/by-uuid:
-        result.uuid = await getUuidFromDevDisk(device);
+        result.uuid = (await getUuidFromDevDisk(device)) ?? "";
       }
       if (isBlank(result.label)) {
-        result.label = await getLabelFromDevDisk(device);
+        result.label = (await getLabelFromDevDisk(device)) ?? "";
       }
     }
 
     // Fix microsoft UUID format:
-    result.uuid = extractUUID(result.uuid) ?? result.uuid;
+    result.uuid = extractUUID(result.uuid) ?? result.uuid ?? "";
 
     // Normalize remote share path
     if (isNotBlank(result.remoteShare)) {
@@ -200,4 +207,17 @@ export class ExportsImpl {
 
     return compactValues(result) as unknown as VolumeMetadata;
   }
+
+  /**
+   * Get metadata for all volumes on the system.
+   *
+   * @param opts Optional filesystem operation settings to override default
+   * values
+   */
+  readonly getAllVolumeMetadata = async (
+    opts?: Partial<Options>,
+  ): Promise<VolumeMetadata[]> => {
+    const arr = await this.getVolumeMountPoints(opts);
+    return Promise.all(arr.map((mp) => this.getVolumeMetadata(mp, opts)));
+  };
 }

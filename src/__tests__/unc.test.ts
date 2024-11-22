@@ -7,6 +7,7 @@ describe("parseUNCPath", () => {
     expect(result).toEqual({
       remoteHost: "server",
       remoteShare: "share",
+      remote: true,
     });
   });
 
@@ -15,6 +16,7 @@ describe("parseUNCPath", () => {
     expect(result).toEqual({
       remoteHost: "server",
       remoteShare: "share",
+      remote: true,
     });
   });
 
@@ -23,6 +25,7 @@ describe("parseUNCPath", () => {
     expect(result).toEqual({
       remoteHost: "server",
       remoteShare: "share",
+      remote: true,
     });
   });
 
@@ -31,6 +34,7 @@ describe("parseUNCPath", () => {
     expect(result).toEqual({
       remoteHost: "server-name.123",
       remoteShare: "share_name-123",
+      remote: true,
     });
   });
 
@@ -104,6 +108,7 @@ describe("parseUNCPath", () => {
     expect(result).toEqual({
       remoteHost: "서버",
       remoteShare: "共有",
+      remote: true,
     });
   });
 });

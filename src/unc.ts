@@ -1,3 +1,4 @@
+import { RemoteInfo } from "./remote_info.js";
 import { isBlank, isString } from "./string.js";
 
 /**
@@ -11,7 +12,7 @@ import { isBlank, isString } from "./string.js";
  */
 export function parseUNCPath(
   path: string | null | undefined,
-): { remoteHost: string; remoteShare: string } | undefined {
+): RemoteInfo | undefined {
   if (path == null || isBlank(path) || !isString(path)) {
     return;
   }
@@ -56,5 +57,5 @@ export function parseUNCPath(
     return;
   }
 
-  return { remoteHost, remoteShare };
+  return { remoteHost, remoteShare, remote: true };
 }

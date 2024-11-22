@@ -17,3 +17,4 @@ const impl = new ExportsImpl(__dirname);
 
 export const getVolumeMountPoints = impl.getVolumeMountPoints;
 export const getVolumeMetadata = impl.getVolumeMetadata;
+export const getAllVolumeMetadata = impl.getAllVolumeMetadata;
