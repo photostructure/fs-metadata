@@ -82,13 +82,14 @@ public:
   void Execute() override {
     try {
       // Get drive status first
-      metadata.status = GetDriveStatus(mountPoint);
+      DriveStatus status = GetDriveStatus(mountPoint);
+      metadata.status = DriveStatusToString(status);
 
       // If drive is not accessible, skip further checks
-      if (metadata.status == Disconnected || metadata.status == Unavailable ||
-          metadata.status == Error || metadata.status == NoMedia) {
+      if (status == Disconnected || status == Unavailable || status == Error ||
+          status == NoMedia) {
         throw FSException("Unhealthy drive status: " +
-                          std::string(DriveStatusToString(metadata.status)));
+                          std::string(metadata.status));
       }
 
       // Use stack-allocated arrays for better performance
@@ -166,8 +167,7 @@ public:
                            ? env.Null()
                            : Napi::String::New(env, metadata.uuid));
     result.Set("remote", Napi::Boolean::New(env, metadata.remote));
-    result.Set("status",
-               Napi::String::New(env, DriveStatusToString(metadata.status)));
+    result.Set("status", Napi::String::New(env, metadata.status));
 
     if (!metadata.mountFrom.empty()) {
       result.Set("mountFrom", Napi::String::New(env, metadata.mountFrom));

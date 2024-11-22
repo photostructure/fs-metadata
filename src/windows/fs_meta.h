@@ -12,4 +12,32 @@ namespace FSMeta {
 constexpr size_t ERROR_BUFFER_SIZE = 256;
 constexpr DWORD BUFFER_SIZE = MAX_PATH + 1;
 
+enum DriveStatus {
+  Unknown,
+  Unavailable,
+  Healthy,
+  Disconnected,
+  Error,
+  NoMedia
+};
+
+inline const char *DriveStatusToString(DriveStatus status) {
+  switch (status) {
+  case Unknown:
+    return "unknown";
+  case Unavailable:
+    return "unavailable";
+  case Healthy:
+    return "healthy";
+  case Disconnected:
+    return "disconnected";
+  case Error:
+    return "error";
+  case NoMedia:
+    return "no_media";
+  default:
+    return "unknown";
+  }
+}
+
 } // namespace FSMeta

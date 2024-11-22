@@ -44,8 +44,7 @@ protected:
     result.Set("uri", metadata.uri.empty()
                           ? env.Null()
                           : Napi::String::New(env, metadata.uri));
-    result.Set("status",
-               Napi::String::New(env, DriveStatusToString(metadata.status)));
+    result.Set("status", Napi::String::New(env, metadata.status));
     result.Set("remote", Napi::Boolean::New(env, metadata.remote));
     result.Set("remoteHost", metadata.remoteHost.empty()
                                  ? env.Null()
