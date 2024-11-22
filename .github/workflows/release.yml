@@ -19,9 +19,35 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-14, alpine-latest]
+        os: [ubuntu-latest, windows-latest, windows-arm64, macos-14, alpine-latest]
         node: [20.x]
         arch: [x64, arm64]
+        
+        include:
+          - os: ubuntu-latest
+            node: 20.x
+            arch: x64
+          - os: ubuntu-latest
+            node: 20.x
+            arch: arm64
+          - os: windows-latest
+            node: 20.x
+            arch: x64
+          - os: windows-arm64
+            node: 20.x
+            arch: arm64
+          - os: macos-14
+            node: 20.x
+            arch: x64
+          - os: macos-14
+            node: 20.x
+            arch: arm64
+          - os: alpine-latest
+            node: 20.x
+            arch: x64
+          - os: alpine-latest
+            node: 20.x
+            arch: arm64
 
     steps:
       - name: Set platform
@@ -32,7 +58,7 @@ jobs:
             ubuntu-latest)
               echo "platform=linux" >> $GITHUB_OUTPUT
               ;;
-            windows-latest)
+            windows-*)
               echo "platform=win32" >> $GITHUB_OUTPUT
               ;;
             macos-*)
