@@ -22,15 +22,12 @@ void GioMountPointsWorker::Execute() {
       throw std::runtime_error("Failed to get GVolumeMonitor");
     }
 
-    std::unique_ptr<GVolumeMonitor, decltype(&g_object_unref)> monitor_guard(
-        monitor, g_object_unref);
-
     GList *mounts = g_volume_monitor_get_mounts(monitor);
     if (!mounts) {
+      g_object_unref(monitor);
       return;
     }
 
-    // Process the mounts and free the list afterward
     for (GList *l = mounts; l != nullptr; l = l->next) {
       GMount *mount = G_MOUNT(l->data);
       if (!G_IS_MOUNT(mount)) {
@@ -50,16 +47,19 @@ void GioMountPointsWorker::Execute() {
         point.mountPoint = path;
         point.fstype = fs_type;
         mountPoints.push_back(point);
-        g_free(path);
-        g_free(fs_type);
       }
 
+      if (path) {
+        g_free(path);
+      }
+      if (fs_type) {
+        g_free(fs_type);
+      }
       g_object_unref(root);
     }
 
-    // Clean up the mounts list
     g_list_free_full(mounts, g_object_unref);
-
+    g_object_unref(monitor);
   } catch (const std::exception &e) {
     SetError(e.what());
   }
