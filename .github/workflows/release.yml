@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-14, alpine-latest]
-        node: [18]
+        node: [20.x]
         arch: [x64, arm64]
 
     steps:
