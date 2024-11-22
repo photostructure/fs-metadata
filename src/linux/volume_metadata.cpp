@@ -31,7 +31,6 @@ public:
       metadata.available = static_cast<double>(blockSize) * vfs.f_bavail;
       metadata.used =
           metadata.size - (static_cast<double>(blockSize) * vfs.f_bfree);
-      metadata.ok = true;
 
 #ifdef ENABLE_GIO
       try {

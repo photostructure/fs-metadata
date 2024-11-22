@@ -59,12 +59,9 @@ export interface VolumeMetadata {
    */
   uuid?: string | undefined;
   /**
-   * We may be able to tell if a mountpoint is "Connected and OK", "degraded",
-   * "disconnected", or otherwise unknown.
-   */
-  ok?: boolean | undefined;
-  /**
-   * May be set if !ok
+   * May be set if !ok--either a message from an exception (say, from blkid or
+   * gio), or a windows drive status, like `Unknown`, `Unavailable`, `Healthy`,
+   * `Disconnected`, `Error`, or `NoMedia`
    */
   status?: string | undefined;
   /**

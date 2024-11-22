@@ -52,14 +52,4 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
       }
     }
   }
-
-  if (metadata.ok !== undefined) {
-    expect(typeof metadata.ok).toBe("boolean");
-
-    // If ok is false, status should be defined
-    if (metadata.ok === false) {
-      expect(typeof metadata.status).toBe("string");
-      expect(metadata.status?.length).toBeGreaterThan(0);
-    }
-  }
 }
