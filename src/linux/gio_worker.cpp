@@ -24,7 +24,6 @@ void GioMountPointsWorker::Execute() {
 
     GList *mounts = g_volume_monitor_get_mounts(monitor);
     if (!mounts) {
-      g_object_unref(monitor);
       return;
     }
 
@@ -59,7 +58,6 @@ void GioMountPointsWorker::Execute() {
     }
 
     g_list_free_full(mounts, g_object_unref);
-    g_object_unref(monitor);
   } catch (const std::exception &e) {
     SetError(e.what());
   }
