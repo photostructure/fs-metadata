@@ -16,27 +16,10 @@ struct VolumeMetadata {
   std::string mountFrom;
   std::string uri;
   std::string status;
-  bool remote;
+  bool remote = false;
   std::string remoteHost;
   std::string remoteShare;
 };
-
-// struct VolumeMetadata
-// {
-//   std::string fileSystem;
-//   std::string label;
-//   std::string uuid;
-//   std::string status;
-//   std::string mountFrom;
-//   std::string remoteHost;
-//   std::string remoteShare;
-//   std::string uri;
-//   double size = 0;
-//   double used = 0;
-//   double available = 0;
-//   bool ok = true;
-//   bool remote = false;
-// };
 
 struct VolumeMetadataOptions {
   uint32_t timeoutMs = 5000;

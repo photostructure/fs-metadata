@@ -211,6 +211,8 @@ public:
     }
   }
 
+  // TODO: switch to ../common/metadata_worker.h?
+
   void OnOK() override {
     Napi::HandleScope scope(Env());
 
@@ -250,18 +252,7 @@ public:
 private:
   std::string mountPoint;
   Napi::Promise::Deferred deferred_;
-  struct {
-    std::string fileSystem;
-    std::string label;
-    std::string uuid;
-    std::string mountFrom;
-    std::string remoteHost;
-    std::string remoteShare;
-    double size;
-    double used;
-    double available;
-    bool remote = false;
-  } metadata;
+  VolumeMetadata metadata;
 };
 
 Napi::Value GetVolumeMountPoints(Napi::Env env) {
