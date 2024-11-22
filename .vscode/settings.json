@@ -9,7 +9,8 @@
     "passno",
     "preprebuildify",
     "tsup",
-    "vfstype"
+    "vfstype",
+    "xarts"
   ],
   "json.schemas": [
     {

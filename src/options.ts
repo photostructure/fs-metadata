@@ -87,15 +87,22 @@ export const ExcludedMountPointGlobsDefault = [
   "/boot/efi",
   "/dev",
   "/dev/**",
+  "/private/var/vm", // macOS swap
   "/proc/**",
   "/run",
+  "/run/credentials/**",
   "/run/lock",
   "/run/snapd/**",
   "/run/user/*/doc",
   "/run/user/*/gvfs",
-  "/run/credentials/**",
   "/snap/**",
   "/sys/**",
+
+  // APFS stuff:
+  "/System/Volumes/Preboot",
+  "/System/Volumes/Recovery",
+  "/System/Volumes/VM",
+  "/System/Volumes/xarts",
 ] as const;
 
 export const OnlyDirectoriesDefault = true;
