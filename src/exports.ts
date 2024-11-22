@@ -133,7 +133,7 @@ export class ExportsImpl {
         const entry = entries.find((e) => e.fs_file === mountPoint);
 
         if (entry != null) {
-          device = entry.fs_spec;
+          mtabInfo.mountFrom = device = entry.fs_spec;
           mtabInfo.fileSystem = entry.fs_vfstype;
           if (isRemoteFSInfo(entry)) {
             mtabInfo.remote = true;
