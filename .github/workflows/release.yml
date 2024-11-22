@@ -1,5 +1,15 @@
-name: Prebuild & Publish to NPM
+name: Release
 on: workflow_dispatch
+inputs:
+  bump:
+    description: 'Version bump type (patch|minor|major)'
+    required: true
+    type: choice
+    options:
+    - patch
+    - minor
+    - major
+    default: 'minor'
 
 jobs:
   build:
@@ -94,7 +104,7 @@ jobs:
           NPM_TOKEN: ${{secrets.NPM_TOKEN}}
 
       - name: Publish to npm
-        run: npm run release --ci
+        run: npm run release --ci -- ${{ github.event.inputs.bump }}
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
