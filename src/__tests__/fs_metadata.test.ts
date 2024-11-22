@@ -1,18 +1,15 @@
 // src/__tests__/fs_metadata.test.ts
 
 import { jest } from "@jest/globals";
-import { platform } from "node:os";
 import { times } from "../array.js";
 import { TimeoutError } from "../async.js";
 import { getVolumeMetadata, getVolumeMountPoints } from "../index.js";
 import { omit } from "../object.js";
+import { isLinux, isMacOS, isWindows } from "../platform.js";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
 import { sortByLocale } from "../string.js";
 import { assertMetadata } from "../test-utils/assert.js";
-
-const isWindows = platform() === "win32";
-const isMacOS = platform() === "darwin";
-const isLinux = platform() === "linux";
+import { MiB } from "../units.js";
 
 describe("Filesystem Metadata", () => {
   jest.setTimeout(15_000);
@@ -142,8 +139,12 @@ describe("Filesystem Metadata", () => {
           expect(omit(ea, "available", "used")).toEqual(
             omit(expected, "available", "used"),
           );
-          expect(ea.available).toBeCloseTo(expected.available, 5);
-          expect(ea.used).toBeCloseTo(expected.used, 5);
+          // REMEMBER: NEVER USE toBeCloseTo -- the api is bonkers and only applicable for fractional numbers
+          expect(ea.available).toBeWithin(
+            expected.available - MiB,
+            expected.available + MiB,
+          );
+          expect(ea.used).toBeWithin(expected.used - MiB, expected.used + MiB);
         }
       }
     });
