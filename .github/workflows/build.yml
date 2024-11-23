@@ -89,6 +89,10 @@ jobs:
     runs-on: ubuntu-latest
     container: node:${{ matrix.node-version }}-alpine
     steps:
+      - name: Setup Docker (used by QEMU)
+        run: |
+          apk add curl --update-cache && \
+          curl -fsSL https://get.docker.com | sh
       - name: Setup QEMU
         if: ${{ matrix.arch == 'arm64' }}
         uses: docker/setup-qemu-action@v3
