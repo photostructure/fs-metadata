@@ -76,7 +76,7 @@ jobs:
         if: ${{ matrix.node-version == 18 && github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
-          name: prebuilds-${{ matrix.os }}-${{ matrix.arch }}-glibc
+          name: prebuilds-linux-${{ matrix.arch }}-glibc
           path: prebuilds/
 
   test-alpine:
@@ -103,7 +103,7 @@ jobs:
         if: ${{ matrix.node-version == 18 && github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
-          name: prebuilds-${{ matrix.os }}-${{ matrix.arch }}-musl
+          name: prebuilds-linux-${{ matrix.arch }}-musl
           path: prebuilds/
 
   publish:
