@@ -1,4 +1,4 @@
-import { isObject } from "./object.js";
+import { compactValues, isObject } from "./object.js";
 import { isWindows } from "./platform.js";
 import { isBlank, isNotBlank } from "./string.js";
 
@@ -29,11 +29,11 @@ export interface RemoteInfo {
   /**
    * If remote, the ip or hostname hosting the share (like "rusty" or "10.1.1.3")
    */
-  remoteHost: string;
+  remoteHost?: string;
   /**
    * If remote, the name of the share (like "homes")
    */
-  remoteShare: string;
+  remoteShare?: string;
 }
 
 export function isRemoteInfo(obj: unknown): obj is RemoteInfo {
@@ -74,33 +74,30 @@ export function isRemoteFsType(fstype: string | undefined): boolean {
   return isNotBlank(fstype) && NETWORK_FS_TYPES.has(normalizeProtocol(fstype));
 }
 
+function parseURL(s: string): URL | undefined {
+  try {
+    return isBlank(s) ? undefined : new URL(s);
+  } catch {
+    return;
+  }
+}
+
 export function extractRemoteInfo(
   fsSpec: string | undefined,
 ): RemoteInfo | undefined {
   if (fsSpec == null || isBlank(fsSpec)) return;
 
-  // Let's try URL first, as it's the most robust:
-  try {
-    // try to parse fsSpec as a uri:
-    const url = new URL(fsSpec);
-    if (url != null) {
-      const protocol = normalizeProtocol(url.protocol);
-      const o = {
-        uri: fsSpec,
-        protocol,
-        remote: isRemoteFsType(protocol),
-        remoteUser: url.username,
-        remoteHost: url.hostname,
-        remoteShare: url.pathname,
-      };
-      if (isRemoteInfo(o)) return o;
-    }
-  } catch {
-    // ignore
-  }
-
   if (isWindows) {
     fsSpec = fsSpec.replace(/\\/g, "/");
+  }
+  
+  const url = parseURL(fsSpec)
+  
+  if (url?.protocol === "file:") {
+    return {
+      remote: false,
+      uri: fsSpec
+    }
   }
 
   const patterns = [
@@ -117,11 +114,39 @@ export function extractRemoteInfo(
   ];
 
   for (const { protocol, regex } of patterns) {
-    const o = {
+    const o = compactValues({
       protocol,
+      remote: true,
       ...(fsSpec.match(regex)?.groups ?? {}),
-    } as RemoteInfo;
+    }) as unknown as RemoteInfo;
     if (isRemoteInfo(o)) return o;
+  }
+
+  // Let's try URL last, as nfs mounts are URI-ish
+  try {
+    // try to parse fsSpec as a uri:
+    const url = new URL(fsSpec);
+    if (url != null) {
+      const protocol = normalizeProtocol(url.protocol);
+      if (!isRemoteFsType(protocol)) {
+        // don't set remoteUser, remoteHost, or remoteShare, it's not remote!
+        return {
+          uri: fsSpec,
+          remote: false,
+        };
+      } else {
+        return compactValues({
+          uri: fsSpec,
+          protocol,
+          remote: true,
+          remoteUser: url.username,
+          remoteHost: url.hostname,
+          remoteShare: url.pathname,
+        }) as unknown as RemoteInfo;
+      }
+    }
+  } catch {
+    // ignore
   }
 
   return;

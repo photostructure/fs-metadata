@@ -141,8 +141,8 @@ export class ExportsImpl {
           mtabInfo.fileSystem = entry.fs_vfstype;
           if (isRemoteInfo(entry)) {
             mtabInfo.remote = true;
-            mtabInfo.remoteHost = entry.remoteHost;
-            mtabInfo.remoteShare = entry.remoteShare;
+            mtabInfo.remoteHost = entry.remoteHost!;
+            mtabInfo.remoteShare = entry.remoteShare!;
             console.log("mtab found remote", { mountPoint, entry });
           }
         }
@@ -178,7 +178,7 @@ export class ExportsImpl {
     if (remoteInfo?.remote != null) remote = remoteInfo.remote;
 
     const result = compactValues({
-      ...mtabInfo,
+      ...compactValues(mtabInfo),
       ...compactValues(remoteInfo),
       ...compactValues(metadata),
       mountPoint,
