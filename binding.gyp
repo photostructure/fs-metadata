@@ -80,7 +80,8 @@
           "OS=='mac'",
           {
             "sources": [
-              "src/darwin/fs_meta.cpp"
+              "src/darwin/volume_mount_points.cpp",
+              "src/darwin/volume_metadata.cpp"
             ],
             "xcode_settings": {
               "CLANG_CXX_LANGUAGE_STANDARD": "c++17",

@@ -1,6 +1,6 @@
-// src/darwin/fs_meta.cpp
+// src/darwin/volume_metadata.cpp
 
-#include "fs_meta.h"
+#include "./fs_meta.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
@@ -12,7 +12,6 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/statvfs.h>
-#include <vector>
 
 namespace FSMeta {
 
@@ -83,58 +82,6 @@ public:
     ref_ = nullptr;
     return temp;
   }
-};
-
-class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
-public:
-  GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred)
-      : Napi::AsyncWorker(deferred.Env()), deferred_(deferred) {}
-
-  void Execute() override {
-    try {
-      struct statfs *mntbufp;
-      int count = getmntinfo(&mntbufp, MNT_WAIT);
-
-      if (count <= 0) {
-        throw std::runtime_error("Failed to get mount information");
-      }
-
-      for (int i = 0; i < count; i++) {
-        MountPoint point;
-        point.mountPoint = mntbufp[i].f_mntonname;
-        point.fsType = mntbufp[i].f_fstypename;
-        mountPoints.push_back(point);
-      }
-    } catch (const std::exception &e) {
-      SetError(e.what());
-    }
-  }
-
-  void OnOK() override {
-    Napi::HandleScope scope(Env());
-    Napi::Array result = Napi::Array::New(Env());
-
-    for (size_t i = 0; i < mountPoints.size(); i++) {
-      Napi::Object point = Napi::Object::New(Env());
-      point.Set("mountPoint", mountPoints[i].mountPoint);
-      point.Set("fstype", mountPoints[i].fsType);
-      result.Set(i, point);
-    }
-
-    deferred_.Resolve(result);
-  }
-
-  void OnError(const Napi::Error &error) override {
-    deferred_.Reject(error.Value());
-  }
-
-private:
-  struct MountPoint {
-    std::string mountPoint;
-    std::string fsType;
-  };
-  std::vector<MountPoint> mountPoints;
-  Napi::Promise::Deferred deferred_;
 };
 
 class GetVolumeMetadataWorker : public MetadataWorkerBase {
@@ -275,13 +222,6 @@ private:
     metadata.uri = CFStringToString(urlString);
   }
 };
-
-Napi::Value GetVolumeMountPoints(Napi::Env env) {
-  auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new GetVolumeMountPointsWorker(deferred);
-  worker->Queue();
-  return deferred.Promise();
-}
 
 Napi::Value GetVolumeMetadata(const Napi::Env &env,
                               const std::string &mountPoint,
