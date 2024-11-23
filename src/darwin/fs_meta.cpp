@@ -36,18 +36,53 @@ static std::string CFStringToString(CFStringRef cfString) {
   return result;
 }
 
-// Helper to safely release CF objects
+// Improved CFReleaser with proper Core Foundation support
 template <typename T> class CFReleaser {
+private:
   T ref_;
 
 public:
-  explicit CFReleaser(T ref) : ref_(ref) {}
-  ~CFReleaser() {
-    if (ref_)
-      CFRelease(ref_);
+  explicit CFReleaser(T ref = nullptr) noexcept : ref_(ref) {}
+
+  // Delete copy operations
+  CFReleaser(const CFReleaser &) = delete;
+  CFReleaser &operator=(const CFReleaser &) = delete;
+
+  // Move operations
+  CFReleaser(CFReleaser &&other) noexcept : ref_(other.ref_) {
+    other.ref_ = nullptr;
   }
-  operator T() const { return ref_; }
-  T get() const { return ref_; }
+
+  CFReleaser &operator=(CFReleaser &&other) noexcept {
+    if (this != &other) {
+      reset();
+      ref_ = other.ref_;
+      other.ref_ = nullptr;
+    }
+    return *this;
+  }
+
+  ~CFReleaser() { reset(); }
+
+  void reset(T ref = nullptr) {
+    if (ref_) {
+      CFRelease(ref_);
+    }
+    ref_ = ref;
+  }
+
+  // Implicit conversion operator for Core Foundation APIs
+  operator T() const noexcept { return ref_; }
+
+  T get() const noexcept { return ref_; }
+  bool isValid() const noexcept { return ref_ != nullptr; }
+
+  // Release ownership
+  T release() noexcept {
+    T temp = ref_;
+    ref_ = nullptr;
+    return temp;
+  }
 };
 
 class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
@@ -102,157 +137,143 @@ private:
   Napi::Promise::Deferred deferred_;
 };
 
-class GetVolumeMetadataWorker : public Napi::AsyncWorker {
+class GetVolumeMetadataWorker : public MetadataWorkerBase {
 public:
   GetVolumeMetadataWorker(const std::string &path,
                           const Napi::Promise::Deferred &deferred)
-      : Napi::AsyncWorker(deferred.Env()), mountPoint(path),
-        deferred_(deferred) {}
+      : MetadataWorkerBase(path, deferred) {
+
+    if (path.empty()) {
+      throw FSException("Mount point path cannot be empty");
+    }
+  }
 
   void Execute() override {
     try {
-      struct statvfs vfs;
-      struct statfs fs;
-
-      // Get basic volume information using statvfs
-      if (statvfs(mountPoint.c_str(), &vfs) != 0) {
-        throw std::runtime_error("Failed to get volume statistics");
+      if (!GetBasicVolumeInfo()) {
+        return;
       }
-
-      // Get additional information using statfs
-      if (statfs(mountPoint.c_str(), &fs) != 0) {
-        throw std::runtime_error("Failed to get file system information");
-      }
-
-      // Calculate sizes using uint64_t to prevent overflow
-      uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
-
-      // Calculate total size first
-      metadata.size =
-          static_cast<double>(blockSize) * static_cast<double>(vfs.f_blocks);
-
-      // Calculate available space
-      metadata.available =
-          static_cast<double>(blockSize) * static_cast<double>(vfs.f_bavail);
-
-      // Calculate used space as the difference between total and free
-      double totalFree =
-          static_cast<double>(blockSize) * static_cast<double>(vfs.f_bfree);
-      metadata.used = metadata.size - totalFree;
-
-      // Sanity check to ensure used + available <= size
-      if (metadata.used + metadata.available > metadata.size) {
-        metadata.used = metadata.size - metadata.available;
-      }
-
-      metadata.fileSystem = fs.f_fstypename;
-      metadata.mountFrom = fs.f_mntfromname;
-
-      // Get additional information using DiskArbitration framework
-      CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
-      if (!session.get()) {
-        throw std::runtime_error("Failed to create DiskArbitration session");
-      }
-
-      CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
-          kCFAllocatorDefault, session, fs.f_mntfromname));
-
-      if (disk.get()) {
-        CFReleaser<CFDictionaryRef> description(DADiskCopyDescription(disk));
-        if (description.get()) {
-          // Get volume name/label
-          CFStringRef volumeName = (CFStringRef)CFDictionaryGetValue(
-              description, kDADiskDescriptionVolumeNameKey);
-          if (volumeName) {
-            metadata.label = CFStringToString(volumeName);
-          }
-
-          // Get UUID
-          CFUUIDRef uuid = (CFUUIDRef)CFDictionaryGetValue(
-              description, kDADiskDescriptionVolumeUUIDKey);
-          if (uuid) {
-            CFReleaser<CFStringRef> uuidString(
-                CFUUIDCreateString(kCFAllocatorDefault, uuid));
-            if (uuidString.get()) {
-              metadata.uuid = CFStringToString(uuidString);
-            }
-          }
-
-          // Check if remote
-          CFBooleanRef isNetworkVolume = (CFBooleanRef)CFDictionaryGetValue(
-              description, kDADiskDescriptionVolumeNetworkKey);
-          if (isNetworkVolume) {
-            metadata.remote = CFBooleanGetValue(isNetworkVolume);
-
-            if (metadata.remote) {
-              // Get network share information
-              CFURLRef url = (CFURLRef)CFDictionaryGetValue(
-                  description, kDADiskDescriptionVolumePathKey);
-              if (url) {
-                CFStringRef urlString = CFURLGetString(url);
-                std::string urlStr = CFStringToString(urlString);
-
-                // Parse URL for host and share info
-                size_t hostStart = urlStr.find("//") + 2;
-                size_t hostEnd = urlStr.find('/', hostStart);
-                if (hostStart != std::string::npos &&
-                    hostEnd != std::string::npos) {
-                  metadata.remoteHost =
-                      urlStr.substr(hostStart, hostEnd - hostStart);
-                  metadata.remoteShare = urlStr.substr(hostEnd + 1);
-                }
-              }
-            }
-          }
-        }
-      }
+      GetDiskArbitrationInfo();
     } catch (const std::exception &e) {
       SetError(e.what());
     }
   }
 
-  // TODO: switch to ../common/metadata_worker.h?
-
-  void OnOK() override {
-    Napi::HandleScope scope(Env());
-
-    Napi::Object result = Napi::Object::New(Env());
-    result.Set("mountPoint", mountPoint);
-    result.Set("fileSystem", metadata.fileSystem);
-    result.Set("size", metadata.size);
-    result.Set("used", metadata.used);
-    result.Set("available", metadata.available);
-
-    if (!metadata.label.empty()) {
-      result.Set("label", metadata.label);
-    }
-    if (!metadata.uuid.empty()) {
-      result.Set("uuid", metadata.uuid);
-    }
-    if (!metadata.mountFrom.empty()) {
-      result.Set("mountFrom", metadata.mountFrom);
-    }
-    if (metadata.remote) {
-      result.Set("remote", metadata.remote);
-      if (!metadata.remoteHost.empty()) {
-        result.Set("remoteHost", metadata.remoteHost);
-      }
-      if (!metadata.remoteShare.empty()) {
-        result.Set("remoteShare", metadata.remoteShare);
-      }
-    }
-
-    deferred_.Resolve(result);
-  }
-
-  void OnError(const Napi::Error &error) override {
-    deferred_.Reject(error.Value());
-  }
-
 private:
-  std::string mountPoint;
-  Napi::Promise::Deferred deferred_;
-  VolumeMetadata metadata;
+  bool GetBasicVolumeInfo() {
+    struct statvfs vfs;
+    struct statfs fs;
+
+    if (statvfs(mountPoint.c_str(), &vfs) != 0) {
+      SetError(CreateErrorMessage("statvfs", errno));
+      return false;
+    }
+
+    if (statfs(mountPoint.c_str(), &fs) != 0) {
+      SetError(CreateErrorMessage("statfs", errno));
+      return false;
+    }
+
+    // Calculate sizes using uint64_t to prevent overflow
+    const uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
+    const uint64_t totalBlocks = vfs.f_blocks;
+    const uint64_t availBlocks = vfs.f_bavail;
+    const uint64_t freeBlocks = vfs.f_bfree;
+
+    // Check for overflow before multiplication
+    if (blockSize > 0 &&
+        totalBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
+      SetError("Volume size calculation would overflow");
+      return false;
+    }
+
+    metadata.size = static_cast<double>(blockSize * totalBlocks);
+    metadata.available = static_cast<double>(blockSize * availBlocks);
+    metadata.used = static_cast<double>(blockSize * (totalBlocks - freeBlocks));
+
+    metadata.fileSystem = fs.f_fstypename;
+    metadata.mountFrom = fs.f_mntfromname;
+    metadata.mountName = fs.f_mntonname;
+    metadata.status = "ready";
+
+    return true;
+  }
+
+  void GetDiskArbitrationInfo() {
+    CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
+    if (!session.isValid()) {
+      metadata.status = "partial";
+      return;
+    }
+
+    // Schedule session with RunLoop
+    DASessionScheduleWithRunLoop(session.get(), CFRunLoopGetCurrent(),
+                                 kCFRunLoopDefaultMode);
+
+    // RAII cleanup for RunLoop scheduling
+    struct RunLoopCleaner {
+      DASessionRef session;
+      explicit RunLoopCleaner(DASessionRef s) : session(s) {}
+      ~RunLoopCleaner() {
+        DASessionUnscheduleFromRunLoop(session, CFRunLoopGetCurrent(),
+                                       kCFRunLoopDefaultMode);
+      }
+    } runLoopCleaner(session.get());
+
+    CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
+        kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
+
+    if (!disk.isValid()) {
+      metadata.status = "partial";
+      return;
+    }
+
+    CFReleaser<CFDictionaryRef> description(DADiskCopyDescription(disk.get()));
+    if (!description.isValid()) {
+      metadata.status = "partial";
+      return;
+    }
+
+    ProcessDiskDescription(description.get());
+  }
+
+  void ProcessDiskDescription(CFDictionaryRef description) {
+    // Get volume name/label
+    if (CFStringRef volumeName = (CFStringRef)CFDictionaryGetValue(
+            description, kDADiskDescriptionVolumeNameKey)) {
+      metadata.label = CFStringToString(volumeName);
+    }
+
+    // Get UUID
+    if (CFUUIDRef uuid = (CFUUIDRef)CFDictionaryGetValue(
+            description, kDADiskDescriptionVolumeUUIDKey)) {
+      CFReleaser<CFStringRef> uuidString(
+          CFUUIDCreateString(kCFAllocatorDefault, uuid));
+      if (uuidString.isValid()) {
+        metadata.uuid = CFStringToString(uuidString.get());
+      }
+    }
+
+    ProcessNetworkVolume(description);
+  }
+
+  void ProcessNetworkVolume(CFDictionaryRef description) {
+    CFBooleanRef isNetworkVolume = (CFBooleanRef)CFDictionaryGetValue(
+        description, kDADiskDescriptionVolumeNetworkKey);
+
+    metadata.remote = CFBooleanGetValue(isNetworkVolume);
+    CFURLRef url = (CFURLRef)CFDictionaryGetValue(
+        description, kDADiskDescriptionVolumePathKey);
+    if (!url) {
+      return;
+    }
+
+    CFStringRef urlString = CFURLGetString(url);
+    if (!urlString) {
+      return;
+    }
+    metadata.uri = CFStringToString(urlString);
+  }
 };
 
 Napi::Value GetVolumeMountPoints(Napi::Env env) {
