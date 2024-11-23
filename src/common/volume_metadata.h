@@ -14,6 +14,7 @@ struct VolumeMetadata {
   double available;
   std::string uuid;
   std::string mountFrom;
+  std::string mountName;
   std::string uri;
   std::string status;
   bool remote = false;

@@ -12,7 +12,7 @@ export interface VolumeMetadata extends RemoteInfo {
    */
   mountPoint: string;
   /**
-   * The name of the mount (only provided on some linux GIO mounts)
+   * The name of the mount. This may match the resolved mountPoint.
    */
   mountName?: string;
   /**

@@ -41,6 +41,9 @@ protected:
     result.Set("mountFrom", metadata.mountFrom.empty()
                                 ? env.Null()
                                 : Napi::String::New(env, metadata.mountFrom));
+    result.Set("mountName", metadata.mountName.empty()
+                                ? env.Null()
+                                : Napi::String::New(env, metadata.mountName));
     result.Set("uri", metadata.uri.empty()
                           ? env.Null()
                           : Napi::String::New(env, metadata.uri));
