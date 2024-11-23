@@ -87,7 +87,6 @@ jobs:
         arch: [amd64, arm64]
         node-version: [18, 20, 22, 23]
     runs-on: ubuntu-latest
-    container: node:${{ matrix.node-version }}-alpine
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
