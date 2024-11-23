@@ -78,7 +78,10 @@ describe("Filesystem Metadata", () => {
       } else if (isMacOS) {
         expect(metadata.fileSystem).toMatch(/^(apfs|hfs)$/i);
       } else if (isLinux) {
-        expect(metadata.fileSystem).toMatch(/^(ext[234]|xfs|btrfs|zfs)$/i);
+        // We expect "overlay" for Docker containers
+        expect(metadata.fileSystem).toMatch(
+          /^(ext[234]|xfs|btrfs|zfs|overlay)$/i,
+        );
       }
     });
 
