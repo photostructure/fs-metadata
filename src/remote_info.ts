@@ -90,14 +90,14 @@ export function extractRemoteInfo(
   if (isWindows) {
     fsSpec = fsSpec.replace(/\\/g, "/");
   }
-  
-  const url = parseURL(fsSpec)
-  
+
+  const url = parseURL(fsSpec);
+
   if (url?.protocol === "file:") {
     return {
       remote: false,
-      uri: fsSpec
-    }
+      uri: fsSpec,
+    };
   }
 
   const patterns = [
