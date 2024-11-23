@@ -4,6 +4,7 @@
     "buildify",
     "fstype",
     "gvfs",
+    "libblkid",
     "mntops",
     "napi",
     "passno",
