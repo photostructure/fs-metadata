@@ -80,7 +80,7 @@ describe("Array", () => {
 
       // Should take approximately the time of the longest delay (50ms)
       // Adding some buffer for execution time
-      expect(totalTime).toBeLessThan(120);
+      expect(totalTime).toBeLessThan(140); // slow GHA runner took 121ms (!!)
     });
 
     // Test error handling
