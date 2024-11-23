@@ -70,7 +70,6 @@ export const ExcludedFileSystemTypesDefault = [
   "debugfs",
   "devpts",
   "none",
-  "overlay",
   "proc",
   "pstore",
   "securityfs",
