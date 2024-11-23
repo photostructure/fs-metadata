@@ -117,7 +117,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "18.x"
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -125,6 +128,9 @@ jobs:
           path: ./prebuilds
           merge-multiple: true # < because prebuilds/linux-x64/ will contain both a glibc and musl build
 
+      - name: List ./prebuilds/
+        run: ls -la ./prebuilds
+  
       - name: Configure git for publishing
         run: |
           git config user.name "${GITHUB_ACTOR}"
