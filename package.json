@@ -23,10 +23,6 @@
     "type": "git",
     "url": "git+ssh://git@github.com/photostructure/fs-metadata.git"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "private": false,
   "license": "MIT",
   "scripts": {
     "install": "node-gyp-build",
@@ -68,6 +64,12 @@
     "release": "release-it"
   },
   "gypfile": true,
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "os": [
     "darwin",
     "linux",
@@ -91,7 +93,6 @@
     "node-addon-api": "^8.2.2",
     "node-gyp-build": "^4.8.4"
   },
-  "why-eslint-9.14.0": "https://github.com/typescript-eslint/typescript-eslint/issues/10338",
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@types/jest": "^29.5.14",
