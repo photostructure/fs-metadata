@@ -65,7 +65,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: linux/arm64
-      - run: sudo apt-get update && apt-get install -y docker libglib2.0-dev libblkid-dev uuid-dev
+      - run: sudo apt-get update && sudo apt-get install -y docker libglib2.0-dev libblkid-dev uuid-dev
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
