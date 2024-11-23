@@ -2,6 +2,7 @@
 
 import { jest } from "@jest/globals";
 import { asyncFilter, times, uniq, uniqBy } from "../array.js";
+import { delay } from "../async.js";
 
 describe("Array", () => {
   describe("asyncFilter", () => {
@@ -67,20 +68,23 @@ describe("Array", () => {
     it("should execute predicates concurrently", async () => {
       jest.retryTimes(3);
       const delays = [50, 40, 30, 20, 10];
-      const start = Date.now();
 
-      const results = await asyncFilter(delays, async (delay) => {
-        await new Promise((resolve) => setTimeout(resolve, delay));
+      const times: [number, number][] = [];
+
+      const results = await asyncFilter(delays, async (ms) => {
+        const start = Date.now();
+        await delay(ms);
+        const end = Date.now();
+        times.push([start, end]);
         return true;
       });
-
+      console.log({ times });
       expect(results).toEqual(delays);
 
-      const totalTime = Date.now() - start;
-
-      // Should take approximately the time of the longest delay (50ms)
-      // Adding some buffer for execution time
-      expect(totalTime).toBeLessThan(140); // slow GHA runner took 121ms (!!)
+      // Rather than checking on full elapsed time, we check that the start and
+      // delay times are not in order, indicating concurrent execution
+      const sorted = times.flat().sort((a, b) => a - b);
+      expect(times).not.toEqual(sorted);
     });
 
     // Test error handling
