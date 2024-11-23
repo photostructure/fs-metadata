@@ -14,7 +14,7 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities. 
 -->
 
-## [0.0.1] - 2024-11-17
+## [0.0.1] - 2024-11-22
 
 First release! Everything is a new feature!
 

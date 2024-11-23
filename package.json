@@ -1,7 +1,8 @@
 {
   "name": "@photostructure/fs-metadata",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Cross-platform native filesystem metadata retrieval for Node.js",
+  "homepage": "https://photostructure.github.io/fs-metadata/",
   "type": "module",
   "main": "dist/cjs/index.cjs",
   "module": "dist/esm/index.mjs",
@@ -18,7 +19,6 @@
       }
     }
   },
-  "homepage": "https://photostructure.github.io/fs-metadata/",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/photostructure/fs-metadata.git"
@@ -26,6 +26,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "private": false,
   "license": "MIT",
   "scripts": {
     "install": "node-gyp-build",
