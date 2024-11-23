@@ -40,8 +40,9 @@ jobs:
       - run: npm run prebuild
       - run: npm run tests
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload prebuilds
         if: ${{ matrix.node-version == '18.x' }} && ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ matrix.os }}
           path: prebuilds/
@@ -55,7 +56,9 @@ jobs:
     runs-on: ubuntu-latest
     container: node:18
     steps:
-      - uses: docker/setup-qemu-action@v3
+      - name: Setup QEMU
+        if: ${{ matrix.arch == 'arm64' }}
+        uses: docker/setup-qemu-action@v3
         with:
           platforms: linux/${{ matrix.arch }}
       - run: apt-get update && apt-get install -y libglib2.0-dev libblkid-dev uuid-dev
@@ -63,8 +66,9 @@ jobs:
       - run: npm ci
       - run: npm run prebuild
       - run: npm run tests
-      - uses: actions/upload-artifact@v4
+      - name: Upload prebuilds
         if: ${{ matrix.node-version == '18.x' }} && ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ matrix.os }}-${{ matrix.arch }}-glibc
           path: prebuilds/
@@ -78,7 +82,8 @@ jobs:
     runs-on: ubuntu-latest
     container: node:18-alpine
     steps:
-      - if: ${{ matrix.arch == 'arm64' }}
+      - name: Setup QEMU
+        if: ${{ matrix.arch == 'arm64' }}
         uses: docker/setup-qemu-action@v3
         with:
           platforms: linux/${{ matrix.arch }}
@@ -87,8 +92,9 @@ jobs:
       - run: npm ci
       - run: npm run prebuild
       - run: npm run tests
-      - uses: actions/upload-artifact@v4
+      - name: Upload prebuilds
         if: ${{ matrix.node-version == '18.x' }} && ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ matrix.os }}-${{ matrix.arch }}-musl
           path: prebuilds/
