@@ -129,8 +129,32 @@ jobs:
           merge-multiple: true # < because prebuilds/linux-x64/ will contain both a glibc and musl build
 
       - name: List ./prebuilds/
-        run: ls -la ./prebuilds
-  
+        run: ls -laR ./prebuilds
+
+      - name: Set up GPG
+        run: |
+          # Import key more securely
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import 2>/dev/null
+
+          # Configure gpg more securely
+          cat > ~/.gnupg/gpg.conf << EOF
+          default-key ${{ secrets.GPG_KEY_ID }}
+          pinentry-mode loopback
+          use-agent
+          EOF
+
+          # Reload agent
+          gpg-connect-agent RELOADAGENT /bye
+
+          # Add key using configuration file instead of CLI args
+          echo "$GPG_PASSPHRASE" | gpg --batch --passphrase-fd 0 --quick-add-key ${{ secrets.GPG_KEY_ID }}
+
+      - name: Configure Git to use GPG
+        run: |
+          git config --global user.signingkey ${{ secrets.GPG_KEY_ID }}
+          git config --global commit.gpgSign true
+          git config --global gpg.program gpg
+
       - name: Configure git for publishing
         run: |
           git config user.name "${GITHUB_ACTOR}"
@@ -145,5 +169,13 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cleanup GPG keys
+        if: always()
+        run: |
+          gpg --batch --yes --delete-secret-keys ${{ secrets.GPG_KEY_ID }}
+          gpg --batch --yes --delete-keys ${{ secrets.GPG_KEY_ID }}
+          rm -rf ~/.gnupg/
+
       - name: Remove npm token
-        run: rm ~/.npmrc
+        if: always()
+        run: rm -f ~/.npmrc
