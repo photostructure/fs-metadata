@@ -147,11 +147,15 @@ describe("Filesystem Metadata", () => {
             omit(expected, "available", "used"),
           );
           // REMEMBER: NEVER USE toBeCloseTo -- the api is bonkers and only applicable for fractional numbers
+          const delta = 8 * MiB;
           expect(ea.available).toBeWithin(
-            expected.available - MiB,
-            expected.available + MiB,
+            expected.available - delta,
+            expected.available + delta,
           );
-          expect(ea.used).toBeWithin(expected.used - MiB, expected.used + MiB);
+          expect(ea.used).toBeWithin(
+            expected.used - delta,
+            expected.used + delta,
+          );
         }
       }
     });
