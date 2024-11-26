@@ -1,15 +1,18 @@
 // index.ts
 import NodeGypBuild from "node-gyp-build";
 import { Stats } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { rename, stat } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { defer } from "./defer.js";
 import { WrappedError } from "./error.js";
+import { findAncestorDir } from "./fs.js";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
-import { getLinuxMountPoints } from "./linux/mount_points.js";
-import { parseMtab } from "./linux/mtab.js";
-import { normalizeMountPoint } from "./mount_point.js";
+import {
+  getLinuxMountPoints,
+  getLinuxMtabMetadata,
+} from "./linux/mount_points.js";
 import type {
   GetVolumeMetadataOptions,
   NativeBindings,
@@ -17,13 +20,14 @@ import type {
 import { gt0 } from "./number.js";
 import { compactValues } from "./object.js";
 import { type Options, options } from "./options.js";
-import { isLinux, isWindows } from "./platform.js";
+import { isRootDirectory, normalizePath } from "./path.js";
+import { isLinux, isMacOS, isWindows } from "./platform.js";
 import {
   extractRemoteInfo,
   isRemoteFsType,
   isRemoteInfo,
+  RemoteInfo,
 } from "./remote_info.js";
-import { findAncestorDir } from "./stat.js";
 import { isBlank, isNotBlank } from "./string.js";
 import { parseUNCPath } from "./unc.js";
 import { extractUUID } from "./uuid.js";
@@ -76,7 +80,7 @@ export class ExportsImpl {
     return filterMountPoints(arr, options);
   }
 
-  async #getUnixMountPoints(options: Options) {
+  async #getUnixMountPoints(options: Options & { device?: string }) {
     return filterTypedMountPoints(
       await (isLinux
         ? getLinuxMountPoints(this.#nativeFn, options)
@@ -112,7 +116,7 @@ export class ExportsImpl {
       );
     }
 
-    mountPoint = normalizeMountPoint(mountPoint);
+    mountPoint = normalizePath(mountPoint);
 
     if (o.onlyDirectories || isWindows) {
       let s: Stats;
@@ -125,26 +129,20 @@ export class ExportsImpl {
         throw new TypeError(`mountPoint ${mountPoint} is not a directory`);
       }
     }
+    let remote: boolean = false;
 
     // Get filesystem info from mtab first on Linux
-    const mtabInfo: Partial<VolumeMetadata> = {};
-
-    let device: string | undefined;
+    let mtabRemoteInfo: undefined | RemoteInfo = undefined;
+    let device: undefined | string;
     if (isLinux) {
       try {
-        const mtab = await readFile(o.linuxMountTablePath, "utf8");
-        const entries = parseMtab(mtab);
-        const entry = entries.find((e) => e.fs_file === mountPoint);
-
-        if (entry != null) {
-          mtabInfo.mountFrom = device = entry.fs_spec;
-          mtabInfo.fileSystem = entry.fs_vfstype;
-          if (isRemoteInfo(entry)) {
-            mtabInfo.remote = true;
-            mtabInfo.remoteHost = entry.remoteHost!;
-            mtabInfo.remoteShare = entry.remoteShare!;
-            console.log("mtab found remote", { mountPoint, entry });
-          }
+        const m = await getLinuxMtabMetadata(mountPoint, o);
+        if (isRemoteInfo(m)) {
+          remote = m.remote ?? false;
+          mtabRemoteInfo = m;
+        }
+        if (isNotBlank(m.fs_spec)) {
+          device = m.fs_spec;
         }
       } catch (error) {
         console.warn("Failed to read mount table:", error);
@@ -162,23 +160,19 @@ export class ExportsImpl {
       await this.#nativeFn()
     ).getVolumeMetadata(mountPoint, nativeOptions)) as VolumeMetadata;
 
-    let remote = metadata.remote ?? false;
-
-    // backstop for macOS:
-    if (!remote && isRemoteFsType(metadata.fileSystem)) {
-      remote = true;
-    }
-
     // Some implementations leave it up to us to extract remote info:
     const remoteInfo =
+      mtabRemoteInfo ??
       extractRemoteInfo(metadata.uri) ??
       extractRemoteInfo(metadata.mountFrom) ??
       (isWindows ? parseUNCPath(mountPoint) : undefined);
 
-    if (remoteInfo?.remote != null) remote = remoteInfo.remote;
+    remote ||=
+      isRemoteFsType(metadata.fileSystem) ||
+      (remoteInfo?.remote ?? metadata.remote ?? false);
 
     const result = compactValues({
-      ...compactValues(mtabInfo),
+      ...compactValues(mtabRemoteInfo),
       ...compactValues(remoteInfo),
       ...compactValues(metadata),
       mountPoint,
@@ -202,7 +196,7 @@ export class ExportsImpl {
 
     // Normalize remote share path
     if (isNotBlank(result.remoteShare)) {
-      result.remoteShare = normalizeMountPoint(result.remoteShare);
+      result.remoteShare = normalizePath(result.remoteShare);
     }
 
     return compactValues(result) as unknown as VolumeMetadata;
@@ -219,5 +213,73 @@ export class ExportsImpl {
   ): Promise<VolumeMetadata[]> => {
     const arr = await this.getVolumeMountPoints(opts);
     return Promise.all(arr.map((mp) => this.getVolumeMetadata(mp, opts)));
+  };
+
+  /**
+   * Check if a file or directory is hidden.
+   *
+   * Note that `path` may be _effectively_ hidden if any of the ancestor
+   * directories are hidden: use {@link isHiddenRecursive} to check for this.
+   *
+   * @param path Path to file or directory
+   * @returns Promise resolving to boolean indicating hidden state
+   */
+  readonly isHidden = async (path: string): Promise<boolean> => {
+    if (isLinux || isMacOS) {
+      if (basename(path).startsWith(".")) {
+        return true;
+      }
+    }
+    if (isWindows && isRootDirectory(path)) {
+      // windows `attr` thinks all drive letters don't exist.
+      return false;
+    }
+    if (isWindows || isMacOS) {
+      return (await this.#nativeFn()).isHidden(path);
+    }
+    return false;
+  };
+
+  /**
+   * Check if a file or directory is hidden, or if any of its ancestor
+   * directories are hidden.
+   */
+  readonly isHiddenRecursive = async (path: string): Promise<boolean> => {
+    let p = normalizePath(path);
+    while (!isRootDirectory(p)) {
+      if (await this.isHidden(p)) {
+        return true;
+      }
+      p = dirname(p);
+    }
+    return false;
+  };
+
+  /**
+   * Set the hidden state of a file or directory
+   * @param path Path to file or directory
+   * @param hidden Desired hidden state
+   * @returns Promise resolving the final name of the file or directory (as it
+   * will change on POSIX systems)
+   */
+  readonly setHidden = async (
+    path: string,
+    hidden: boolean,
+  ): Promise<string> => {
+    if ((await this.isHidden(path)) === hidden) {
+      return path;
+    }
+
+    if (isLinux || isMacOS) {
+      const dir = dirname(path);
+      const srcBase = basename(path).replace(/^\./, "");
+      const dest = join(dir, (hidden ? "." : "") + srcBase);
+      if (path !== dest) await rename(path, dest);
+      return dest;
+    }
+    if (isWindows) {
+      await (await this.#nativeFn()).setHidden(path, hidden);
+    }
+    return path;
   };
 }

@@ -29,12 +29,12 @@ describe("options()", () => {
   it("should override multiple fields when provided", () => {
     const overrides = {
       timeoutMs: 8000,
-      linuxMountTablePath: "/etc/mtab",
+      linuxMountTablePaths: ["/etc/mtab"],
       onlyDirectories: false,
     };
     const result = options(overrides);
     expect(result.timeoutMs).toBe(overrides.timeoutMs);
-    expect(result.linuxMountTablePath).toBe(overrides.linuxMountTablePath);
+    expect(result.linuxMountTablePaths).toBe(overrides.linuxMountTablePaths);
     expect(result.onlyDirectories).toBe(overrides.onlyDirectories);
   });
 

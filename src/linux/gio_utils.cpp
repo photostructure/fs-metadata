@@ -1,31 +1,37 @@
+// src/linux/gio_utils.cpp
 #ifdef ENABLE_GIO
 
 #include "gio_utils.h"
 #include "gio_worker.h"
 #include <gio/gio.h>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 
 namespace FSMeta {
 namespace gio {
 
-// Custom deleter for GObject types
-struct GObjectDeleter {
-  void operator()(void *ptr) const {
+// Custom deleter for GObject types using g_object_unref
+template <typename T> struct GObjectDeleter {
+  void operator()(T *ptr) const {
     if (ptr) {
       g_object_unref(ptr);
     }
   }
 };
 
-// Type aliases for common GObject smart pointers
-using GVolumeMonitorPtr = std::unique_ptr<GVolumeMonitor, GObjectDeleter>;
-using GObjectPtr = std::unique_ptr<GObject, GObjectDeleter>;
-using GFilePtr = std::unique_ptr<GFile, GObjectDeleter>;
-using GVolumePtr = std::unique_ptr<GVolume, GObjectDeleter>;
-using GMountPtr = std::unique_ptr<GMount, GObjectDeleter>;
-using GUriPtr = std::unique_ptr<GUri, GObjectDeleter>;
+// Custom deleter for g_free
+struct GFreeDeleter {
+  void operator()(void *ptr) const {
+    if (ptr) {
+      g_free(ptr);
+    }
+  }
+};
+
+// Smart pointer aliases
+template <typename T> using GObjectPtr = std::unique_ptr<T, GObjectDeleter<T>>;
+
+using GCharPtr = std::unique_ptr<char, GFreeDeleter>;
 
 Napi::Value GetMountPoints(Napi::Env env) {
   auto deferred = Napi::Promise::Deferred::New(env);
@@ -35,17 +41,24 @@ Napi::Value GetMountPoints(Napi::Env env) {
 }
 
 void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
-
+  // Obtain the GVolumeMonitor singleton (do not unref)
   GVolumeMonitor *monitor = g_volume_monitor_get();
   if (!monitor) {
     return;
   }
 
-  std::unique_ptr<GVolumeMonitor, GObjectDeleter> monitor_guard(monitor);
+  // Get the list of mounts
   GList *mounts = g_volume_monitor_get_mounts(monitor);
   if (!mounts) {
     return;
   }
+
+  // Ensure mounts are freed when out of scope
+  auto mounts_cleanup = [](GList *list) {
+    g_list_free_full(list, reinterpret_cast<GDestroyNotify>(g_object_unref));
+  };
+  std::unique_ptr<GList, decltype(mounts_cleanup)> mounts_guard(mounts,
+                                                                mounts_cleanup);
 
   for (GList *l = mounts; l != nullptr; l = l->next) {
     GMount *mount = G_MOUNT(l->data);
@@ -53,96 +66,55 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
       continue;
     }
 
-    GFile *root = g_mount_get_root(mount);
+    GObjectPtr<GFile> root(g_mount_get_root(mount));
     if (!root) {
       continue;
     }
 
-    char *path = g_file_get_path(root);
+    GCharPtr path(g_file_get_path(root.get()));
+    if (!path) {
+      continue;
+    }
 
-    if (path && mountPoint == path) {
-
-      // Get volume name
-      GVolume *volume = g_mount_get_volume(mount);
+    if (mountPoint == path.get()) {
+      // Get volume information
+      GObjectPtr<GVolume> volume(g_mount_get_volume(mount));
       if (volume) {
-        char *name = g_volume_get_name(volume);
+        GCharPtr name(g_volume_get_name(volume.get()));
         if (name) {
-          metadata.label = name;
-          g_free(name);
+          metadata.label = name.get();
         }
-        g_object_unref(volume);
       }
 
-      // Get mount name (can include filesystem type info)
-      char *mount_name = g_mount_get_name(mount);
+      GCharPtr mount_name(g_mount_get_name(mount));
       if (mount_name) {
-        g_free(mount_name);
+        metadata.mountName = mount_name.get();
       }
 
-      // Get location and URI
-      GFile *location = g_mount_get_default_location(mount);
+      GObjectPtr<GFile> location(g_mount_get_default_location(mount));
       if (location) {
-
-        // Try different URI methods
-        char *uri = g_file_get_uri(location);
-        char *parse_name = g_file_get_parse_name(location);
-
+        GCharPtr uri(g_file_get_uri(location.get()));
         if (uri) {
-          metadata.uri = uri;
-
-          // Parse URI for remote details
-          GError *error = nullptr;
-          GUri *parsed_uri = g_uri_parse(uri, G_URI_FLAGS_NONE, &error);
-          if (parsed_uri) {
-            const char *scheme = g_uri_get_scheme(parsed_uri);
-
-            if (scheme && strcmp(scheme, "file") != 0) {
-              metadata.remote = true;
-              metadata.fileSystem = scheme;
-
-              const char *host = g_uri_get_host(parsed_uri);
-              const char *path = g_uri_get_path(parsed_uri);
-
-              if (host)
-                metadata.remoteHost = host;
-              if (path && path[0] == '/')
-                metadata.remoteShare = path + 1;
-            }
-            g_uri_unref(parsed_uri);
-          } else {
-            if (error) {
-              g_error_free(error);
-            }
-          }
-          g_free(uri);
+          metadata.uri = uri.get();
         }
-
-        if (parse_name) {
-          g_free(parse_name);
-        }
-        g_object_unref(location);
       }
 
-      // Try additional methods to get filesystem info
       if (metadata.fileSystem.empty()) {
-        GDrive *drive = g_mount_get_drive(mount);
+        GObjectPtr<GDrive> drive(g_mount_get_drive(mount));
         if (drive) {
-          // Try to get unix device path
-          char *unix_device = g_drive_get_identifier(
-              drive, G_DRIVE_IDENTIFIER_KIND_UNIX_DEVICE);
+          GCharPtr unix_device(g_drive_get_identifier(
+              drive.get(), G_DRIVE_IDENTIFIER_KIND_UNIX_DEVICE));
           if (unix_device) {
-            g_free(unix_device);
+            metadata.fileSystem = unix_device.get();
           }
-          g_object_unref(drive);
         }
       }
+
+      // Exit early since we've found the mount point
       break;
     }
-    g_object_unref(root);
-    g_free(path);
   }
-
-  g_list_free_full(mounts, g_object_unref);
+  // Mounts are automatically freed by mounts_guard
 }
 
 } // namespace gio

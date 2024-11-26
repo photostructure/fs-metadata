@@ -38,9 +38,11 @@ export interface Options {
   excludedMountPointGlobs: string[];
 
   /**
-   * On Linux, what mount point table should we look at? This defaults to `/proc/mounts`, but `/etc/mtab` is also common.
+   * On Linux, use the first mount point table in this array that is readable.
+   *
+   * @see {@link LinuxMountTablePathsDefault} for the default values
    */
-  linuxMountTablePath: string;
+  linuxMountTablePaths: string[];
 
   /**
    * Should only readable directories be included?
@@ -110,6 +112,12 @@ export const ExcludedMountPointGlobsDefault = [
 
 export const OnlyDirectoriesDefault = true;
 
+export const LinuxMountTablePathsDefault = [
+  "/proc/self/mounts",
+  "/proc/mounts",
+  "/etc/mtab",
+];
+
 /**
  * Default {@link Options} object.
  *
@@ -119,7 +127,7 @@ export const OptionsDefault: Options = {
   timeoutMs: TimeoutMsDefault,
   excludedFileSystemTypes: [...ExcludedFileSystemTypesDefault],
   excludedMountPointGlobs: [...ExcludedMountPointGlobsDefault],
-  linuxMountTablePath: "/proc/mounts",
+  linuxMountTablePaths: LinuxMountTablePathsDefault,
   onlyDirectories: OnlyDirectoriesDefault,
 } as const;
 

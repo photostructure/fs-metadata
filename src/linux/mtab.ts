@@ -1,7 +1,7 @@
 // src/linux/mtab.ts
 
-import { normalizeLinuxMountPoint } from "../mount_point.js";
 import { toInt } from "../number.js";
+import { normalizeLinuxPath } from "../path.js";
 import {
   extractRemoteInfo,
   isRemoteFsType,
@@ -71,7 +71,8 @@ export function parseMtab(
 
     const entry: MountEntry = {
       fs_spec: fields[0]!,
-      fs_file: normalizeLinuxMountPoint(fields[1] ?? ""),
+      // normalizeLinuxPath DOES NOT resolve()!
+      fs_file: normalizeLinuxPath(fields[1] ?? ""),
       fs_vfstype: fields[2]!,
       fs_mntops: fields[3]!,
       fs_freq: toInt(fields[4]),

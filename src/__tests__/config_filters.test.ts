@@ -8,7 +8,7 @@ import {
   filterMountPoints,
   filterTypedMountPoints,
 } from "../config_filters.js";
-import { normalizeMountPoint } from "../mount_point.js";
+import { normalizePath } from "../path.js";
 import { isWindows } from "../platform.js";
 import { shuffle } from "../random.js";
 import { sortByLocale } from "../string.js";
@@ -27,7 +27,7 @@ const MockDirectoryStatResult = {
 const NonExistentPath = isWindows ? "A:\\" : "/nonexistent";
 const ExistingPaths = sortByLocale(
   (isWindows ? [env["SystemDrive"]!] : ["/", "/home", "/usr"]).map(
-    normalizeMountPoint,
+    normalizePath,
   ),
 );
 

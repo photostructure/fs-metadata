@@ -1,9 +1,9 @@
 // src/config_filters.ts
 
 import { asyncFilter, uniq } from "./array.js";
+import { isDirectory } from "./fs.js";
 import { compileGlob } from "./glob.js";
 import { type Options, options } from "./options.js";
-import { isDirectory } from "./stat.js";
 import { isNotBlank, isString, sortByLocale } from "./string.js";
 import {
   isTypedMountPoint,

@@ -18,3 +18,6 @@ const impl = new ExportsImpl(__dirname);
 export const getVolumeMountPoints = impl.getVolumeMountPoints;
 export const getVolumeMetadata = impl.getVolumeMetadata;
 export const getAllVolumeMetadata = impl.getAllVolumeMetadata;
+export const isHidden = impl.isHidden;
+export const isHiddenRecursive = impl.isHiddenRecursive;
+export const setHidden = impl.setHidden;

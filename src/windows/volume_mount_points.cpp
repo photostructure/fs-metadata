@@ -1,5 +1,6 @@
 // src/windows/volume_mount_points.cpp
-#include "../common/metadata_worker.h" // Add this include
+#include "../common/metadata_worker.h"
+#include "./error_utils.h"
 #include "./fs_meta.h"
 #include <sstream>
 #include <windows.h>
@@ -19,13 +20,12 @@ public:
       DWORD length = GetLogicalDriveStringsA(0, nullptr);
       if (length == 0) {
         throw FSException(
-            CreateErrorMessage("GetLogicalDriveStrings", GetLastError()));
+            "GetLogicalDriveStrings", GetLastError());
       }
 
       std::vector<char> driveStrings(length);
       if (GetLogicalDriveStringsA(length, driveStrings.data()) == 0) {
-        throw FSException(
-            CreateErrorMessage("GetLogicalDriveStrings data", GetLastError()));
+        throw FSException("GetLogicalDriveStrings data", GetLastError());
       }
 
       for (const char *drive = driveStrings.data(); *drive;
