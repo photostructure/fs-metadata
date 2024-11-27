@@ -12,7 +12,7 @@ export default [
       },
     },
   },
-  { ignores: [".tsup", "build", "coverage", "dist", "docs"] },
+  { ignores: [".tsup", "build", "coverage", "dist*", "docs"] },
   pluginJs.configs.recommended,
   ...ts_eslint.configs.recommended,
 ];
