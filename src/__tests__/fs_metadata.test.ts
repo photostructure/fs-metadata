@@ -39,7 +39,9 @@ describe("Filesystem Metadata", () => {
     it("should handle concurrent mountPoint requests", async () => {
       const expected = await getVolumeMountPoints();
       assertMountPoints(expected);
-      for (const ea of await Promise.all(times(8, getVolumeMountPoints))) {
+      for (const ea of await Promise.all(
+        times(8, () => getVolumeMountPoints()),
+      )) {
         expect(ea).toEqual(expected);
       }
     });
