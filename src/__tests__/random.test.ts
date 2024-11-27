@@ -1,5 +1,6 @@
 // src/__tests__/random.test.ts
 
+import { times } from "../array.js";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
 
 describe("random", () => {
@@ -25,7 +26,8 @@ describe("random", () => {
 
   describe("shuffle", () => {
     it("should return a shuffled array", () => {
-      const array = [1, 2, 3, 4, 5];
+      let i = 0;
+      const array = times(64, () => i++);
       const shuffled = shuffle(array);
       expect(shuffled).not.toEqual(array);
       expect(shuffled.sort()).toEqual(array.sort());
@@ -35,7 +37,7 @@ describe("random", () => {
       const array = [1, 2, 3, 4, 5];
       const arrayCopy = [...array];
       shuffle(array);
-      expect(array).toEqual(arrayCopy);
+      expect(array).toBe(arrayCopy);
     });
   });
 
