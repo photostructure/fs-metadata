@@ -44,7 +44,7 @@
     "jest:watch": "npm t -- --watch",
     "jest:clear": "jest --clearCache",
     "// tests": "is called by .github/workflows/test.yml",
-    "tests": "run-s test test:memory",
+    "tests": "run-s lint test test:memory",
     "test": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js",
     "// test:memory:todo": "set up valgrind or similar",
     "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js src/__tests__/memory.test.ts",
@@ -58,7 +58,7 @@
     "fmt:pkg": "npm pkg fix",
     "fmt:ts": "prettier --write \"src/**/*.ts\"",
     "// precommit": "is called manually before committing",
-    "precommit": "run-s clean fmt lint prebuild tsc tests",
+    "precommit": "run-s clean fmt prebuild tsc tests",
     "// release": "is called by .github/workflows/release.yml and should only be run via GitHub Actions",
     "prerelease": "tsc",
     "release": "release-it"
