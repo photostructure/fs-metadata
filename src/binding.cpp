@@ -4,7 +4,7 @@
 
 #if defined(_WIN32)
 #include "windows/fs_meta.h"
-#include "windows/hidden_attr.h"
+#include "windows/hidden.h"
 #elif defined(__APPLE__)
 #include "darwin/fs_meta.h"
 #elif defined(__linux__)

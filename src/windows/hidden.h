@@ -1,4 +1,4 @@
-// src/windows/hidden_attr.h
+// src/windows/hidden.h
 #pragma once
 #include <napi.h>
 #include <windows.h>

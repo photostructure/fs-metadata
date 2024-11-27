@@ -1,5 +1,5 @@
-// hidden_attr.cpp
-#include "hidden_attr.h"
+// src/windows/hidden.cpp
+#include "hidden.h"
 #include "error_utils.h"
 #include <windows.h>
 

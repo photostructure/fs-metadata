@@ -64,7 +64,7 @@
             "sources": [
               "src/windows/volume_mount_points.cpp",
               "src/windows/volume_metadata.cpp",
-              "src/windows/hidden_attr.cpp"
+              "src/windows/hidden.cpp"
             ],
             "libraries": [
               "-lMpr.lib"
