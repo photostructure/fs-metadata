@@ -2,6 +2,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isHidden, isHiddenRecursive, setHidden } from "../index.js";
 
+/**
+ * This function exercises the hidden file functionality and is used both for
+ * the memory and hidden test suites.
+ */
 export async function validateHidden(dir: string) {
   await mkdir(dir, { recursive: true });
   let file = join(dir, "test.txt");

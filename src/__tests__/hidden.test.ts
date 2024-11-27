@@ -15,8 +15,12 @@ describe("hidden file tests", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs
+      .rm(tempDir, { recursive: true, force: true })
+      .catch((err) => console.warn(`Failed to rm ${tempDir}: ${err}`));
   });
+
+  it("runs validateHidden()", () => validateHidden(tempDir));
 
   describe("isHidden()", () => {
     if (isWindows) {
@@ -157,7 +161,4 @@ describe("hidden file tests", () => {
       expect((await statAsync(hidden)).isDirectory()).toBe(true);
     });
   });
-
-  it("run hidden-tests", () =>
-    validateHidden(path.join(tempDir, "hidden-tests-")));
 });

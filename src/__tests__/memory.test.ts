@@ -1,7 +1,7 @@
 // src/__tests__/memory.test.ts
 
 import { jest } from "@jest/globals";
-import { mkdtemp, rmdir } from "fs/promises";
+import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { delay } from "../async.js";
@@ -103,19 +103,14 @@ describeMemory("Memory Tests", () => {
     });
   });
   describe("isHidden/setHidden", () => {
-    const tmpDirs: string[] = [];
-
-    afterEach(async () => {
-      for (const dir of tmpDirs) {
-        await rmdir(dir, { recursive: true, maxRetries: 3 }).catch(() => null);
-      }
-    });
-
     it("should not leak memory under repeated calls", async () => {
       await checkMemoryUsage(async () => {
         const dir = await mkdtemp(join(tmpDirNotHidden(), "memory-tests-"));
-        tmpDirs.push(dir);
-        await validateHidden(dir);
+        try {
+          await validateHidden(dir);
+        } finally {
+          await rm(dir, { recursive: true, maxRetries: 3 }).catch(() => null);
+        }
       });
     });
 
