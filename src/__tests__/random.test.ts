@@ -1,0 +1,55 @@
+// src/__tests__/random.test.ts
+
+import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
+
+describe("random", () => {
+  describe("randomLetter", () => {
+    it("should return a single character between 'a' and 'z'", () => {
+      const letter = randomLetter();
+      expect(letter).toMatch(/^[a-z]$/);
+    });
+  });
+
+  describe("randomLetters", () => {
+    it("should return a string of the specified length", () => {
+      const length = 10;
+      const letters = randomLetters(length);
+      expect(letters).toHaveLength(length);
+    });
+
+    it("should return a string containing only characters between 'a' and 'z'", () => {
+      const letters = randomLetters(100);
+      expect(letters).toMatch(/^[a-z]+$/);
+    });
+  });
+
+  describe("shuffle", () => {
+    it("should return a shuffled array", () => {
+      const array = [1, 2, 3, 4, 5];
+      const shuffled = shuffle(array);
+      expect(shuffled).not.toEqual(array);
+      expect(shuffled.sort()).toEqual(array.sort());
+    });
+
+    it("should not modify the original array", () => {
+      const array = [1, 2, 3, 4, 5];
+      const arrayCopy = [...array];
+      shuffle(array);
+      expect(array).toEqual(arrayCopy);
+    });
+  });
+
+  describe("pickRandom", () => {
+    it("should return an element from the array", () => {
+      const array = [1, 2, 3, 4, 5];
+      const element = pickRandom(array);
+      expect(array).toContain(element);
+    });
+
+    it("should return undefined for an empty array", () => {
+      const array: number[] = [];
+      const element = pickRandom(array);
+      expect(element).toBeUndefined();
+    });
+  });
+});

@@ -32,5 +32,5 @@ export function shuffle<T>(a: T[]): T[] {
 }
 
 export function pickRandom<T>(a: T[]): T | undefined {
-  return a[randomInt(0, a.length)];
+  return a == null || a.length === 0 ? undefined : a[randomInt(0, a.length)];
 }
