@@ -38,7 +38,7 @@
     "tsc:esm": "tsc -p tsconfig.esm.json",
     "tsc:cjs": "tsc -p tsconfig.cjs.json",
     "tsc:tests": "tsc -p tsconfig.json",
-    "watch": "tsc --watch",
+    "watch": "tsc --watch --project tsconfig.watch.json",
     "docs": "typedoc --out docs src/index.ts",
     "jest:coverage": "jest --coverage",
     "jest:watch": "npm t -- --watch",
