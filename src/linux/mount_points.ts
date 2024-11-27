@@ -3,8 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { toError, WrappedError } from "../error.js";
 import type { NativeBindingsFn } from "../native_bindings.js";
-import { type Options, options } from "../options.js";
-import { RemoteInfo } from "../remote_info.js";
+import { type Options, optionsWithDefaults } from "../options.js";
 import { toNotBlank } from "../string.js";
 import {
   isTypedMountPoint,
@@ -27,7 +26,7 @@ export async function getLinuxMountPoints(
   }
 
   let caughtError: Error | undefined;
-  const inputs = options(opts).linuxMountTablePaths;
+  const inputs = optionsWithDefaults(opts).linuxMountTablePaths;
   for (const input of inputs) {
     try {
       const mtabMounts: TypedMountPoint[] = [];
@@ -56,9 +55,9 @@ export async function getLinuxMountPoints(
 export async function getLinuxMtabMetadata(
   mountPoint: string,
   opts?: Pick<Options, "linuxMountTablePaths">,
-): Promise<MountEntry | (MountEntry & RemoteInfo)> {
+): Promise<MountEntry> {
   let caughtError: Error | undefined;
-  const inputs = options(opts).linuxMountTablePaths;
+  const inputs = optionsWithDefaults(opts).linuxMountTablePaths;
   for (const input of inputs) {
     try {
       const mtabContent = await readFile(input, "utf8");

@@ -1,5 +1,9 @@
 // src/__tests__/linux_mtab.test.ts
-import { formatMtab, parseMtab } from "../linux/mtab.js";
+import {
+  formatMtab,
+  mountEntryToPartialVolumeMetadata,
+  parseMtab,
+} from "../linux/mtab.js";
 
 describe("mtab", () => {
   describe("parseMtab()", () => {
@@ -57,10 +61,6 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
           fs_passno: 0,
           fs_vfstype: "nfs",
           fs_spec: "nfs-server:/export",
-          protocol: "nfs",
-          remote: true,
-          remoteHost: "nfs-server",
-          remoteShare: "export",
         },
         {
           fs_file: "/media/freenas",
@@ -69,10 +69,6 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
           fs_passno: 0,
           fs_spec: "192.168.0.216:/mnt/HDD1",
           fs_vfstype: "nfs",
-          protocol: "nfs",
-          remote: true,
-          remoteHost: "192.168.0.216",
-          remoteShare: "mnt/HDD1",
         },
         {
           fs_file: "/mnt/cifs",
@@ -81,9 +77,6 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
           fs_passno: 0,
           fs_spec: "//cifs-server/share",
           fs_vfstype: "cifs",
-          remote: true,
-          remoteHost: "cifs-server",
-          remoteShare: "share",
         },
         {
           fs_file: "/mnt/cifs2",
@@ -92,10 +85,80 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
           fs_passno: 0,
           fs_spec: "//guest@SERVER._smb._tcp.local/share",
           fs_vfstype: "smb",
+        },
+      ]);
+
+      const vm_arr = entries.map(mountEntryToPartialVolumeMetadata);
+
+      console.dir({ vm_arr });
+
+      expect(vm_arr).toEqual([
+        {
+          fileSystem: "ext4",
+          mountFrom: "/dev/sda1",
+          mountName: "",
+          mountPoint: "/",
+          remote: false,
+        },
+        {
+          fileSystem: "ext4",
+          mountFrom: "/dev/sda2",
+          mountName: "home",
+          mountPoint: "/home",
+          remote: false,
+        },
+        {
+          fileSystem: "proc",
+          mountFrom: "proc",
+          mountName: "proc",
+          mountPoint: "/proc",
+          remote: false,
+        },
+        {
+          fileSystem: "tmpfs",
+          mountFrom: "tmpfs",
+          mountName: "run",
+          mountPoint: "/run",
+          remote: false,
+        },
+        {
+          fileSystem: "nfs",
+          mountFrom: "nfs-server:/export",
+          mountName: "nfs",
+          mountPoint: "/mnt/nfs",
+          protocol: "nfs",
           remote: true,
-          remoteUser: "guest",
+          remoteHost: "nfs-server",
+          remoteShare: "export",
+        },
+        {
+          fileSystem: "nfs",
+          mountFrom: "192.168.0.216:/mnt/HDD1",
+          mountName: "freenas",
+          mountPoint: "/media/freenas",
+          protocol: "nfs",
+          remote: true,
+          remoteHost: "192.168.0.216",
+          remoteShare: "mnt/HDD1",
+        },
+        {
+          fileSystem: "cifs",
+          mountFrom: "//cifs-server/share",
+          mountName: "cifs",
+          mountPoint: "/mnt/cifs",
+          remote: true,
+          remoteHost: "cifs-server",
+          remoteShare: "share",
+        },
+        {
+          fileSystem: "smb",
+          mountFrom: "//guest@SERVER._smb._tcp.local/share",
+          mountName: "cifs2",
+          mountPoint: "/mnt/cifs2",
+          remote: true,
           remoteHost: "SERVER._smb._tcp.local",
           remoteShare: "share",
+          remoteUser: "guest",
         },
       ]);
     });

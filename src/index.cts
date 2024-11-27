@@ -6,12 +6,12 @@ import { ExportsImpl } from "./exports.js";
 export {
   ExcludedFileSystemTypesDefault,
   ExcludedMountPointGlobsDefault,
-  options,
-  Options,
   OptionsDefault,
+  optionsWithDefaults,
   TimeoutMsDefault,
 } from "./options.js";
-export { VolumeMetadata } from "./volume_metadata.js";
+export type { Options } from "./options.js";
+export type { VolumeMetadata } from "./volume_metadata.js";
 
 const impl = new ExportsImpl(__dirname);
 

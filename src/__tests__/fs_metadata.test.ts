@@ -69,6 +69,8 @@ describe("Filesystem Metadata", () => {
       const rootPath = isWindows ? "C:\\" : "/";
       const metadata = await getVolumeMetadata(rootPath);
 
+      console.dir(metadata);
+
       expect(metadata.mountPoint).toBe(rootPath);
       assertMetadata(metadata);
 

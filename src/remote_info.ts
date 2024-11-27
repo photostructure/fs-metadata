@@ -66,7 +66,7 @@ const NETWORK_FS_TYPES = new Set([
   "webdav",
 ]);
 
-function normalizeProtocol(protocol: string): string {
+export function normalizeProtocol(protocol: string): string {
   return (protocol ?? "").toLowerCase().replace(/:$/, "");
 }
 
@@ -74,7 +74,7 @@ export function isRemoteFsType(fstype: string | undefined): boolean {
   return isNotBlank(fstype) && NETWORK_FS_TYPES.has(normalizeProtocol(fstype));
 }
 
-function parseURL(s: string): URL | undefined {
+export function parseURL(s: string): URL | undefined {
   try {
     return isBlank(s) ? undefined : new URL(s);
   } catch {
@@ -109,7 +109,7 @@ export function extractRemoteInfo(
     // NFS pattern: hostname:/share
     {
       protocol: "nfs",
-      regex: /^(?<remoteHost>[^:]+):\/(?<remoteShare>.+)$/,
+      regex: /^(?<remoteHost>[^:]+):\/(?!\/)(?<remoteShare>.+)$/,
     },
   ];
 

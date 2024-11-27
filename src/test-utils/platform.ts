@@ -14,10 +14,17 @@ export function describePlatform(...supported: NodeJS.Platform[]) {
   return supported.includes(platform) ? describe : describe.skip;
 }
 
+export function systemDrive() {
+  if (isWindows) {
+    return toNotBlank(env["SystemDrive"] ?? "") ?? "C:\\";
+  } else {
+    return "/";
+  }
+}
+
 export function tmpDirNotHidden() {
   if (isWindows) {
-    const systemDrive = toNotBlank(env["SystemDrive"] ?? "") ?? "C:\\";
-    return join(systemDrive, "tmp");
+    return join(systemDrive(), "tmp");
   } else {
     return "/tmp";
   }

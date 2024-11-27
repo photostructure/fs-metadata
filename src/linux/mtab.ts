@@ -1,17 +1,15 @@
 // src/linux/mtab.ts
 
+import { basename } from "path";
 import { toInt } from "../number.js";
 import { normalizeLinuxPath } from "../path.js";
-import {
-  extractRemoteInfo,
-  isRemoteFsType,
-  RemoteInfo,
-} from "../remote_info.js";
+import { extractRemoteInfo } from "../remote_info.js";
 import {
   decodeEscapeSequences,
   encodeEscapeSequences,
   isBlank,
 } from "../string.js";
+import { VolumeMetadata } from "../volume_metadata.js";
 
 /**
  * Represents an entry in the mount table.
@@ -43,15 +41,31 @@ export interface MountEntry {
   fs_passno: number | undefined;
 }
 
+export type MtabVolumeMetadata = Omit<
+  VolumeMetadata,
+  "size" | "used" | "available" | "label" | "uuid" | "status"
+>;
+
+export function mountEntryToPartialVolumeMetadata(
+  entry: MountEntry,
+): MtabVolumeMetadata {
+  return {
+    mountPoint: entry.fs_file,
+    mountName: basename(entry.fs_file),
+    fileSystem: entry.fs_vfstype,
+    mountFrom: entry.fs_spec,
+    remote: false, // < default to false
+    ...extractRemoteInfo(entry.fs_spec),
+  };
+}
+
 /**
  * Parses an mtab/fstab file content into structured mount entries
  * @param content - Raw content of the mtab/fstab file
  * @returns Array of parsed mount entries
  */
-export function parseMtab(
-  content: string,
-): (MountEntry | (MountEntry & RemoteInfo))[] {
-  const entries: (MountEntry | (MountEntry & RemoteInfo))[] = [];
+export function parseMtab(content: string): MountEntry[] {
+  const entries: MountEntry[] = [];
   const lines = content.split("\n");
 
   for (const line of lines) {
@@ -68,8 +82,7 @@ export function parseMtab(
     if (!fields || fields.length < 3) {
       continue; // Skip malformed lines
     }
-
-    const entry: MountEntry = {
+    entries.push({
       fs_spec: fields[0]!,
       // normalizeLinuxPath DOES NOT resolve()!
       fs_file: normalizeLinuxPath(fields[1] ?? ""),
@@ -77,18 +90,8 @@ export function parseMtab(
       fs_mntops: fields[3]!,
       fs_freq: toInt(fields[4]),
       fs_passno: toInt(fields[5]),
-    };
-
-    const remoteInfo = isRemoteFsType(entry.fs_vfstype)
-      ? extractRemoteInfo(entry.fs_spec)
-      : undefined;
-    if (remoteInfo) {
-      entries.push({ ...entry, ...remoteInfo });
-    } else {
-      entries.push(entry);
-    }
+    });
   }
-
   return entries;
 }
 

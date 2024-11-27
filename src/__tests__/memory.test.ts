@@ -1,7 +1,7 @@
 // src/__tests__/memory.test.ts
 
 import { jest } from "@jest/globals";
-import { mkdtemp, rmdir, writeFile } from "fs/promises";
+import { mkdtemp, rmdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { delay } from "../async.js";
@@ -10,10 +10,10 @@ import {
   getVolumeMetadata,
   getVolumeMountPoints,
   isHidden,
-  isHiddenRecursive,
   setHidden,
 } from "../index.js";
 import { randomLetters } from "../random.js";
+import { validateHidden } from "../test-utils/hidden-tests.js";
 import { tmpDirNotHidden } from "../test-utils/platform.js";
 
 // Enable garbage collection access
@@ -107,30 +107,15 @@ describeMemory("Memory Tests", () => {
 
     afterEach(async () => {
       for (const dir of tmpDirs) {
-        await rmdir(dir, { recursive: true, maxRetries: 3 });
+        await rmdir(dir, { recursive: true, maxRetries: 3 }).catch(() => null);
       }
     });
 
     it("should not leak memory under repeated calls", async () => {
       await checkMemoryUsage(async () => {
-        const dir = await mkdtemp(join(tmpDirNotHidden(), "memory-test-"));
+        const dir = await mkdtemp(join(tmpDirNotHidden(), "memory-tests-"));
         tmpDirs.push(dir);
-        const file = join(dir, "test.txt");
-        await writeFile(file, "test");
-        expect(await isHidden(dir)).toBe(false);
-        expect(await isHidden(file)).toBe(false);
-        expect(await isHiddenRecursive(dir)).toBe(false);
-        expect(await isHiddenRecursive(file)).toBe(false);
-        const hiddenDir = await setHidden(dir, true);
-        expect(await isHidden(hiddenDir)).toBe(true);
-        expect(await isHidden(file)).toBe(false);
-        expect(await isHiddenRecursive(file)).toBe(true);
-
-        // This should be a no-op:
-        expect(await setHidden(hiddenDir, true)).toEqual(hiddenDir);
-        const hiddenFile = await setHidden(file, true);
-        expect(await isHidden(hiddenFile)).toBe(true);
-        expect(await isHidden(hiddenDir)).toBe(true);
+        await validateHidden(dir);
       });
     });
 
