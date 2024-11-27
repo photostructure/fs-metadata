@@ -43,6 +43,6 @@ export function uniqBy<T, K>(arr: T[], keyFn: (item: T) => K): T[] {
  * @return an array of specified length, with each element created by calling
  * the provided function.
  */
-export function times<T>(length: number, fn: () => T): T[] {
-  return Array.from({ length }, fn);
+export function times<T>(length: number, fn: (index: number) => T): T[] {
+  return Array.from({ length }, (_, i) => fn(i));
 }

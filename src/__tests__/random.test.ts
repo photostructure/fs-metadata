@@ -26,18 +26,17 @@ describe("random", () => {
 
   describe("shuffle", () => {
     it("should return a shuffled array", () => {
-      let i = 0;
-      const array = times(64, () => i++);
+      const array = times(10, (i) => i);
       const shuffled = shuffle(array);
       expect(shuffled).not.toEqual(array);
       expect(shuffled.sort()).toEqual(array.sort());
     });
 
     it("should not modify the original array", () => {
-      const array = [1, 2, 3, 4, 5];
-      const arrayCopy = [...array];
+      const array = times(10, (i) => i);
+      const expected = [...array];
       shuffle(array);
-      expect(array).toBe(arrayCopy);
+      expect(array).toEqual(expected);
     });
   });
 

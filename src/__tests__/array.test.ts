@@ -182,6 +182,11 @@ describe("Array", () => {
       expect(result).toEqual([42, 42, 42, 42, 42]);
     });
 
+    it("should pass the correct index", () => {
+      const result = times(7, (i) => i);
+      expect(result).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    });
+
     it("should return empty array when length is 0", () => {
       const result = times(0, () => "value");
       expect(result).toEqual([]);
