@@ -5,7 +5,7 @@ import { isObject } from "./object.js";
 /**
  * Configuration options for filesystem operations.
  *
- * @see {@link options} for creating an options object with default values
+ * @see {@link optionsWithDefaults} for creating an options object with default values
  * @see {@link OptionsDefault} for the default values
  */
 export interface Options {
@@ -121,7 +121,7 @@ export const LinuxMountTablePathsDefault = [
 /**
  * Default {@link Options} object.
  *
- * @see {@link options} for creating an options object with default values
+ * @see {@link optionsWithDefaults} for creating an options object with default values
  */
 export const OptionsDefault: Options = {
   timeoutMs: TimeoutMsDefault,
@@ -135,7 +135,7 @@ export const OptionsDefault: Options = {
  * Create an {@link Options} object using default values from
  * {@link OptionsDefault} for missing fields.
  */
-export function options(overrides: Partial<Options> = {}): Options {
+export function optionsWithDefaults(overrides: Partial<Options> = {}): Options {
   if (!isObject(overrides)) {
     throw new TypeError(
       "options(): expected an object, got " +

@@ -3,7 +3,7 @@
 import { asyncFilter, uniq } from "./array.js";
 import { isDirectory } from "./fs.js";
 import { compileGlob } from "./glob.js";
-import { type Options, options } from "./options.js";
+import { type Options, optionsWithDefaults } from "./options.js";
 import { isNotBlank, isString, sortByLocale } from "./string.js";
 import {
   isTypedMountPoint,
@@ -17,7 +17,7 @@ export async function filterTypedMountPoints<T extends TypedMountPoint>(
   arr: (T | string | undefined)[],
   overrides: Partial<Options> = {},
 ): Promise<string[]> {
-  const o = options(overrides);
+  const o = optionsWithDefaults(overrides);
   const excludedFsType = compileGlob(o.excludedFileSystemTypes);
   const typedArr = arr.filter((mp) => {
     return isTypedMountPoint(mp) && !excludedFsType.test(mp.fstype);
@@ -36,7 +36,7 @@ export async function filterMountPoints(
   arr: (TypedMountPoint | string | undefined)[],
   overrides: Partial<Options> = {},
 ): Promise<string[]> {
-  const o = options(overrides);
+  const o = optionsWithDefaults(overrides);
   const excludeRE = compileGlob(o.excludedMountPointGlobs);
   const mountPoints = arr
     .map((ea) =>
