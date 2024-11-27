@@ -76,12 +76,10 @@ describe("hidden file tests", () => {
       expect(await isHidden(systemDrive())).toBe(false);
     });
 
-    if (isWindows) {
-      it("should throw on non-existent paths", async () => {
-        const nonExistentPath = path.join(tempDir, "does-not-exist");
-        await expect(isHidden(nonExistentPath)).rejects.toThrow();
-      });
-    }
+    it("should return false on non-existent paths", async () => {
+      const nonExistentPath = path.join(tempDir, "does-not-exist");
+      await expect(await isHidden(nonExistentPath)).toBe(false);
+    });
   });
 
   describe("isHiddenRecursive()", () => {
