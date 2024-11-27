@@ -11,6 +11,7 @@ describe("hidden file tests", () => {
   let tempDir: string;
 
   beforeEach(async () => {
+    await fs.mkdir(tmpDirNotHidden(), { recursive: true });
     tempDir = await fs.mkdtemp(path.join(tmpDirNotHidden(), "hidden-tests-"));
   });
 
