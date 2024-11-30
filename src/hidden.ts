@@ -163,7 +163,7 @@ export type HideMethod = "dotPrefix" | "systemFlag" | "all" | "auto";
 
 export async function setHidden(
   pathname: string,
-  hidden: boolean,
+  hide: boolean,
   method: HideMethod,
   nativeFn: NativeBindingsFn,
 ) {
@@ -174,21 +174,21 @@ export async function setHidden(
     systemFlag: false,
   };
 
-  let handled = false;
+  let hidden = false;
 
   if (LocalSupport.dotPrefix && ["auto", "all", "dotPrefix"].includes(method)) {
-    if (isPosixHidden(pathname) !== hidden) {
-      pathname = await setHiddenPosix(pathname, hidden);
+    if (isPosixHidden(pathname) !== hide) {
+      pathname = await setHiddenPosix(pathname, hide);
       actions.dotPrefix = true;
     }
-    handled = true;
+    hidden = true;
   }
 
   if (
     LocalSupport.systemFlag &&
-    (["all", "systemFlag"].includes(method) || (!handled && method === "auto"))
+    (["all", "systemFlag"].includes(method) || (!hidden && method === "auto"))
   ) {
-    await (await nativeFn()).setHidden(pathname, hidden);
+    await (await nativeFn()).setHidden(pathname, hide);
     actions.systemFlag = true;
   }
 

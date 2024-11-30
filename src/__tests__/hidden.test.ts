@@ -1,3 +1,4 @@
+import { jest } from "@jest/globals";
 import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -304,7 +305,9 @@ describe("hidden file tests", () => {
       });
 
       // Test "all" method
-      const allResult = await setHidden(testFile, true, "all");
+      const allResult = await setHidden(dotPrefixResult.pathname, true, "all");
+
+      expect(allResult.pathname).toEqual(dotPrefixResult.pathname);
 
       if (isWindows) {
         expect(allResult.actions).toEqual({
@@ -313,7 +316,7 @@ describe("hidden file tests", () => {
         });
       } else {
         expect(allResult.actions).toEqual({
-          dotPrefix: true,
+          dotPrefix: false,
           systemFlag: process.platform === "darwin",
         });
       }
