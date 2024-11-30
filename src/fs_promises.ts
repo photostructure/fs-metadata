@@ -12,3 +12,12 @@ export async function statAsync(
 ): Promise<Stats> {
   return stat(path, options);
 }
+
+export async function canStatAsync(path: string): Promise<boolean> {
+  try {
+    await statAsync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}

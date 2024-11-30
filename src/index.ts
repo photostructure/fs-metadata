@@ -5,9 +5,11 @@ import { fileURLToPath } from "node:url";
 import { ExportsImpl } from "./exports.js";
 
 // IMPORTANT: KEEP THESE IN SYNC WITH index.cts!
+export type { HiddenMetadata, HideMethod } from "./hidden.js";
 export {
   ExcludedFileSystemTypesDefault,
   ExcludedMountPointGlobsDefault,
+  LinuxMountTablePathsDefault,
   optionsWithDefaults as options,
   OptionsDefault,
   TimeoutMsDefault,
@@ -18,8 +20,11 @@ export type { VolumeMetadata } from "./volume_metadata.js";
 const impl = new ExportsImpl(dirname(fileURLToPath(import.meta.url)));
 
 export const getVolumeMountPoints = impl.getVolumeMountPoints;
+
 export const getVolumeMetadata = impl.getVolumeMetadata;
 export const getAllVolumeMetadata = impl.getAllVolumeMetadata;
+
 export const isHidden = impl.isHidden;
 export const isHiddenRecursive = impl.isHiddenRecursive;
+export const getHiddenMetadata = impl.getHiddenMetadata;
 export const setHidden = impl.setHidden;

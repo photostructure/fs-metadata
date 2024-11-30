@@ -1,43 +1,100 @@
 import { rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { statAsync } from "./fs_promises.js";
+import { canStatAsync } from "./fs_promises.js";
 import { NativeBindingsFn } from "./native_bindings.js";
 import { isRootDirectory, normalizePath } from "./path.js";
-import { isLinux, isMacOS, isWindows } from "./platform.js";
+import { isWindows } from "./platform.js";
 
+/**
+ * Represents the detailed state of a file or directory's hidden attribute
+ */
+export interface HiddenMetadata {
+  /**
+   * Whether the item is considered hidden by any method
+   */
+  hidden: boolean;
+
+  /**
+   * Whether the item has a dot prefix (POSIX-style hidden). Windows doesn't
+   * care about dot prefixes.
+   */
+  dotPrefix: boolean;
+
+  /**
+   * Whether the item has system hidden flags set, like via `chflags` on macOS
+   * or on Windows via `GetFileAttributesW`
+   */
+  systemFlag: boolean;
+
+  /**
+   * Indicates which hiding methods are supported on the current platform
+   */
+  supported: {
+    /**
+     * Whether dot prefix hiding is supported on the current operating system
+     */
+    dotPrefix: boolean;
+
+    /**
+     * Whether system flag hiding is supported
+     */
+    systemFlag: boolean;
+  };
+}
+
+const HiddenSupportByPlatform: Partial<
+  Record<NodeJS.Platform, Pick<HiddenMetadata, "supported">>
+> = {
+  win32: {
+    supported: {
+      dotPrefix: false,
+      systemFlag: true,
+    },
+  },
+  darwin: {
+    supported: {
+      dotPrefix: true,
+      systemFlag: true,
+    },
+  },
+  linux: {
+    supported: {
+      dotPrefix: true,
+      systemFlag: false,
+    },
+  },
+};
+
+export const LocalSupport = HiddenSupportByPlatform[process.platform]
+  ?.supported ?? {
+  dotPrefix: false,
+  systemFlag: false,
+};
+
+/**
+ * Checks if the file or directory is hidden through any available method
+ * @returns A boolean indicating if the item is hidden
+ * @throws {Error} If the file doesn't exist or permissions are insufficient
+ */
 export async function isHidden(
-  path: string,
+  pathname: string,
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
-  // Make sure the native code sees a normalized path:
-  path = normalizePath(path);
+  pathname = normalizePath(pathname);
 
-  // Windows doesn't hide dot-prefixed files or directories:
-  if (isLinux || isMacOS) {
-    const b = basename(path);
-    if (b.startsWith(".") && b !== "." && b !== "..") {
-      return true;
-    }
-  }
-
-  if (isWindows && isRootDirectory(path)) {
+  if (isWindows && isRootDirectory(pathname)) {
     // windows `attr` thinks all drive letters don't exist.
     return false;
   }
 
-  // Don't bother the native code if the file doesn't exist.
-  try {
-    await statAsync(path);
-  } catch {
-    return false;
-  }
-
-  // only windows has a native implementation:
-  if (isWindows) {
-    return (await nativeFn()).isHidden(path);
-  }
-
-  return false;
+  // Windows doesn't hide dot-prefixed files or directories:
+  return (
+    (LocalSupport.dotPrefix && isPosixHidden(pathname)) ||
+    (LocalSupport.systemFlag &&
+      // don't bother the native bindings if the file doesn't exist:
+      (await canStatAsync(pathname)) &&
+      (await nativeFn()).isHidden(pathname))
+  );
 }
 
 export async function isHiddenRecursive(
@@ -54,26 +111,86 @@ export async function isHiddenRecursive(
   return false;
 }
 
-export async function setHidden(
-  path: string,
-  hidden: boolean,
-  nativeFn: NativeBindingsFn,
-): Promise<string> {
-  if ((await isHidden(path, nativeFn)) === hidden) {
-    return path;
-  }
+export function createHiddenPosixPath(pathname: string, hidden: boolean) {
+  pathname = normalizePath(pathname);
+  const dir = dirname(pathname);
+  const srcBase = basename(pathname).replace(/^\./, "");
+  const dest = join(dir, (hidden ? "." : "") + srcBase);
+  return dest;
+}
 
-  if (isLinux || isMacOS) {
-    const dir = dirname(path);
-    const srcBase = basename(path).replace(/^\./, "");
-    const dest = join(dir, (hidden ? "." : "") + srcBase);
-    if (path !== dest) await rename(path, dest);
+export async function setHiddenPosix(
+  pathname: string,
+  hidden: boolean,
+): Promise<string> {
+  if (LocalSupport.dotPrefix) {
+    const dest = createHiddenPosixPath(pathname, hidden);
+    if (pathname !== dest) await rename(pathname, dest);
     return dest;
   }
 
-  if (isWindows) {
-    await (await nativeFn()).setHidden(path, hidden);
+  throw new Error("Unsupported platform");
+}
+
+export function isPosixHidden(pathname: string): boolean {
+  const b = basename(pathname);
+  return b.startsWith(".") && b !== "." && b !== "..";
+}
+
+/**
+ * Gets detailed information about the hidden state of the file or directory
+ * @returns An object containing detailed hidden state information
+ * @throws {Error} If the file doesn't exist or permissions are insufficient
+ */
+export async function getHiddenMetadata(
+  pathname: string,
+  nativeFn: NativeBindingsFn,
+): Promise<HiddenMetadata> {
+  pathname = normalizePath(pathname);
+
+  const dotPrefix = LocalSupport.dotPrefix && isPosixHidden(pathname);
+  const systemFlag =
+    LocalSupport.systemFlag && (await isHidden(pathname, nativeFn));
+  return {
+    hidden: dotPrefix || systemFlag,
+    dotPrefix,
+    systemFlag,
+    supported: LocalSupport,
+  };
+}
+
+export type HideMethod = "dotPrefix" | "systemFlag" | "all" | "auto";
+
+export async function setHidden(
+  pathname: string,
+  hidden: boolean,
+  method: HideMethod,
+  nativeFn: NativeBindingsFn,
+) {
+  pathname = normalizePath(pathname);
+
+  const actions = {
+    dotPrefix: false,
+    systemFlag: false,
+  };
+
+  let handled = false;
+
+  if (LocalSupport.dotPrefix && ["auto", "all", "dotPrefix"].includes(method)) {
+    if (isPosixHidden(pathname) !== hidden) {
+      pathname = await setHiddenPosix(pathname, hidden);
+      actions.dotPrefix = true;
+    }
+    handled = true;
   }
 
-  return path;
+  if (
+    LocalSupport.systemFlag &&
+    (["all", "systemFlag"].includes(method) || (!handled && method === "auto"))
+  ) {
+    await (await nativeFn()).setHidden(pathname, hidden);
+    actions.systemFlag = true;
+  }
+
+  return { pathname, actions };
 }

@@ -4,7 +4,14 @@ import { thenOrTimeout } from "./async.js";
 import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
 import { defer } from "./defer.js";
 import { findAncestorDir } from "./fs.js";
-import { isHidden, isHiddenRecursive, setHidden } from "./hidden.js";
+import {
+  getHiddenMetadata,
+  HiddenMetadata,
+  HideMethod,
+  isHidden,
+  isHiddenRecursive,
+  setHidden,
+} from "./hidden.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
 import type { NativeBindings } from "./native_bindings.js";
 import { type Options, optionsWithDefaults } from "./options.js";
@@ -13,7 +20,8 @@ import { getVolumeMetadata, type VolumeMetadata } from "./volume_metadata.js";
 
 /**
  * Glue code between the native bindings and the rest of the library to make
- * things simpler for index.ts and index.cts
+ * things simpler for index.ts and index.cts with the management of the native
+ * bindings.
  */
 export class ExportsImpl {
   constructor(readonly _dirname: string) {}
@@ -97,26 +105,39 @@ export class ExportsImpl {
    * Note that `path` may be _effectively_ hidden if any of the ancestor
    * directories are hidden: use {@link isHiddenRecursive} to check for this.
    *
-   * @param path Path to file or directory
+   * @param pathname Path to file or directory
    * @returns Promise resolving to boolean indicating hidden state
    */
-  readonly isHidden = (path: string): Promise<boolean> =>
-    isHidden(path, this.#nativeFn);
+  readonly isHidden = (pathname: string): Promise<boolean> =>
+    isHidden(pathname, this.#nativeFn);
 
   /**
    * Check if a file or directory is hidden, or if any of its ancestor
    * directories are hidden.
    */
-  readonly isHiddenRecursive = (path: string): Promise<boolean> =>
-    isHiddenRecursive(path, this.#nativeFn);
+  readonly isHiddenRecursive = (pathname: string): Promise<boolean> =>
+    isHiddenRecursive(pathname, this.#nativeFn);
+
+  readonly getHiddenMetadata = (pathname: string): Promise<HiddenMetadata> =>
+    getHiddenMetadata(pathname, this.#nativeFn);
 
   /**
    * Set the hidden state of a file or directory
-   * @param path Path to file or directory
-   * @param hidden Desired hidden state
+   *
+   * @param pathname Path to file or directory
+   * @param hidden - Whether the item should be hidden (true) or visible (false)
+   * @param method Method to use for hiding the file or directory. The default
+   * is "auto", which is "dotPrefix" on Linux and macOS, and "systemFlag" on
+   * Windows. "all" will attempt to use all relevant methods for the current
+   * operating system.
    * @returns Promise resolving the final name of the file or directory (as it
-   * will change on POSIX systems)
+   * will change on POSIX systems), and the action(s) taken.
+   * @throws {Error} If the file doesn't exist, permissions are insufficient, or
+   * the requested method is unsupported
    */
-  readonly setHidden = (path: string, hidden: boolean): Promise<string> =>
-    setHidden(path, hidden, this.#nativeFn);
+  readonly setHidden = (
+    pathname: string,
+    hidden: boolean,
+    method: HideMethod = "auto",
+  ) => setHidden(pathname, hidden, method, this.#nativeFn);
 }

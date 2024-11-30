@@ -2,7 +2,13 @@ import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { statAsync } from "../fs_promises.js";
-import { isHidden, isHiddenRecursive, setHidden } from "../index.js";
+import { createHiddenPosixPath, LocalSupport } from "../hidden.js";
+import {
+  getHiddenMetadata,
+  isHidden,
+  isHiddenRecursive,
+  setHidden,
+} from "../index.js";
 import { isWindows } from "../platform.js";
 import { validateHidden } from "../test-utils/hidden-tests.js";
 import { systemDrive, tmpDirNotHidden } from "../test-utils/platform.js";
@@ -94,7 +100,7 @@ describe("hidden file tests", () => {
 
       let level2 = path.join(level1, "level2");
       await fs.mkdir(level2);
-      level2 = await setHidden(level2, true);
+      level2 = (await setHidden(level2, true)).pathname;
       const level3 = path.join(level2, "level3");
       await fs.mkdir(level3);
 
@@ -129,7 +135,11 @@ describe("hidden file tests", () => {
         ? testFile
         : path.join(tempDir, ".to-hide.txt");
 
-      expect(await setHidden(testFile, true)).toEqual(expected);
+      expect(await setHidden(testFile, true)).toEqual(
+        expect.objectContaining({
+          pathname: expected,
+        }),
+      );
       expect(await isHidden(expected)).toBe(true);
 
       expect((await statAsync(expected)).isFile()).toBe(true);
@@ -143,12 +153,16 @@ describe("hidden file tests", () => {
       const expectedHidden = isWindows
         ? testFile
         : path.join(tempDir, ".to-unhide.txt");
-      const hidden = await setHidden(testFile, true);
+      const hidden = (await setHidden(testFile, true)).pathname;
 
       expect(hidden).toEqual(expectedHidden);
       expect(await isHidden(hidden)).toBe(true);
 
-      expect(await setHidden(testFile, false)).toEqual(testFile);
+      expect(await setHidden(testFile, false)).toEqual(
+        expect.objectContaining({
+          pathname: testFile,
+        }),
+      );
       expect(await isHidden(testFile)).toBe(false);
     });
 
@@ -156,10 +170,210 @@ describe("hidden file tests", () => {
       const testSubDir = path.join(tempDir, "hide-me");
       const expected = isWindows ? testSubDir : path.join(tempDir, ".hide-me");
       await fs.mkdir(testSubDir);
-      const hidden = await setHidden(testSubDir, true);
+      const hidden = (await setHidden(testSubDir, true)).pathname;
       expect(hidden).toEqual(expected);
       expect(await isHidden(hidden)).toBe(true);
       expect((await statAsync(hidden)).isDirectory()).toBe(true);
+    });
+  });
+
+  describe("getHiddenMetadata()", () => {
+    if (isWindows) {
+      it("should return correct metadata for normal file on Windows", async () => {
+        const testFile = path.join(tempDir, "normal.txt");
+        await fs.writeFile(testFile, "test");
+
+        const metadata = await getHiddenMetadata(testFile);
+        expect(metadata).toEqual({
+          hidden: false,
+          dotPrefix: false,
+          systemFlag: false,
+          supported: {
+            dotPrefix: false,
+            systemFlag: true,
+          },
+        });
+      });
+
+      it("should return correct metadata for hidden file on Windows", async () => {
+        const testFile = path.join(tempDir, "hidden.txt");
+        await fs.writeFile(testFile, "test");
+        execSync(`attrib +h "${testFile}"`);
+
+        const metadata = await getHiddenMetadata(testFile);
+        expect(metadata).toEqual({
+          hidden: true,
+          dotPrefix: false,
+          systemFlag: true,
+          supported: {
+            dotPrefix: false,
+            systemFlag: true,
+          },
+        });
+      });
+
+      it("should handle dot-prefixed files correctly on Windows", async () => {
+        const testFile = path.join(tempDir, ".config");
+        await fs.writeFile(testFile, "test");
+
+        const metadata = await getHiddenMetadata(testFile);
+        expect(metadata).toEqual({
+          hidden: false,
+          dotPrefix: false,
+          systemFlag: false,
+          supported: {
+            dotPrefix: false,
+            systemFlag: true,
+          },
+        });
+      });
+    } else {
+      it("should return correct metadata for normal file on POSIX", async () => {
+        const testFile = path.join(tempDir, "normal.txt");
+        await fs.writeFile(testFile, "test");
+
+        const metadata = await getHiddenMetadata(testFile);
+        expect(metadata).toEqual({
+          hidden: false,
+          dotPrefix: false,
+          systemFlag: false,
+          supported: {
+            dotPrefix: true,
+            systemFlag: process.platform === "darwin",
+          },
+        });
+      });
+
+      it("should return correct metadata for dot-prefixed file on POSIX", async () => {
+        const testFile = path.join(tempDir, ".hidden");
+        await fs.writeFile(testFile, "test");
+
+        const metadata = await getHiddenMetadata(testFile);
+        expect(metadata).toEqual({
+          hidden: true,
+          dotPrefix: true,
+          systemFlag: false,
+          supported: {
+            dotPrefix: true,
+            systemFlag: process.platform === "darwin",
+          },
+        });
+      });
+    }
+
+    it("should handle root directory", async () => {
+      const metadata = await getHiddenMetadata(systemDrive());
+      expect(metadata.hidden).toBe(false);
+      expect(metadata.dotPrefix).toBe(false);
+      if (isWindows) {
+        expect(metadata.supported).toEqual({
+          dotPrefix: false,
+          systemFlag: true,
+        });
+      }
+    });
+
+    it("should handle non-existent paths", async () => {
+      const nonExistentPath = path.join(tempDir, "does-not-exist");
+      const metadata = await getHiddenMetadata(nonExistentPath);
+      expect(metadata.hidden).toBe(false);
+      expect(metadata.dotPrefix).toBe(false);
+      expect(metadata.systemFlag).toBe(false);
+    });
+  });
+
+  describe("setHidden method handling", () => {
+    it("should respect method parameter", async () => {
+      const testFile = path.join(tempDir, "method-test.txt");
+      await fs.writeFile(testFile, "test");
+
+      // Test explicit dotPrefix method
+      const dotPrefixResult = await setHidden(testFile, true, "dotPrefix");
+
+      expect(dotPrefixResult.actions).toEqual({
+        dotPrefix: !isWindows, // true on POSIX, false on Windows
+        systemFlag: false,
+      });
+
+      // Test explicit systemFlag method
+      const systemFlagResult = await setHidden(testFile, true, "systemFlag");
+
+      expect(systemFlagResult.actions).toEqual({
+        dotPrefix: false,
+        systemFlag: isWindows || process.platform === "darwin",
+      });
+
+      // Test "all" method
+      const allResult = await setHidden(testFile, true, "all");
+
+      if (isWindows) {
+        expect(allResult.actions).toEqual({
+          dotPrefix: false,
+          systemFlag: true,
+        });
+      } else {
+        expect(allResult.actions).toEqual({
+          dotPrefix: true,
+          systemFlag: process.platform === "darwin",
+        });
+      }
+    });
+
+    it("should handle 'auto' method correctly", async () => {
+      const testFile = path.join(tempDir, "auto-test.txt");
+      await fs.writeFile(testFile, "test");
+
+      const result = await setHidden(testFile, true, "auto");
+
+      if (isWindows) {
+        expect(result.actions).toEqual({
+          dotPrefix: false,
+          systemFlag: true,
+        });
+      } else {
+        expect(result.actions).toEqual({
+          dotPrefix: true,
+          systemFlag: false, // On POSIX, dotPrefix handles it so systemFlag isn't needed
+        });
+      }
+    });
+
+    it("should not apply systemFlag if already handled by dotPrefix in auto mode", async () => {
+      if (!isWindows) {
+        const testFile = path.join(tempDir, "already-handled.txt");
+        await fs.writeFile(testFile, "test");
+
+        const mockSetHidden = jest.fn();
+        const result = await setHidden(testFile, true, "auto");
+
+        expect(mockSetHidden).not.toHaveBeenCalled();
+        expect(result.actions.dotPrefix).toBe(true);
+        expect(result.actions.systemFlag).toBe(false);
+      }
+    });
+
+    it("should apply both methods when hiding using 'all'", async () => {
+      const testFile = path.join(tempDir, "all-methods.txt");
+      await fs.writeFile(testFile, "test");
+      const result = await setHidden(testFile, true, "all");
+      expect(result).toEqual({
+        pathname: LocalSupport.dotPrefix
+          ? createHiddenPosixPath(testFile, true)
+          : testFile,
+        actions: LocalSupport,
+      });
+    });
+
+    it("should apply both methods when unhiding using 'all'", async () => {
+      const testFile = path.join(tempDir, ".all-methods.txt");
+      await fs.writeFile(testFile, "test");
+      const result = await setHidden(testFile, false, "all");
+      expect(result).toEqual({
+        pathname: LocalSupport.dotPrefix
+          ? createHiddenPosixPath(testFile, false)
+          : testFile,
+        actions: LocalSupport,
+      });
     });
   });
 });
