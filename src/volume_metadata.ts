@@ -29,7 +29,7 @@ import { extractUUID } from "./uuid.js";
 
 /**
  * Metadata associated to a volume.
- * 
+ *
  * @see https://en.wikipedia.org/wiki/Volume_(computing)
  */
 export interface VolumeMetadata extends RemoteInfo {

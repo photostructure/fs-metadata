@@ -13,7 +13,7 @@ export const Degraded = "degraded" as const;
 /** Status can't be determined */
 export const Unknown = "unknown" as const;
 
-export type VolumeHealthStatus = 
+export type VolumeHealthStatus =
   | typeof Healthy
   | typeof Inaccessible
   | typeof Disconnected
@@ -28,7 +28,7 @@ export interface MountPoint {
    * The mount point for the volume.
    */
   pathname: string;
-  
+
   /**
    * @see {@link VolumeHealthStatus}
    */
@@ -38,7 +38,7 @@ export interface MountPoint {
    * The type of file system on the volume, like `ext4`, `apfs`, or `ntfs`.
    */
   fstype: string;
-  
+
   /**
    * Indicates if this volume is primarily for system use (e.g., swap, snap
    * loopbacks, EFI boot, system directories).
