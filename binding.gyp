@@ -82,7 +82,8 @@
           {
             "sources": [
               "src/darwin/volume_mount_points.cpp",
-              "src/darwin/volume_metadata.cpp"
+              "src/darwin/volume_metadata.cpp",
+              "src/darwin/hidden.cpp"
             ],
             "xcode_settings": {
               "CLANG_CXX_LANGUAGE_STANDARD": "c++17",

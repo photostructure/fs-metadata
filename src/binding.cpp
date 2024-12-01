@@ -7,6 +7,7 @@
 #include "windows/hidden.h"
 #elif defined(__APPLE__)
 #include "darwin/fs_meta.h"
+#include "darwin/hidden.h"
 #elif defined(__linux__)
 #include "common/volume_metadata.h"
 #ifdef ENABLE_GIO
@@ -15,6 +16,20 @@
 #endif
 
 namespace {
+    
+#ifdef ENABLE_GIO
+Napi::Value GetGioMountPoints(const Napi::CallbackInfo &info) {
+    Napi::Env env = info.Env();
+    return FSMeta::gio::GetMountPoints(env);
+}
+#endif
+
+#if defined(_WIN32) || defined(__APPLE__)
+Napi::Value GetVolumeMountPoints(const Napi::CallbackInfo &info) {
+    Napi::Env env = info.Env();
+    return FSMeta::GetVolumeMountPoints(env);
+}
+#endif
 
 Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
     Napi::Env env = info.Env();
@@ -31,21 +46,7 @@ Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
     return FSMeta::GetVolumeMetadata(env, mountPoint, options);
 }
 
-#ifdef ENABLE_GIO
-Napi::Value GetGioMountPoints(const Napi::CallbackInfo &info) {
-    Napi::Env env = info.Env();
-    return FSMeta::gio::GetMountPoints(env);
-}
-#endif
-
-#if defined(_WIN32) || defined(__APPLE__)
-Napi::Value GetVolumeMountPoints(const Napi::CallbackInfo &info) {
-    Napi::Env env = info.Env();
-    return FSMeta::GetVolumeMountPoints(env);
-}
-#endif
-
-#if defined(_WIN32)
+#if defined(_WIN32)  || defined(__APPLE__)
 Napi::Value GetHiddenAttribute(const Napi::CallbackInfo &info) {
     return FSMeta::GetHiddenAttribute(info);
 }
@@ -69,7 +70,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
                 Napi::Function::New(env, GetGioMountPoints));
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32)  || defined(__APPLE__)
     exports.Set("isHidden",
                 Napi::Function::New(env, GetHiddenAttribute));
     exports.Set("setHidden",
