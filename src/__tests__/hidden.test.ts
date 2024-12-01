@@ -178,6 +178,55 @@ describe("hidden file tests", () => {
       expect(await isHidden(hidden)).toBe(true);
       expect((await statAsync(hidden)).isDirectory()).toBe(true);
     });
+
+    if (isWindows) {
+      for (const method of ["systemFlag", "all", "auto"] as const) {
+        it(`should throw error when trying to hide Windows root with ${method} method`, async () => {
+          await expect(setHidden("C:\\", true, method)).rejects.toThrow(
+            "Cannot hide root directory on Windows",
+          );
+        });
+      }
+    }
+
+    if (!isWindows) {
+      it("should throw error when using systemFlag method on Linux", async () => {
+        const testFile = path.join(tempDir, "linux-error-test.txt");
+        await fs.writeFile(testFile, "test");
+
+        await expect(setHidden(testFile, true, "systemFlag")).rejects.toThrow(
+          /not supported/i,
+        );
+      });
+
+      it("should correctly handle multiple dot prefixes when hiding", async () => {
+        const testFile = path.join(tempDir, ".already-hidden.txt");
+        await fs.writeFile(testFile, "test");
+
+        const result = await setHidden(testFile, true, "dotPrefix");
+        expect(result.pathname).toEqual(
+          path.join(tempDir, ".already-hidden.txt"),
+        );
+        expect(result.actions).toEqual({
+          dotPrefix: false, // No action needed as already hidden
+          systemFlag: false,
+        });
+      });
+
+      it("should handle dots in middle of filename", async () => {
+        const testFile = path.join(tempDir, "file.with.dots.txt");
+        await fs.writeFile(testFile, "test");
+
+        const result = await setHidden(testFile, true, "dotPrefix");
+        expect(result.pathname).toEqual(
+          path.join(tempDir, ".file.with.dots.txt"),
+        );
+        expect(result.actions).toEqual({
+          dotPrefix: true,
+          systemFlag: false,
+        });
+      });
+    }
   });
 
   describe("getHiddenMetadata()", () => {
@@ -310,16 +359,18 @@ describe("hidden file tests", () => {
       });
 
       // Test explicit systemFlag method
-      const systemFlagResult = await setHidden(
-        dotPrefixResult.pathname,
-        true,
-        "systemFlag",
-      );
+      if (LocalSupport.systemFlag) {
+        const systemFlagResult = await setHidden(
+          dotPrefixResult.pathname,
+          true,
+          "systemFlag",
+        );
 
-      expect(systemFlagResult.actions).toEqual({
-        dotPrefix: false,
-        systemFlag: isWindows || process.platform === "darwin",
-      });
+        expect(systemFlagResult.actions).toEqual({
+          dotPrefix: false,
+          systemFlag: isWindows || process.platform === "darwin",
+        });
+      }
 
       // Test "all" method
       const allResult = await setHidden(dotPrefixResult.pathname, true, "all");

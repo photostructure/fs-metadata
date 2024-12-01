@@ -124,6 +124,7 @@ async function setHiddenPosix(
 }
 
 function isPosixHidden(pathname: string): boolean {
+  if (!LocalSupport.dotPrefix) return false;
   const b = basename(pathname);
   return b.startsWith(".") && b !== "." && b !== "..";
 }
@@ -159,9 +160,8 @@ export async function getHiddenMetadata(
 ): Promise<HiddenMetadata> {
   pathname = normalizePath(pathname);
 
-  const dotPrefix = LocalSupport.dotPrefix && isPosixHidden(pathname);
-  const systemFlag =
-    LocalSupport.systemFlag && (await isSystemHidden(pathname, nativeFn));
+  const dotPrefix = isPosixHidden(pathname);
+  const systemFlag = await isSystemHidden(pathname, nativeFn);
   return {
     hidden: dotPrefix || systemFlag,
     dotPrefix,
@@ -179,6 +179,14 @@ export async function setHidden(
   nativeFn: NativeBindingsFn,
 ) {
   pathname = normalizePath(pathname);
+
+  if (method === "dotPrefix" && !LocalSupport.dotPrefix) {
+    throw new Error("Dot prefix hiding is not supported on this platform");
+  }
+
+  if (method === "systemFlag" && !LocalSupport.systemFlag) {
+    throw new Error("System flag hiding is not supported on this platform");
+  }
 
   try {
     await statAsync(pathname);
