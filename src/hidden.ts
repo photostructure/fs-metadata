@@ -82,19 +82,9 @@ export async function isHidden(
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
   pathname = normalizePath(pathname);
-
-  if (isWindows && isRootDirectory(pathname)) {
-    // windows `attr` thinks all drive letters don't exist.
-    return false;
-  }
-
-  // Windows doesn't hide dot-prefixed files or directories:
   return (
     (LocalSupport.dotPrefix && isPosixHidden(pathname)) ||
-    (LocalSupport.systemFlag &&
-      // don't bother the native bindings if the file doesn't exist:
-      (await canStatAsync(pathname)) &&
-      (await nativeFn()).isHidden(pathname))
+    (LocalSupport.systemFlag && isSystemHidden(pathname, nativeFn))
   );
 }
 
@@ -120,7 +110,7 @@ export function createHiddenPosixPath(pathname: string, hidden: boolean) {
   return dest;
 }
 
-export async function setHiddenPosix(
+async function setHiddenPosix(
   pathname: string,
   hidden: boolean,
 ): Promise<string> {
@@ -133,9 +123,29 @@ export async function setHiddenPosix(
   throw new Error("Unsupported platform");
 }
 
-export function isPosixHidden(pathname: string): boolean {
+function isPosixHidden(pathname: string): boolean {
   const b = basename(pathname);
   return b.startsWith(".") && b !== "." && b !== "..";
+}
+
+async function isSystemHidden(
+  pathname: string,
+  nativeFn: NativeBindingsFn,
+): Promise<boolean> {
+  if (!LocalSupport.systemFlag) {
+    // not supported on this platform
+    return false;
+  }
+  if (isWindows && isRootDirectory(pathname)) {
+    // windows `attr` thinks all drive letters don't exist.
+    return false;
+  }
+
+  // don't bother the native bindings if the file doesn't exist:
+  return (
+    (await canStatAsync(pathname)) &&
+    (await (await nativeFn()).isHidden(pathname))
+  );
 }
 
 /**
@@ -151,9 +161,7 @@ export async function getHiddenMetadata(
 
   const dotPrefix = LocalSupport.dotPrefix && isPosixHidden(pathname);
   const systemFlag =
-    LocalSupport.systemFlag &&
-    (await canStatAsync(pathname)) &&
-    (await (await nativeFn()).isHidden(pathname));
+    LocalSupport.systemFlag && (await isSystemHidden(pathname, nativeFn));
   return {
     hidden: dotPrefix || systemFlag,
     dotPrefix,
@@ -176,6 +184,10 @@ export async function setHidden(
     await statAsync(pathname);
   } catch (err) {
     throw new WrappedError("setHidden()", err);
+  }
+
+  if (isWindows && isRootDirectory(pathname)) {
+    throw new Error("Cannot hide root directory on Windows");
   }
 
   const actions = {
