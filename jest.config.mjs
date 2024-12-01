@@ -1,4 +1,4 @@
-import { env, platform } from "node:process";
+import { env } from "node:process";
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 const config = {
