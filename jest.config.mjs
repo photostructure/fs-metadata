@@ -20,16 +20,18 @@ const config = {
   },
   extensionsToTreatAsEsm: [".ts"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
-  collectCoverage: platform === "linux" && !env.TEST_MEMORY,
+  collectCoverage: !env.TEST_MEMORY,
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
   coveragePathIgnorePatterns: ["/__tests__/", "/test-utils/"],
   coverageThreshold: {
+    // These are low because we're doing integration tests and there are quite
+    // different codepaths for macOS, Windows, and Linux
     global: {
-      branches: 80,
+      branches: 70,
       functions: 80,
-      lines: 80,
-      statements: 80,
+      lines: 75,
+      statements: 75,
     },
   },
   verbose: true,
