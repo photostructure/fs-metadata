@@ -177,7 +177,10 @@ export async function setHidden(
   hide: boolean,
   method: HideMethod,
   nativeFn: NativeBindingsFn,
-) {
+): Promise<{
+  pathname: string;
+  actions: { dotPrefix: boolean; systemFlag: boolean };
+}> {
   pathname = normalizePath(pathname);
 
   if (method === "dotPrefix" && !LocalSupport.dotPrefix) {
@@ -203,19 +206,19 @@ export async function setHidden(
     systemFlag: false,
   };
 
-  let hidden = false;
+  let acted = false;
 
   if (LocalSupport.dotPrefix && ["auto", "all", "dotPrefix"].includes(method)) {
     if (isPosixHidden(pathname) !== hide) {
       pathname = await setHiddenPosix(pathname, hide);
       actions.dotPrefix = true;
     }
-    hidden = true;
+    acted = true;
   }
 
   if (
     LocalSupport.systemFlag &&
-    (["all", "systemFlag"].includes(method) || (!hidden && method === "auto"))
+    (["all", "systemFlag"].includes(method) || (!acted && method === "auto"))
   ) {
     await (await nativeFn()).setHidden(pathname, hide);
     actions.systemFlag = true;
