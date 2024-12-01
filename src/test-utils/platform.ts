@@ -1,8 +1,10 @@
 // src/test-utils/platform.ts
 
+import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { env, platform } from "node:process";
-import { isWindows } from "../platform.js";
+import { isMacOS, isWindows } from "../platform.js";
 import { toNotBlank } from "../string.js";
 
 /**
@@ -23,9 +25,12 @@ export function systemDrive() {
 }
 
 export function tmpDirNotHidden() {
-  if (isWindows) {
-    return join(systemDrive(), "tmp");
-  } else {
-    return "/tmp";
-  }
+  const dir = isMacOS
+    ? join(homedir(), "tmp")
+    : isWindows
+      ? join(systemDrive(), "tmp")
+      : "/tmp";
+
+  mkdirSync(dir, { recursive: true });
+  return dir;
 }

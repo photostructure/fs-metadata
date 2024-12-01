@@ -1,7 +1,8 @@
 import { jest } from "@jest/globals";
 import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
-import path from "node:path";
+import { homedir } from "node:os";
+import path, { join } from "node:path";
 import { statAsync } from "../fs_promises.js";
 import { createHiddenPosixPath, LocalSupport } from "../hidden.js";
 import {
@@ -10,7 +11,7 @@ import {
   isHiddenRecursive,
   setHidden,
 } from "../index.js";
-import { isWindows } from "../platform.js";
+import { isMacOS, isWindows } from "../platform.js";
 import { validateHidden } from "../test-utils/hidden-tests.js";
 import { systemDrive, tmpDirNotHidden } from "../test-utils/platform.js";
 
@@ -124,7 +125,7 @@ describe("hidden file tests", () => {
     });
 
     it("should return false for root path", async () => {
-      expect(await isHiddenRecursive("C:\\")).toBe(false);
+      expect(await isHiddenRecursive(isWindows ? "C:\\" : "/")).toBe(false);
     });
   });
 
@@ -136,7 +137,8 @@ describe("hidden file tests", () => {
         ? testFile
         : path.join(tempDir, ".to-hide.txt");
 
-      expect(await setHidden(testFile, true)).toEqual(
+      const hidden = await setHidden(testFile, true);
+      expect(hidden).toEqual(
         expect.objectContaining({
           pathname: expected,
         }),
@@ -159,7 +161,7 @@ describe("hidden file tests", () => {
       expect(hidden).toEqual(expectedHidden);
       expect(await isHidden(hidden)).toBe(true);
 
-      expect(await setHidden(testFile, false)).toEqual(
+      expect(await setHidden(hidden, false)).toEqual(
         expect.objectContaining({
           pathname: testFile,
         }),
@@ -228,7 +230,21 @@ describe("hidden file tests", () => {
           },
         });
       });
-    } else {
+    }
+
+    if (isMacOS) {
+      it("should return systemFlagged for a known directory", async () => {
+        const result = await getHiddenMetadata(join(homedir(), "Library"));
+        expect(result).toEqual({
+          hidden: true,
+          dotPrefix: false,
+          systemFlag: true,
+          supported: LocalSupport,
+        });
+      });
+    }
+
+    if (!isWindows) {
       it("should return correct metadata for normal file on POSIX", async () => {
         const testFile = path.join(tempDir, "normal.txt");
         await fs.writeFile(testFile, "test");
@@ -254,32 +270,29 @@ describe("hidden file tests", () => {
           hidden: true,
           dotPrefix: true,
           systemFlag: false,
-          supported: {
-            dotPrefix: true,
-            systemFlag: process.platform === "darwin",
-          },
+          supported: LocalSupport,
         });
       });
     }
 
     it("should handle root directory", async () => {
-      const metadata = await getHiddenMetadata(systemDrive());
-      expect(metadata.hidden).toBe(false);
-      expect(metadata.dotPrefix).toBe(false);
-      if (isWindows) {
-        expect(metadata.supported).toEqual({
-          dotPrefix: false,
-          systemFlag: true,
-        });
-      }
+      expect(await getHiddenMetadata(systemDrive())).toEqual({
+        hidden: false,
+        dotPrefix: false,
+        systemFlag: false,
+        supported: LocalSupport,
+      });
     });
 
     it("should handle non-existent paths", async () => {
-      const nonExistentPath = path.join(tempDir, "does-not-exist");
-      const metadata = await getHiddenMetadata(nonExistentPath);
-      expect(metadata.hidden).toBe(false);
-      expect(metadata.dotPrefix).toBe(false);
-      expect(metadata.systemFlag).toBe(false);
+      expect(
+        await getHiddenMetadata(path.join(tempDir, "does-not-exist")),
+      ).toEqual({
+        hidden: false,
+        dotPrefix: false,
+        systemFlag: false,
+        supported: LocalSupport,
+      });
     });
   });
 
@@ -297,7 +310,11 @@ describe("hidden file tests", () => {
       });
 
       // Test explicit systemFlag method
-      const systemFlagResult = await setHidden(testFile, true, "systemFlag");
+      const systemFlagResult = await setHidden(
+        dotPrefixResult.pathname,
+        true,
+        "systemFlag",
+      );
 
       expect(systemFlagResult.actions).toEqual({
         dotPrefix: false,

@@ -15,8 +15,7 @@ export async function statAsync(
 
 export async function canStatAsync(path: string): Promise<boolean> {
   try {
-    await statAsync(path);
-    return true;
+    return null != (await statAsync(path));
   } catch {
     return false;
   }

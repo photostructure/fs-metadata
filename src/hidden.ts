@@ -1,6 +1,7 @@
 import { rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { canStatAsync } from "./fs_promises.js";
+import { WrappedError } from "./error.js";
+import { canStatAsync, statAsync } from "./fs_promises.js";
 import { NativeBindingsFn } from "./native_bindings.js";
 import { isRootDirectory, normalizePath } from "./path.js";
 import { isWindows } from "./platform.js";
@@ -150,7 +151,9 @@ export async function getHiddenMetadata(
 
   const dotPrefix = LocalSupport.dotPrefix && isPosixHidden(pathname);
   const systemFlag =
-    LocalSupport.systemFlag && (await isHidden(pathname, nativeFn));
+    LocalSupport.systemFlag &&
+    (await canStatAsync(pathname)) &&
+    (await (await nativeFn()).isHidden(pathname));
   return {
     hidden: dotPrefix || systemFlag,
     dotPrefix,
@@ -168,6 +171,12 @@ export async function setHidden(
   nativeFn: NativeBindingsFn,
 ) {
   pathname = normalizePath(pathname);
+
+  try {
+    await statAsync(pathname);
+  } catch (err) {
+    throw new WrappedError("setHidden()", err);
+  }
 
   const actions = {
     dotPrefix: false,
