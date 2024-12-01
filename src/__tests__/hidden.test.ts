@@ -11,7 +11,7 @@ import {
   isHiddenRecursive,
   setHidden,
 } from "../index.js";
-import { isMacOS, isWindows } from "../platform.js";
+import { isLinux, isMacOS, isWindows } from "../platform.js";
 import { validateHidden } from "../test-utils/hidden-tests.js";
 import { systemDrive, tmpDirNotHidden } from "../test-utils/platform.js";
 
@@ -189,7 +189,7 @@ describe("hidden file tests", () => {
       }
     }
 
-    if (!isWindows) {
+    if (isLinux) {
       it("should throw error when using systemFlag method on Linux", async () => {
         const testFile = path.join(tempDir, "linux-error-test.txt");
         await fs.writeFile(testFile, "test");
@@ -198,7 +198,9 @@ describe("hidden file tests", () => {
           /not supported/i,
         );
       });
+    }
 
+    if (!isWindows) {
       it("should correctly handle multiple dot prefixes when hiding", async () => {
         const testFile = path.join(tempDir, ".already-hidden.txt");
         await fs.writeFile(testFile, "test");
