@@ -1,14 +1,27 @@
 {
   "cSpell.words": [
+    "autofs",
+    "binfmt",
     "blkid",
     "buildify",
+    "configfs",
+    "debugfs",
+    "devpts",
+    "devtmpfs",
+    "efivarfs",
     "fstype",
+    "fusectl",
     "gvfs",
+    "hugetlbfs",
     "libblkid",
     "mntops",
+    "mqueue",
     "napi",
     "passno",
     "preprebuildify",
+    "securityfs",
+    "squashfs",
+    "sysfs",
     "tsup",
     "unhiding",
     "vfstype",
@@ -17,7 +30,10 @@
   "json.schemas": [
     {
       "url": "https://json.schemastore.org/tsconfig",
-      "fileMatch": ["tsconfig.json", "tsconfig.*.json"]
+      "fileMatch": [
+        "tsconfig.json",
+        "tsconfig.*.json"
+      ]
     }
   ],
   "files.associations": {
