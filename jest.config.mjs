@@ -1,4 +1,6 @@
-import { env } from "node:process";
+//@ts-check
+
+import { argv } from "node:process";
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 const config = {
@@ -20,7 +22,7 @@ const config = {
   },
   extensionsToTreatAsEsm: [".ts"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
-  collectCoverage: !env.TEST_MEMORY,
+  collectCoverage: argv.includes("--coverage") && !argv.includes("--no-coverage"),
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
   coveragePathIgnorePatterns: ["/__tests__/", "/test-utils/"],
