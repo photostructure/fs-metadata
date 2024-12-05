@@ -1,8 +1,26 @@
-// src/stat.ts
+// src/fs.ts
 
-import { statSync } from "node:fs";
+import { type PathLike, type StatOptions, Stats, statSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { statAsync } from "./fs_promises.js";
+
+/**
+ * Wrapping node:fs/promises.stat() so we can mock it in tests.
+ */
+export async function statAsync(
+  path: PathLike,
+  options?: StatOptions & { bigint?: false },
+): Promise<Stats> {
+  return stat(path, options);
+}
+
+export async function canStatAsync(path: string): Promise<boolean> {
+  try {
+    return null != (await statAsync(path));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * @return true if `path` exists and is a directory

@@ -1,20 +1,97 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findAncestorDir } from "../fs.js";
+import {
+  canStatAsync,
+  existsSync,
+  findAncestorDir,
+  isDirectory,
+} from "../fs.js";
 
 describe("fs", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), "findAncestorDir-tests-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  describe("canStatAsync", () => {
+    it("should return true for existing file", async () => {
+      const filePath = join(tempDir, "test.txt");
+      await writeFile(filePath, "test content");
+
+      const result = await canStatAsync(filePath);
+      expect(result).toBe(true);
+    });
+
+    it("should return true for existing directory", async () => {
+      const dirPath = join(tempDir, "testDir");
+      await mkdir(dirPath);
+
+      const result = await canStatAsync(dirPath);
+      expect(result).toBe(true);
+    });
+
+    it("should return false for non-existent path", async () => {
+      const nonExistentPath = join(tempDir, "does-not-exist");
+
+      const result = await canStatAsync(nonExistentPath);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("isDirectory", () => {
+    it("should return true for directory", async () => {
+      const dirPath = join(tempDir, "testDir");
+      await mkdir(dirPath);
+
+      const result = await isDirectory(dirPath);
+      expect(result).toBe(true);
+    });
+
+    it("should return false for file", async () => {
+      const filePath = join(tempDir, "test.txt");
+      await writeFile(filePath, "test content");
+
+      const result = await isDirectory(filePath);
+      expect(result).toBe(false);
+    });
+
+    it("should return false for non-existent path", async () => {
+      const nonExistentPath = join(tempDir, "does-not-exist");
+
+      const result = await isDirectory(nonExistentPath);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("existsSync", () => {
+    it("should return true for existing file", async () => {
+      const filePath = join(tempDir, "test.txt");
+      await writeFile(filePath, "test content");
+
+      expect(existsSync(filePath)).toBe(true);
+    });
+
+    it("should return true for existing directory", async () => {
+      const dirPath = join(tempDir, "testDir");
+      await mkdir(dirPath);
+
+      expect(existsSync(dirPath)).toBe(true);
+    });
+
+    it("should return false for non-existent path", () => {
+      const nonExistentPath = join(tempDir, "does-not-exist");
+
+      expect(existsSync(nonExistentPath)).toBe(false);
+    });
+  });
+
   describe("findAncestorDir", () => {
-    let tempDir: string;
-
-    beforeEach(async () => {
-      tempDir = await mkdtemp(join(tmpdir(), "findAncestorDir-tests-"));
-    });
-
-    afterEach(async () => {
-      await rm(tempDir, { recursive: true, force: true });
-    });
-
     it("should return the directory containing the file", async () => {
       const dir1 = join(tempDir, "dir1");
       const dir2 = join(dir1, "dir2");
