@@ -22,7 +22,8 @@ const config = {
   },
   extensionsToTreatAsEsm: [".ts"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
-  collectCoverage: argv.includes("--coverage") && !argv.includes("--no-coverage"),
+  collectCoverage:
+    argv.includes("--coverage") && !argv.includes("--no-coverage"),
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
   coveragePathIgnorePatterns: ["/__tests__/", "/test-utils/"],

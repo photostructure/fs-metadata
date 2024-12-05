@@ -30,10 +30,7 @@
   "json.schemas": [
     {
       "url": "https://json.schemastore.org/tsconfig",
-      "fileMatch": [
-        "tsconfig.json",
-        "tsconfig.*.json"
-      ]
+      "fileMatch": ["tsconfig.json", "tsconfig.*.json"]
     }
   ],
   "files.associations": {
