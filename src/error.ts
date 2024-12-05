@@ -1,14 +1,75 @@
 // src/error.ts
 
-export class WrappedError extends Error {
-  constructor(context: string, cause: unknown) {
-    const errorMessage = cause instanceof Error ? cause.message : String(cause);
-    super(`${context}: ${errorMessage}`);
-    this.cause = cause;
+import { isNumber } from "./number.js";
+import { compactValues, map, omit } from "./object.js";
+import { isNotBlank } from "./string.js";
 
-    if (cause instanceof Error) {
-      this.stack = `${this.stack}\nCaused by: ${cause.stack}`;
+export class WrappedError extends Error {
+  errno?: number;
+  code?: string;
+  syscall?: string;
+  path?: string;
+  constructor(
+    context: string,
+    options?: {
+      name?: string;
+      cause?: unknown;
+      errno?: number;
+      code?: string;
+      syscall?: string;
+      path?: string;
+    },
+  ) {
+    let message = context;
+    if (options?.cause != null) {
+      if (options.cause instanceof Error) {
+        message += ": " + options.cause.message;
+      } else if (isNotBlank(options.cause)) {
+        message += ": " + options.cause;
+      } else {
+        message += ": " + JSON.stringify(options.cause);
+      }
     }
+
+    super(message);
+
+    const cause = map(options?.cause, toError);
+    const opts = { ...compactValues(cause), ...compactValues(options) };
+
+    if (isNotBlank(options?.name)) {
+      this.name = options.name;
+    }
+
+    if (cause != null) {
+      this.cause = cause;
+      if (cause instanceof Error) {
+        this.stack = `${this.stack}\nCaused by: ${cause.stack}`;
+      }
+    }
+
+    if (isNumber(opts.errno)) {
+      this.errno = opts.errno;
+    }
+    if (isNotBlank(opts.code)) {
+      this.code = opts.code;
+    }
+    if (isNotBlank(opts.syscall)) {
+      this.syscall = opts.syscall;
+    }
+    if (isNotBlank(options?.path)) {
+      this.path = options.path;
+    }
+  }
+
+  get details(): Record<string, unknown> {
+    return compactValues(omit(this, "name", "message", "cause"));
+  }
+
+  override toString(): string {
+    const details = this.details;
+    const detailsStr =
+      Object.keys(details).length === 0 ? "" : " " + JSON.stringify(details);
+    return `${super.toString()}${detailsStr}`;
   }
 }
 
