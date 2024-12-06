@@ -4,6 +4,10 @@ export function isString(input: unknown): input is string {
   return typeof input === "string";
 }
 
+export function toS(input: unknown): string {
+  return isString(input) ? input : input == null ? "" : String(input);
+}
+
 /**
  * @return true iff the input is a string and has at least one non-whitespace character
  */
@@ -66,7 +70,7 @@ export function encodeEscapeSequences(input: string): string {
 /**
  * Sort an array of strings using the locale-aware collation algorithm.
  *
- * @param arr - The array of strings to sort. The original array **is sorted in
+ * @param arr The array of strings to sort. The original array **is sorted in
  * place**.
  */
 export function sortByLocale(
@@ -75,4 +79,21 @@ export function sortByLocale(
   options?: Intl.CollatorOptions,
 ): string[] {
   return arr.sort((a, b) => a.localeCompare(b, locales, options));
+}
+
+/**
+ * Sort an array of objects using the locale-aware collation algorithm.
+ *
+ * @param arr The array of objects to sort.
+ * @param fn The function to extract the key to sort by from each object.
+ * @param locales The locales to use for sorting.
+ * @param options The collation options to use for sorting.
+ */
+export function sortObjectsByLocale<T>(
+  arr: T[],
+  fn: (key: T) => string,
+  locales?: Intl.LocalesArgument,
+  options?: Intl.CollatorOptions,
+): T[] {
+  return arr.sort((a, b) => fn(a).localeCompare(fn(b), locales, options));
 }
