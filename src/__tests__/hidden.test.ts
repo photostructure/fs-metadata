@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path, { join } from "node:path";
-import { statAsync } from "../fs_promises.js";
+import { statAsync } from "../fs.js";
 import { createHiddenPosixPath, LocalSupport } from "../hidden.js";
 import {
   getHiddenMetadata,

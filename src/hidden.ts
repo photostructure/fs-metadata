@@ -1,7 +1,7 @@
 import { rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { WrappedError } from "./error.js";
-import { canStatAsync, statAsync } from "./fs_promises.js";
+import { canStatAsync, statAsync } from "./fs.js";
 import { NativeBindingsFn } from "./native_bindings.js";
 import { isRootDirectory, normalizePath } from "./path.js";
 import { isWindows } from "./platform.js";
@@ -193,8 +193,8 @@ export async function setHidden(
 
   try {
     await statAsync(pathname);
-  } catch (err) {
-    throw new WrappedError("setHidden()", err);
+  } catch (cause) {
+    throw new WrappedError("setHidden()", { cause });
   }
 
   if (isWindows && isRootDirectory(pathname)) {
