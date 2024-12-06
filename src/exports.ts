@@ -1,7 +1,7 @@
 // index.ts
 import NodeGypBuild from "node-gyp-build";
-import { thenOrTimeout } from "./async.js";
-import { filterMountPoints, filterTypedMountPoints } from "./config_filters.js";
+import { availableParallelism } from "node:os";
+import { mapConcurrent, thenOrTimeout } from "./async.js";
 import { defer } from "./defer.js";
 import { findAncestorDir } from "./fs.js";
 import {
@@ -12,10 +12,14 @@ import {
   isHiddenRecursive,
   setHidden,
 } from "./hidden.js";
-import { getLinuxMountPoints } from "./linux/mount_points.js";
+import {
+  GetVolumeMountPointOptions,
+  getVolumeMountPoints,
+  MountPoint,
+} from "./mount_point.js";
 import type { NativeBindings } from "./native_bindings.js";
+import { toGt0 } from "./number.js";
 import { type Options, optionsWithDefaults } from "./options.js";
-import { isLinux, isWindows } from "./platform.js";
 import { getVolumeMetadata, type VolumeMetadata } from "./volume_metadata.js";
 
 /**
@@ -44,30 +48,17 @@ export class ExportsImpl {
    *
    * @param opts Optional filesystem operation settings to override default
    * values
+   *
    */
   readonly getVolumeMountPoints = async (
-    opts: Partial<Options> = {},
-  ): Promise<string[]> => {
+    opts?: Partial<GetVolumeMountPointOptions>,
+  ): Promise<MountPoint[]> => {
     const o = optionsWithDefaults(opts);
-    return thenOrTimeout(
-      isWindows ? this.#getWindowsMountPoints(o) : this.#getUnixMountPoints(o),
-      { timeoutMs: o.timeoutMs, desc: "getVolumeMountPoints()" },
-    );
+    return thenOrTimeout(getVolumeMountPoints(this.#nativeFn, o), {
+      timeoutMs: o.timeoutMs,
+      desc: "getVolumeMountPoints()",
+    });
   };
-
-  async #getWindowsMountPoints(options: Options) {
-    const arr = await (await this.#nativeFn()).getVolumeMountPoints();
-    return filterMountPoints(arr, options);
-  }
-
-  async #getUnixMountPoints(options: Options & { device?: string }) {
-    return filterTypedMountPoints(
-      await (isLinux
-        ? getLinuxMountPoints(this.#nativeFn, options)
-        : (await this.#nativeFn()).getVolumeMountPoints()),
-      options,
-    );
-  }
 
   /**
    * Get metadata for the volume at the given mount point.
@@ -77,26 +68,52 @@ export class ExportsImpl {
    */
   readonly getVolumeMetadata = (
     mountPoint: string,
-    opts: Partial<Pick<Options, "timeoutMs" | "onlyDirectories">> = {},
+    opts?: Partial<Pick<Options, "timeoutMs">>,
   ): Promise<VolumeMetadata> => {
     const o = optionsWithDefaults(opts);
-    return thenOrTimeout(getVolumeMetadata(mountPoint, o, this.#nativeFn), {
+    return thenOrTimeout(getVolumeMetadata(mountPoint, this.#nativeFn, o), {
       timeoutMs: o.timeoutMs,
       desc: "getVolumeMetadata()",
     });
   };
 
   /**
-   * Get metadata for all volumes on the system.
+   * Retrieves metadata for all mounted volumes with optional filtering and
+   * concurrency control.
    *
-   * @param opts Optional filesystem operation settings to override default
-   * values
+   * @param opts - Optional configuration object
+   * @param opts.includeSystemVolumes - If true, includes system volumes in the
+   * results. Defaults to false.
+   * @param opts.maxConcurrency - Maximum number of concurrent operations.
+   * Defaults to the system's available parallelism: see
+   * {@link https://nodejs.org/api/os.html#osavailableparallelism | os.availableParallelism()}
+   * @param opts.timeoutMs - Maximum time to wait for each
+   * {@link getVolumeMetadata} to complete. Defaults to
+   * {@link TimeoutMsDefault}.
+   * @returns Promise that resolves to an array of either VolumeMetadata objects
+   * or error objects containing the mount point and error
+   * @throws Never - errors are caught and returned as part of the result array
    */
   readonly getAllVolumeMetadata = async (
-    opts?: Partial<Options>,
-  ): Promise<VolumeMetadata[]> => {
+    opts?: Partial<Options> & {
+      includeSystemVolumes?: boolean;
+      maxConcurrency?: number;
+      timeoutMs?: number;
+    },
+  ): Promise<(VolumeMetadata | { mountPoint: string; error: Error })[]> => {
     const arr = await this.getVolumeMountPoints(opts);
-    return Promise.all(arr.map((mp) => this.getVolumeMetadata(mp, opts)));
+    return mapConcurrent({
+      maxConcurrency: toGt0(opts?.maxConcurrency) ?? availableParallelism(),
+      items:
+        (opts?.includeSystemVolumes ?? false)
+          ? arr
+          : arr.filter((ea) => !ea.isSystemVolume),
+      fn: async (mp) =>
+        this.getVolumeMetadata(mp.mountPoint, opts).catch((error) => ({
+          mountPoint: mp.mountPoint,
+          error,
+        })),
+    }) as Promise<(VolumeMetadata | { mountPoint: string; error: Error })[]>;
   };
 
   /**

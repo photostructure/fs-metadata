@@ -1,54 +1,44 @@
 // src/linux/mount_points.ts
-
 import { readFile } from "node:fs/promises";
 import { toError, WrappedError } from "../error.js";
+import { isMountPoint, type MountPoint } from "../mount_point.js";
 import type { NativeBindingsFn } from "../native_bindings.js";
-import { type Options, optionsWithDefaults } from "../options.js";
-import { toNotBlank } from "../string.js";
-import {
-  isTypedMountPoint,
-  type TypedMountPoint,
-} from "../typed_mount_point.js";
-import { MountEntry, parseMtab } from "./mtab.js";
+import { optionsWithDefaults, type Options } from "../options.js";
+import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab.js";
 
 export async function getLinuxMountPoints(
   native: NativeBindingsFn,
   opts?: Pick<Options, "linuxMountTablePaths">,
-): Promise<TypedMountPoint[]> {
+): Promise<MountPoint[]> {
+  const o = optionsWithDefaults(opts);
   // Get GIO mounts if available from native module
-  const gioMounts: TypedMountPoint[] = [];
+  const gioMountPoints: MountPoint[] = [];
   try {
     const points = await (await native()).getGioMountPoints?.();
-    gioMounts.push(...(points ?? []).filter(isTypedMountPoint));
+    if (points != null) gioMountPoints.push(...points);
   } catch (error) {
-    console.warn(error);
+    console.warn("Failed to get GIO mount points: " + error);
     // GIO support not compiled in or failed, continue with just mtab mounts
   }
 
-  let caughtError: Error | undefined;
-  const inputs = optionsWithDefaults(opts).linuxMountTablePaths;
-  for (const input of inputs) {
+  let cause: Error | undefined;
+  for (const input of o.linuxMountTablePaths) {
     try {
-      const mtabMounts: TypedMountPoint[] = [];
       const mtabContent = await readFile(input, "utf8");
-      for (const ea of parseMtab(mtabContent)) {
-        const obj = {
-          mountPoint: ea.fs_file,
-          fstype: toNotBlank(ea.fs_vfstype) ?? toNotBlank(ea.fs_spec),
-        };
-        if (isTypedMountPoint(obj)) {
-          mtabMounts.push(obj);
-        }
+      const mtabMounts = parseMtab(mtabContent)
+        .map((ea) => mountEntryToMountPoint(ea, o))
+        .filter((ea) => ea != null);
+      if (mtabMounts.length > 0) {
+        return [...gioMountPoints, ...mtabMounts].filter(isMountPoint);
       }
-      return [...gioMounts, ...mtabMounts];
     } catch (error) {
-      caughtError ??= toError(error);
+      cause ??= toError(error);
     }
   }
 
   throw new WrappedError(
-    `Failed to read any mount points (tried: ${JSON.stringify(inputs)})`,
-    caughtError,
+    `Failed to read any mount points (tried: ${JSON.stringify(o.linuxMountTablePaths)})`,
+    { cause },
   );
 }
 

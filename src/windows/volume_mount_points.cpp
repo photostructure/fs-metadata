@@ -1,153 +1,111 @@
 // src/windows/volume_mount_points.cpp
-#include "../common/metadata_worker.h"
-#include "./error_utils.h"
-#include "./fs_meta.h"
+#include "../common/volume_mount_points.h"
+#include "../common/error_utils.h"
+#include "fs_meta.h"
+#include "string.h"
 #include <memory>
-#include <sstream>
 #include <vector>
 #include <windows.h>
-#include <winnetwk.h>
 
 namespace FSMeta {
 
 namespace {
-// RAII wrapper for logical drive enumeration
-class LogicalDriveEnumerator {
-  std::vector<char> buffer;
-  bool valid = false;
-
-public:
-  LogicalDriveEnumerator() {
-    DWORD length = GetLogicalDriveStringsA(0, nullptr);
-    if (length == 0) {
-      throw FSException("GetLogicalDriveStrings length query", GetLastError());
-    }
-
-    buffer.resize(length);
-    if (GetLogicalDriveStringsA(length, buffer.data()) == 0) {
-      throw FSException("GetLogicalDriveStrings", GetLastError());
-    }
-    valid = true;
-  }
-
-  // Iterator class for drives
-  class iterator {
-    const char *current;
-
-  public:
-    explicit iterator(const char *ptr) : current(ptr) {}
-
-    iterator &operator++() {
-      if (current && *current) {
-        current += strlen(current) + 1;
-        if (!*current)
-          current = nullptr;
-      }
-      return *this;
-    }
-
-    bool operator!=(const iterator &other) const {
-      return current != other.current;
-    }
-
-    std::string operator*() const { return std::string(current); }
-  };
-
-  iterator begin() const { return iterator(valid ? buffer.data() : nullptr); }
-
-  iterator end() const { return iterator(nullptr); }
+struct DriveStringsBuffer {
+  std::unique_ptr<WCHAR[]> buffer;
+  explicit DriveStringsBuffer(DWORD size)
+      : buffer(std::make_unique<WCHAR[]>(size)) {}
 };
+} // namespace
 
-// Helper class for drive status checking
-class DriveStatusChecker {
+class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
 public:
-  static bool isAccessible(const std::string &path) {
-    char volumeName[MAX_PATH] = {0};
-    char fileSystem[MAX_PATH] = {0};
-    DWORD serialNumber = 0;
-    DWORD maxComponentLen = 0;
-    DWORD fsFlags = 0;
-
-    return GetVolumeInformationA(path.c_str(), volumeName, MAX_PATH,
-                                 &serialNumber, &maxComponentLen, &fsFlags,
-                                 fileSystem, MAX_PATH) != 0;
-  }
-
-  static bool isValidNetworkDrive(const std::string &path) {
-    std::vector<char> buffer(MAX_PATH);
-    DWORD bufferSize = MAX_PATH;
-    DWORD result = WNetGetConnectionA(path.substr(0, 2).c_str(), buffer.data(),
-                                      &bufferSize);
-    return result == NO_ERROR;
-  }
-};
-
-} // anonymous namespace
-
-class GetVolumeMountPointsWorker : public MetadataWorkerBase {
-public:
-  explicit GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred)
-      : MetadataWorkerBase("", deferred) {}
+  GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred)
+      : Napi::AsyncWorker(deferred.Env()), deferred_(deferred) {}
 
   void Execute() override {
     try {
-      std::vector<std::string> validMountPoints;
-      validMountPoints.reserve(26); // Maximum possible drives A-Z
-
-      LogicalDriveEnumerator drives;
-      for (const auto &drive : drives) {
-        try {
-          // For network drives, verify connection
-          if (GetDriveTypeA(drive.c_str()) == DRIVE_REMOTE) {
-            if (DriveStatusChecker::isValidNetworkDrive(drive)) {
-              validMountPoints.push_back(drive);
-            }
-            continue;
-          }
-
-          // For local drives, check accessibility
-          if (DriveStatusChecker::isAccessible(drive)) {
-            validMountPoints.push_back(drive);
-          }
-        } catch (const FSException &) {
-          // Skip problematic drives but continue enumeration
-          continue;
-        }
+      DWORD size = GetLogicalDriveStringsW(0, nullptr);
+      if (!size) {
+        throw FSException(
+            CreateErrorMessage("GetLogicalDriveStrings", GetLastError()));
       }
 
-      mountPoints = std::move(validMountPoints);
+      DriveStringsBuffer drives(size);
+      if (!GetLogicalDriveStringsW(size, drives.buffer.get())) {
+        throw FSException(
+            CreateErrorMessage("GetLogicalDriveStrings", GetLastError()));
+      }
 
+      WCHAR winDir[MAX_PATH + 1] = {0};
+      GetWindowsDirectoryW(winDir, MAX_PATH);
+
+      for (LPWSTR drive = drives.buffer.get(); *drive;
+           drive += wcslen(drive) + 1) {
+        UINT driveType = GetDriveTypeW(drive);
+        if (driveType == DRIVE_NO_ROOT_DIR) {
+          continue;
+        }
+
+        MountPoint mp;
+        mp.mountPoint = WideToUtf8(drive);
+
+        WCHAR fsName[MAX_PATH + 1] = {0};
+        if (GetVolumeInformationW(drive, nullptr, 0, nullptr, nullptr, nullptr,
+                                  fsName, MAX_PATH)) {
+          mp.fstype = WideToUtf8(fsName);
+        }
+
+        mp.status = GetVolumeHealthStatus(driveType);
+
+        std::wstring drivePath(drive);
+        std::wstring winDirStr(winDir);
+        mp.isSystemVolume = (mp.fstype == "System" || mp.fstype == "Reserved" ||
+                             mp.fstype == "Recovery");
+
+        mountPoints_.push_back(std::move(mp));
+      }
     } catch (const std::exception &e) {
       SetError(e.what());
     }
   }
 
   void OnOK() override {
-    Napi::HandleScope scope(Env());
-    auto result = Napi::Array::New(Env(), mountPoints.size());
+    auto env = Env();
+    Napi::Array result = Napi::Array::New(env, mountPoints_.size());
 
-    for (size_t i = 0; i < mountPoints.size(); i++) {
-      result.Set(i, Napi::String::New(Env(), mountPoints[i]));
+    for (size_t i = 0; i < mountPoints_.size(); i++) {
+      result[i] = mountPoints_[i].ToObject(env);
     }
 
     deferred_.Resolve(result);
   }
 
 private:
-  std::vector<std::string> mountPoints;
+  Napi::Promise::Deferred deferred_;
+  std::vector<MountPoint> mountPoints_;
+
+  static std::string GetVolumeHealthStatus(UINT type) {
+    switch (type) {
+    case DRIVE_REMOVABLE:
+    case DRIVE_FIXED:
+    case DRIVE_CDROM:
+    case DRIVE_RAMDISK:
+      return "healthy";
+    case DRIVE_REMOTE:
+      return "disconnected";
+    case DRIVE_UNKNOWN:
+    case DRIVE_NO_ROOT_DIR:
+    default:
+      return "unknown";
+    }
+  }
 };
 
-Napi::Value GetVolumeMountPoints(Napi::Env env) {
-  try {
-    auto deferred = Napi::Promise::Deferred::New(env);
-    auto *worker = new GetVolumeMountPointsWorker(deferred);
-    worker->Queue();
-    return deferred.Promise();
-  } catch (const std::exception &e) {
-    auto deferred = Napi::Promise::Deferred::New(env);
-    deferred.Reject(Napi::Error::New(env, e.what()).Value());
-    return deferred.Promise();
-  }
+Napi::Promise GetVolumeMountPoints(const Napi::CallbackInfo &info) {
+  auto deferred = Napi::Promise::Deferred::New(info.Env());
+  auto *worker = new GetVolumeMountPointsWorker(deferred);
+  worker->Queue();
+  return deferred.Promise();
 }
 
 } // namespace FSMeta

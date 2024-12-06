@@ -17,8 +17,8 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
     expect(typeof metadata.mountPoint).toBe("string");
     expect(metadata.mountPoint.length).toBeGreaterThan(0);
 
-    if (metadata.fileSystem !== undefined) {
-      expect(typeof metadata.fileSystem).toBe("string");
+    if (metadata.fstype !== undefined) {
+      expect(typeof metadata.fstype).toBe("string");
     }
 
     // Size checks

@@ -1,7 +1,7 @@
 import { availableParallelism } from "node:os";
 import { env } from "node:process";
 import { defer } from "./defer.js";
-import { gt0, gte0, isNumber, toInt } from "./number.js";
+import { gt0, isNumber, toInt } from "./number.js";
 import { isBlank } from "./string.js";
 
 /**
@@ -130,7 +130,7 @@ export async function mapConcurrent<I, O>({
   maxConcurrency?: number;
 }): Promise<(O | Error)[]> {
   // Validate maxConcurrency
-  if (!gte0(maxConcurrency)) {
+  if (!gt0(maxConcurrency)) {
     throw new Error(
       `maxConcurrency must be a positive integer, got: ${maxConcurrency}`,
     );

@@ -6,12 +6,26 @@ import { ExportsImpl } from "./exports.js";
 
 // IMPORTANT: KEEP THESE IN SYNC WITH index.cts!
 export type { HiddenMetadata, HideMethod } from "./hidden.js";
+export type {
+  GetVolumeMountPointOptions,
+  MountPoint,
+  SystemVolumeConfig,
+  VolumeHealthStatus,
+} from "./mount_point.js";
+
 export {
-  ExcludedFileSystemTypesDefault,
-  ExcludedMountPointGlobsDefault,
+  Degraded,
+  Disconnected,
+  Healthy,
+  Inaccessible,
+  Unknown,
+} from "./mount_point.js";
+export {
   LinuxMountTablePathsDefault,
   optionsWithDefaults as options,
   OptionsDefault,
+  SystemFsTypesDefault,
+  SystemPathPatternsDefault,
   TimeoutMsDefault,
 } from "./options.js";
 export type { Options } from "./options.js";

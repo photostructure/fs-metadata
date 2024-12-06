@@ -4,7 +4,7 @@
 
 #ifdef ENABLE_GIO
 
-#include "../common/mount_point.h"
+#include "../common/volume_mount_points.h"
 #include <napi.h>
 #include <string>
 #include <vector>

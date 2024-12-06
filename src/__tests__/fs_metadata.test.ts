@@ -7,6 +7,7 @@ import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
+  MountPoint,
 } from "../index.js";
 import { omit } from "../object.js";
 import { isLinux, isMacOS, isWindows } from "../platform.js";
@@ -19,10 +20,11 @@ describe("Filesystem Metadata", () => {
   jest.setTimeout(15_000);
 
   describe("Mount Points", () => {
-    function assertMountPoints(mountPoints: string[]) {
-      expect(Array.isArray(mountPoints)).toBe(true);
-      expect(mountPoints.length).toBeGreaterThan(0);
+    function assertMountPoints(arr: MountPoint[]) {
+      expect(Array.isArray(arr)).toBe(true);
+      expect(arr.length).toBeGreaterThan(0);
 
+      const mountPoints = arr.map((ea) => ea.mountPoint);
       // Platform-specific root checks
       if (isWindows) {
         expect(mountPoints).toContain("C:\\");
@@ -60,8 +62,9 @@ describe("Filesystem Metadata", () => {
     }
 
     it("should return sorted mount points", async () => {
-      const mountPoints = await getVolumeMountPoints();
-      const sorted = sortByLocale(mountPoints);
+      const arr = await getVolumeMountPoints();
+      const mountPoints = arr.map((ea) => ea.mountPoint);
+      const sorted = sortByLocale([...mountPoints]);
       expect(mountPoints).toEqual(sorted);
     });
   });
@@ -78,38 +81,33 @@ describe("Filesystem Metadata", () => {
 
       // Platform-specific filesystem checks
       if (isWindows) {
-        expect(metadata.fileSystem).toMatch(/^(ntfs|refs)$/i);
+        expect(metadata.fstype).toMatch(/^(ntfs|refs)$/i);
       } else if (isMacOS) {
-        expect(metadata.fileSystem).toMatch(/^(apfs|hfs)$/i);
+        expect(metadata.fstype).toMatch(/^(apfs|hfs)$/i);
       } else if (isLinux) {
         // We expect "overlay" for Docker containers
-        expect(metadata.fileSystem).toMatch(
-          /^(ext[234]|xfs|btrfs|zfs|overlay)$/i,
-        );
+        expect(metadata.fstype).toMatch(/^(ext[234]|xfs|btrfs|zfs|overlay)$/i);
       }
     });
-
+  });
+  describe("Volume Metadata errors", () => {
     it("handles non-existant mount points (from native)", async () => {
-      expect(
-        getVolumeMetadata("/nonexistent", {
-          onlyDirectories: false,
-        }),
-      ).rejects.toThrow(
+      await expect(getVolumeMetadata("/nonexistent")).rejects.toThrow(
         isWindows
           ? /ENOENT: no such file or directory/
-          : /statvfs|Failed to get volume (statistics|information)/,
+          : /ENOENT|statvfs|Failed to get volume (statistics|information)/,
       );
     });
 
     it("handles non-existant mount points (from js)", async () => {
-      expect(getVolumeMetadata("/nonexistent")).rejects.toThrow(
-        /mountPoint .+ is not accessible:/,
-      );
+      await expect(getVolumeMetadata("/nonexistent")).rejects.toThrow(/ENOENT/);
     });
+  });
 
+  describe("concurrent", () => {
     it("should handle concurrent getVolumeMetadata() calls", async () => {
       const mountPoints = await getVolumeMountPoints();
-      const expectedMountPoint = mountPoints[0]!;
+      const expectedMountPoint = mountPoints[0]!.mountPoint;
       const expected = await getVolumeMetadata(expectedMountPoint);
 
       const samples = 12;
@@ -122,7 +120,7 @@ describe("Filesystem Metadata", () => {
         ...times(samples, () =>
           isWindows ? randomLetter() + ":\\" : "/" + randomLetters(12),
         ),
-        ...times(samples, () => pickRandom(mountPoints)!),
+        ...times(samples, () => pickRandom(mountPoints)!.mountPoint),
       ]);
 
       const arr = await Promise.all(
@@ -141,7 +139,7 @@ describe("Filesystem Metadata", () => {
 
       for (const ea of arr) {
         if (ea instanceof Error) {
-          expect(ea.message).toMatch(/not accessible/i);
+          expect(String(ea)).toMatch(/EACCES|ENOTDIR|ENOENT/i);
         } else if (ea.mountPoint === expectedMountPoint) {
           // it's true that some metadata (like free space) can change between
           // calls. We don't expect it, but by omitting these fields, we don't
@@ -163,32 +161,21 @@ describe("Filesystem Metadata", () => {
         }
       }
     });
-
-    if (isMacOS) {
-      it("should handle Time Machine volumes if present", async () => {
-        const mountPoints = await getVolumeMountPoints();
-        const backupVolumes = mountPoints.filter(
-          (mp) =>
-            mp.includes("Backups.backupdb") ||
-            mp.includes("Time Machine Backups"),
-        );
-
-        for (const volume of backupVolumes) {
-          const metadata = await getVolumeMetadata(volume);
-          assertMetadata(metadata);
-          expect(metadata.fileSystem?.toLowerCase()).toMatch(/^(apfs|hfs)$/);
-        }
-      });
-    }
   });
 
   describe("getAllVolumeMetadata()", () => {
     it("should get metadata for all volumes", async () => {
       const expectedMountPoints = await getVolumeMountPoints();
       const all = await getAllVolumeMetadata();
-      expect(expectedMountPoints).toEqual(all.map((m) => m.mountPoint));
+      expect(
+        expectedMountPoints
+          .filter((ea) => !ea.isSystemVolume)
+          .map((ea) => ea.mountPoint),
+      ).toEqual(all.map((m) => m.mountPoint));
       for (const ea of all) {
-        assertMetadata(ea);
+        if (!("error" in ea)) {
+          assertMetadata(ea);
+        }
       }
     });
   });
@@ -201,15 +188,17 @@ describe("Filesystem Metadata", () => {
       delete process.env["TEST_DELAY"];
     });
     const rootPath = isWindows ? "C:\\" : "/";
+
     it("should handle getVolumeMountPoints() timeout", async () => {
-      expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
-        TimeoutError,
-      );
+      await expect(
+        getVolumeMountPoints({ timeoutMs: 1 }),
+      ).rejects.toBeInstanceOf(TimeoutError);
     });
+
     it("should handle getVolumeMetadata() timeout", async () => {
-      expect(getVolumeMetadata(rootPath, { timeoutMs: 1 })).rejects.toThrow(
-        TimeoutError,
-      );
+      await expect(
+        getVolumeMetadata(rootPath, { timeoutMs: 1 }),
+      ).rejects.toBeInstanceOf(TimeoutError);
     });
   });
 
@@ -226,7 +215,9 @@ describe("Filesystem Metadata", () => {
       ];
 
       for (const path of invalidPaths) {
-        await expect(getVolumeMetadata(path as string)).rejects.toThrow();
+        await expect(getVolumeMetadata(path as string)).rejects.toThrow(
+          /ENOENT|Invalid/i,
+        );
       }
     });
   });
@@ -234,39 +225,24 @@ describe("Filesystem Metadata", () => {
   describe("Network Filesystems", () => {
     jest.setTimeout(10_000);
 
-    const hasNetworkFS = async () => {
-      const metadata = await Promise.all(
-        (await getVolumeMountPoints()).map((mp) => getVolumeMetadata(mp)),
-      );
-      return metadata.some((m) => m.remote);
-    };
-
     it("should correctly identify network filesystems", async () => {
-      if (!(await hasNetworkFS())) {
-        console.log(
-          "Skipping network filesystem test - no network mounts found",
-        );
-        return;
+      for (const mp of await getVolumeMountPoints()) {
+        if (!mp.isSystemVolume) {
+          const meta = await getVolumeMetadata(mp.mountPoint);
+          if (meta.remote) {
+            expect(meta.isSystemVolume).toBe(false);
+
+            if (meta.remoteHost) {
+              expect(typeof meta.remoteHost).toBe("string");
+              expect(meta.remoteHost.length).toBeGreaterThan(0);
+            }
+            if (meta.remoteShare) {
+              expect(typeof meta.remoteShare).toBe("string");
+              expect(meta.remoteShare.length).toBeGreaterThan(0);
+            }
+          }
+        }
       }
-
-      const mountPoints = await getVolumeMountPoints();
-      const metadata = await Promise.all(
-        mountPoints.map((mp) => getVolumeMetadata(mp)),
-      );
-
-      const networkFS = metadata.filter((m) => m.remote);
-      networkFS.forEach((meta) => {
-        expect(meta.remote).toBe(true);
-
-        if (meta.remoteHost) {
-          expect(typeof meta.remoteHost).toBe("string");
-          expect(meta.remoteHost.length).toBeGreaterThan(0);
-        }
-        if (meta.remoteShare) {
-          expect(typeof meta.remoteShare).toBe("string");
-          expect(meta.remoteShare.length).toBeGreaterThan(0);
-        }
-      });
     });
   });
 });

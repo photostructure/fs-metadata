@@ -10,32 +10,29 @@ import { isObject } from "./object.js";
  */
 export interface Options {
   /**
-   * Timeout in milliseconds for filesystem operations. Disable timeouts by
-   * setting this to 0.
+   * Timeout in milliseconds for filesystem operations.
    *
-   * Default is 5000ms (5 seconds) on macOS and Linux, and 15000ms (15 seconds)
-   * on Windows.
+   * Disable timeouts by setting this to 0.
    *
-   * @see {@link TimeoutMsDefault} for the default value
+   * @see {@link TimeoutMsDefault}.
    */
   timeoutMs: number;
 
   /**
-   * File system types to exclude when listing mount points. Only applied on
-   * Linux and macOS systems.
+   * On Linux and macOS, mount point pathnames that matches any of these glob
+   * patterns will have {@link MountPoint.isSystemVolume} set to true.
    *
-   * @see {@link ExcludedFileSystemTypesDefault} for the default values
+   * @see {@link SystemPathPatternsDefault} for the default value
    */
-  excludedFileSystemTypes: string[];
+  systemPathPatterns: string[];
 
   /**
-   * Glob patterns to exclude when listing mount points.
+   * On Linux and macOS, volumes whose filesystem matches any of these strings
+   * will have {@link MountPoint.isSystemVolume} set to true.
    *
-   * POSIX forward-slashed pathnames will work on all platforms.
-   *
-   * @see {@link ExcludedMountPointGlobsDefault} for the default values
+   * @see {@link SystemFsTypesDefault} for the default value
    */
-  excludedMountPointGlobs: string[];
+  systemFsTypes: Set<string>;
 
   /**
    * On Linux, use the first mount point table in this array that is readable.
@@ -43,52 +40,24 @@ export interface Options {
    * @see {@link LinuxMountTablePathsDefault} for the default values
    */
   linuxMountTablePaths: string[];
-
-  /**
-   * Should only readable directories be included?
-   *
-   * @default true
-   */
-  onlyDirectories: boolean;
 }
 
 /**
- * Default timeout in milliseconds for {@link Options}.
+ * Default timeout in milliseconds for {@link Options.timeoutMs}.
  *
  * Note that this timeout may be insufficient for some devices, like spun-down
  * optical drives.
  */
-export const TimeoutMsDefault = 7_000;
+export const TimeoutMsDefault = 7_000 as const;
 
 /**
- * Default excluded file system types for {@link Options}.
- *
- * Note that these are only applied on Linux and macOS systems.
+ * System paths and globs that indicate system volumes
  */
-export const ExcludedFileSystemTypesDefault = [
-  "cgroup",
-  "cgroup2",
-  "configfs",
-  "debugfs",
-  "devpts",
-  "none",
-  "proc",
-  "pstore",
-  "securityfs",
-  "snap*",
-  "sysfs",
-  "tmpfs",
-] as const;
-
-/**
- * Default excluded mount point globs for {@link Options}.
- */
-export const ExcludedMountPointGlobsDefault = [
+export const SystemPathPatternsDefault = [
   "/boot",
   "/boot/efi",
   "/dev",
   "/dev/**",
-  "/private/var/vm", // macOS swap
   "/proc/**",
   "/run",
   "/run/credentials/**",
@@ -99,7 +68,8 @@ export const ExcludedMountPointGlobsDefault = [
   "/snap/**",
   "/sys/**",
 
-  // APFS stuff:
+  // MacOS stuff:
+  "/private/var/vm", // macOS swap
   "/System/Volumes/Hardware",
   "/System/Volumes/iSCPreboot",
   "/System/Volumes/Preboot",
@@ -108,15 +78,41 @@ export const ExcludedMountPointGlobsDefault = [
   "/System/Volumes/Update",
   "/System/Volumes/VM",
   "/System/Volumes/xarts",
-] as const;
+];
 
-export const OnlyDirectoriesDefault = true;
+/**
+ * Filesystem types that indicate system volumes
+ */
+export const SystemFsTypesDefault = new Set([
+  "autofs",
+  "binfmt_misc",
+  "cgroup",
+  "cgroup2",
+  "configfs",
+  "debugfs",
+  "devpts",
+  "devtmpfs",
+  "efivarfs",
+  "fusectl",
+  "hugetlbfs",
+  "mqueue",
+  "none",
+  "proc",
+  "pstore",
+  "securityfs",
+  "snap*",
+  "squashfs",
+  "sysfs",
+  "tmpfs",
+]);
 
 export const LinuxMountTablePathsDefault = [
   "/proc/self/mounts",
   "/proc/mounts",
   "/etc/mtab",
 ];
+
+export const OnlyDirectoriesDefault = true;
 
 /**
  * Default {@link Options} object.
@@ -125,10 +121,9 @@ export const LinuxMountTablePathsDefault = [
  */
 export const OptionsDefault: Options = {
   timeoutMs: TimeoutMsDefault,
-  excludedFileSystemTypes: [...ExcludedFileSystemTypesDefault],
-  excludedMountPointGlobs: [...ExcludedMountPointGlobsDefault],
+  systemPathPatterns: [...SystemPathPatternsDefault],
+  systemFsTypes: new Set(SystemFsTypesDefault),
   linuxMountTablePaths: LinuxMountTablePathsDefault,
-  onlyDirectories: OnlyDirectoriesDefault,
 } as const;
 
 /**

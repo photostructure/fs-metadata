@@ -1,5 +1,5 @@
+import { MountPoint } from "./mount_point.js";
 import type { Options } from "./options.js";
-import type { TypedMountPoint } from "./typed_mount_point.js";
 import type { VolumeMetadata } from "./volume_metadata.js";
 
 export interface NativeBindings {
@@ -17,11 +17,17 @@ export interface NativeBindings {
    * @throws {Error} If the operation fails
    */
   setHidden(path: string, hidden: boolean): Promise<void>;
+
   /**
    * This is only available on macOS and Windows--Linux directly reads from the
    * proc mounts table.
    */
-  getVolumeMountPoints(): Promise<(string | TypedMountPoint)[]>;
+  getVolumeMountPoints(): Promise<MountPoint[]>;
+
+  /**
+   * This is only available on Linux, and only if libglib-2.0 is installed.
+   */
+  getGioMountPoints?(): Promise<MountPoint[]>;
 
   /**
    * This is only a partial implementation for most platforms, to minimize
@@ -32,10 +38,6 @@ export interface NativeBindings {
     mountPoint: string,
     options?: GetVolumeMetadataOptions & { device?: string },
   ): Promise<VolumeMetadata>;
-  /**
-   * This is only available on Linux, and only if libglib-2.0 is installed.
-   */
-  getGioMountPoints?(): Promise<TypedMountPoint[]>;
 }
 
 export type GetVolumeMetadataOptions = Partial<

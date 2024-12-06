@@ -1,14 +1,14 @@
 // src/volume_metadata.ts
 
-import { Stats } from "fs";
 import { WrappedError } from "./error.js";
-import { statAsync } from "./fs_promises.js";
+import { statAsync } from "./fs.js";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
 import { getLinuxMtabMetadata } from "./linux/mount_points.js";
 import {
   MtabVolumeMetadata,
   mountEntryToPartialVolumeMetadata,
 } from "./linux/mtab.js";
+import { MountPoint, isSystemVolume } from "./mount_point.js";
 import {
   GetVolumeMetadataOptions,
   NativeBindingsFn,
@@ -32,20 +32,7 @@ import { extractUUID } from "./uuid.js";
  *
  * @see https://en.wikipedia.org/wiki/Volume_(computing)
  */
-export interface VolumeMetadata extends RemoteInfo {
-  /**
-   * Mount location (like "/home" or "C:\"). May be a unique key at any given
-   * time, unless there are file system shenanigans (like from `mergefs`)
-   */
-  mountPoint: string;
-  /**
-   * The name of the mount. This may match the resolved mountPoint.
-   */
-  mountName?: string;
-  /**
-   * This is the file system type (like "ext4" or "apfs")
-   */
-  fileSystem?: string;
+export interface VolumeMetadata extends RemoteInfo, MountPoint {
   /**
    * The name of the partition
    */
@@ -64,51 +51,52 @@ export interface VolumeMetadata extends RemoteInfo {
   available: number;
 
   /**
-   * Device or service that the mountpoint is from. May be `/dev/sda1`,
-   * `nfs-server:/export`, `//username@remoteHost/remoteShare`, or
-   * `//cifs-server/share`
+   * Path to the device or service that the mountpoint is from.
+   *
+   * Examples include `/dev/sda1`, `nfs-server:/export`,
+   * `//username@remoteHost/remoteShare`, or `//cifs-server/share`.
+   *
+   * May be undefined for remote volumes.
    */
-  mountFrom: string;
+  mountFrom?: string;
 
   /**
-   * UUID for the volume, like "d46edc85-a030-4dd7-a2a8-68344034e27d".
+   * The name of the mount. This may match the resolved mountPoint.
+   */
+  mountName?: string;
+
+  /**
+   * UUID for the volume, like "c9b08f6e-b392-11ef-bf19-4b13bb7db4b4".
+   *
+   * On windows, this _may_ be the 128-bit volume UUID, but if that is not
+   * available, like in the case of remote volumes, we fallback to the 32-bit
+   * volume serial number, rendered in lowercase hexadecimal.
    */
   uuid?: string;
-
-  /**
-   * If there are non-critical errors while extracting metadata, those error
-   * messages may be added to this field (say, from blkid or gio).
-   *
-   * Windows volumes may set this field to `Unknown`, `Unavailable`, `Healthy`,
-   * `Disconnected`, `Error`, or `NoMedia`.
-   */
-  status?: string;
 }
 
 export async function getVolumeMetadata(
   mountPoint: string,
-  o: GetVolumeMetadataOptions & Options,
   nativeFn: NativeBindingsFn,
+  o: GetVolumeMetadataOptions & Options,
 ): Promise<VolumeMetadata> {
   if (isBlank(mountPoint)) {
     throw new TypeError(
-      "mountPoint is required: got " + JSON.stringify(mountPoint),
+      "Invalid mountPoint argument: got " + JSON.stringify(mountPoint),
     );
   }
 
   mountPoint = normalizePath(mountPoint);
 
-  if (o.onlyDirectories || isWindows) {
-    let s: Stats;
-    try {
-      s = await statAsync(mountPoint);
-    } catch (e) {
-      throw new WrappedError(`mountPoint ${mountPoint} is not accessible`, e);
-    }
-    if (!s.isDirectory()) {
-      throw new TypeError(`mountPoint ${mountPoint} is not a directory`);
-    }
+  // This will throw an error if the mount point is not accessible:
+  const s = await statAsync(mountPoint);
+  if (!s.isDirectory()) {
+    throw new WrappedError(`mountPoint ${mountPoint} is not a directory`, {
+      code: "ENOTDIR",
+      path: mountPoint,
+    });
   }
+
   let remote: boolean = false;
   // Get filesystem info from mtab first on Linux
   let mtabInfo: undefined | MtabVolumeMetadata;
@@ -116,7 +104,7 @@ export async function getVolumeMetadata(
   if (isLinux) {
     try {
       const m = await getLinuxMtabMetadata(mountPoint, o);
-      mtabInfo = mountEntryToPartialVolumeMetadata(m);
+      mtabInfo = mountEntryToPartialVolumeMetadata(m, o);
       if (mtabInfo.remote) {
         remote = true;
       }
@@ -147,7 +135,7 @@ export async function getVolumeMetadata(
     (isWindows ? parseUNCPath(mountPoint) : undefined);
 
   remote ||=
-    isRemoteFsType(metadata.fileSystem) ||
+    isRemoteFsType(metadata.fstype) ||
     (remoteInfo?.remote ?? metadata.remote ?? false);
 
   const result = compactValues({
@@ -156,7 +144,7 @@ export async function getVolumeMetadata(
     ...compactValues(metadata),
     mountPoint,
     remote,
-  }) as unknown as VolumeMetadata;
+  }) as VolumeMetadata;
 
   // Backfill if blkid or gio failed us:
   if (isLinux && isNotBlank(device)) {
@@ -170,6 +158,9 @@ export async function getVolumeMetadata(
     }
   }
 
+  result.isSystemVolume =
+    result.isSystemVolume ?? isSystemVolume(mountPoint, result.fstype, o);
+
   // Fix microsoft UUID format:
   result.uuid = extractUUID(result.uuid) ?? result.uuid ?? "";
 
@@ -178,5 +169,5 @@ export async function getVolumeMetadata(
     result.remoteShare = normalizePath(result.remoteShare);
   }
 
-  return compactValues(result) as unknown as VolumeMetadata;
+  return compactValues(result) as VolumeMetadata;
 }

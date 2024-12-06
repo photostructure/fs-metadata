@@ -4,12 +4,13 @@ import { ExportsImpl } from "./exports.js";
 
 // IMPORTANT: KEEP THESE IN SYNC WITH index.ts!
 export type { HiddenMetadata, HideMethod } from "./hidden.js";
+export type { MountPoint, SystemVolumeConfig } from "./mount_point.js";
 export {
-  ExcludedFileSystemTypesDefault,
-  ExcludedMountPointGlobsDefault,
   LinuxMountTablePathsDefault,
+  optionsWithDefaults as options,
   OptionsDefault,
-  optionsWithDefaults,
+  SystemFsTypesDefault,
+  SystemPathPatternsDefault,
   TimeoutMsDefault,
 } from "./options.js";
 export type { Options } from "./options.js";

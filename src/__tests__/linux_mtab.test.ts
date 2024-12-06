@@ -88,77 +88,79 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
         },
       ]);
 
-      const vm_arr = entries.map(mountEntryToPartialVolumeMetadata);
+      const vm_arr = entries.map((ea) =>
+        mountEntryToPartialVolumeMetadata(ea, {}),
+      );
 
       console.dir({ vm_arr });
 
       expect(vm_arr).toEqual([
         {
-          fileSystem: "ext4",
+          fstype: "ext4",
           mountFrom: "/dev/sda1",
-          mountName: "",
           mountPoint: "/",
           remote: false,
+          isSystemVolume: false,
         },
         {
-          fileSystem: "ext4",
+          fstype: "ext4",
           mountFrom: "/dev/sda2",
-          mountName: "home",
           mountPoint: "/home",
           remote: false,
+          isSystemVolume: false,
         },
         {
-          fileSystem: "proc",
+          fstype: "proc",
           mountFrom: "proc",
-          mountName: "proc",
           mountPoint: "/proc",
           remote: false,
+          isSystemVolume: true,
         },
         {
-          fileSystem: "tmpfs",
+          fstype: "tmpfs",
           mountFrom: "tmpfs",
-          mountName: "run",
           mountPoint: "/run",
           remote: false,
+          isSystemVolume: true,
         },
         {
-          fileSystem: "nfs",
+          fstype: "nfs",
           mountFrom: "nfs-server:/export",
-          mountName: "nfs",
           mountPoint: "/mnt/nfs",
           protocol: "nfs",
           remote: true,
           remoteHost: "nfs-server",
           remoteShare: "export",
+          isSystemVolume: false,
         },
         {
-          fileSystem: "nfs",
+          fstype: "nfs",
           mountFrom: "192.168.0.216:/mnt/HDD1",
-          mountName: "freenas",
           mountPoint: "/media/freenas",
           protocol: "nfs",
           remote: true,
           remoteHost: "192.168.0.216",
           remoteShare: "mnt/HDD1",
+          isSystemVolume: false,
         },
         {
-          fileSystem: "cifs",
+          fstype: "cifs",
           mountFrom: "//cifs-server/share",
-          mountName: "cifs",
           mountPoint: "/mnt/cifs",
           remote: true,
           remoteHost: "cifs-server",
           remoteShare: "share",
+          isSystemVolume: false,
         },
         {
-          fileSystem: "smb",
+          fstype: "smb",
           mountFrom: "//guest@SERVER._smb._tcp.local/share",
-          mountName: "cifs2",
           mountPoint: "/mnt/cifs2",
           remote: true,
           remoteHost: "SERVER._smb._tcp.local",
           remoteShare: "share",
           remoteUser: "guest",
+          isSystemVolume: false,
         },
       ]);
     });

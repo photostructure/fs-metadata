@@ -99,13 +99,13 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
         }
       }
 
-      if (metadata.fileSystem.empty()) {
+      if (metadata.fstype.empty()) {
         GObjectPtr<GDrive> drive(g_mount_get_drive(mount));
         if (drive) {
           GCharPtr unix_device(g_drive_get_identifier(
               drive.get(), G_DRIVE_IDENTIFIER_KIND_UNIX_DEVICE));
           if (unix_device) {
-            metadata.fileSystem = unix_device.get();
+            metadata.fstype = unix_device.get();
           }
         }
       }

@@ -12,17 +12,13 @@ describe("options()", () => {
     const override = { timeoutMs: 10000 };
     const result = optionsWithDefaults(override);
     expect(result.timeoutMs).toBe(override.timeoutMs);
-    expect(result.excludedFileSystemTypes).toEqual(
-      OptionsDefault.excludedFileSystemTypes,
-    );
+    expect(result.systemFsTypes).toEqual(OptionsDefault.systemFsTypes);
   });
 
   it("should override excludedFileSystemTypes when provided", () => {
-    const override = { excludedFileSystemTypes: ["customfs"] };
+    const override = { systemFsTypes: new Set(["customfs"]) };
     const result = optionsWithDefaults(override);
-    expect(result.excludedFileSystemTypes).toEqual(
-      override.excludedFileSystemTypes,
-    );
+    expect(result.systemFsTypes).toEqual(override.systemFsTypes);
     expect(result.timeoutMs).toBe(OptionsDefault.timeoutMs);
   });
 
@@ -35,7 +31,6 @@ describe("options()", () => {
     const result = optionsWithDefaults(overrides);
     expect(result.timeoutMs).toBe(overrides.timeoutMs);
     expect(result.linuxMountTablePaths).toBe(overrides.linuxMountTablePaths);
-    expect(result.onlyDirectories).toBe(overrides.onlyDirectories);
   });
 
   it("should throw a TypeError if overrides is not an object", () => {
@@ -51,11 +46,9 @@ describe("options()", () => {
   });
 
   it("should preserve default values for fields not overridden", () => {
-    const override = { excludedMountPointGlobs: ["/custom/mount"] };
+    const override = { systemPathPatterns: ["/custom/mount"] };
     const result = optionsWithDefaults(override);
-    expect(result.excludedMountPointGlobs).toEqual(
-      override.excludedMountPointGlobs,
-    );
-    expect(result.onlyDirectories).toBe(OptionsDefault.onlyDirectories);
+    expect(result.systemPathPatterns).toEqual(override.systemPathPatterns);
+    expect(result.systemFsTypes).toBe(OptionsDefault.systemFsTypes);
   });
 });

@@ -14,9 +14,25 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities. 
 -->
 
-## [0.0.1] - 2024-11-22
+## [0.0.1] - to be released
 
 First release! Everything is a new feature!
 
 The 1.0.0 release will happen after some integration testing with the native
-library payloads, but the API should be stable.
+library payloads, but the API should be stable after the first release.
+
+## TODO
+
+- see if macOS has a native, not expensive "health status" for both
+  getVolumeMountPoints and getVolumeMetadata
+
+- try to add `syscall` (and `errno`) to all native exceptions, like:
+
+> require("fs").readdirSync("/home/mrm/.bashrc")
+Uncaught Error: ENOTDIR: not a directory, scandir '/home/mrm/.bashrc'
+    at Object.readdirSync (node:fs:1506:26) {
+  errno: -20,
+  code: 'ENOTDIR',
+  syscall: 'scandir',
+  path: '/home/mrm/.bashrc'
+}

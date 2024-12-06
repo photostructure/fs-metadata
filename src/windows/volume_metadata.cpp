@@ -2,6 +2,7 @@
 #include "../common/metadata_worker.h"
 #include "error_utils.h"
 #include "fs_meta.h"
+#include "string.h"
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -28,22 +29,46 @@ public:
     isValid = (result == NO_ERROR);
   }
 
+  WNetConnection(WNetConnection &&) noexcept = default;
+  WNetConnection &operator=(WNetConnection &&) noexcept = default;
+
+  // Prevent copying
+  WNetConnection(const WNetConnection &) = delete;
+  WNetConnection &operator=(const WNetConnection &) = delete;
+
   bool valid() const { return isValid; }
   const char *remotePath() const { return buffer.get(); }
 };
 
-// Helper for formatting volume UUID
-inline std::string FormatVolumeUUID(DWORD serialNumber) {
+// Helper for formatting volume serialNumber
+inline std::string FormatVolumeSerialNumber(DWORD serialNumber) {
   std::stringstream ss;
-  ss << std::uppercase << std::hex << std::setfill('0') << std::setw(8)
-     << serialNumber;
+  // We aren't using std::uppercase here because volume UUIDs aren't coming
+  // out uppercase either.
+  ss << std::hex << std::setfill('0') << std::setw(8) << serialNumber;
   return ss.str();
+}
+
+// Helper for getting volume GUID path
+inline std::string GetVolumeGUID(const std::string &mountPoint) {
+  std::wstring widePath(mountPoint.begin(), mountPoint.end());
+  if (widePath.back() != L'\\') {
+    widePath += L'\\';
+  }
+
+  WCHAR volumeGUID[50] = {0}; // Sufficient size for a GUID path
+  if (!GetVolumeNameForVolumeMountPointW(widePath.c_str(), volumeGUID, 50)) {
+    throw FSException("GetVolumeNameForVolumeMountPoint", GetLastError());
+  }
+
+  // Convert GUID to string and trim the trailing slash
+  return WideToUtf8(volumeGUID);
 }
 
 // RAII wrapper for volume information
 class VolumeInfo {
   char volumeName[BUFFER_SIZE];
-  char fileSystem[BUFFER_SIZE];
+  char fstype[BUFFER_SIZE];
   DWORD serialNumber;
   DWORD maxComponentLen;
   DWORD fsFlags;
@@ -53,7 +78,7 @@ public:
   explicit VolumeInfo(const std::string &mountPoint) {
     valid = GetVolumeInformationA(mountPoint.c_str(), volumeName, BUFFER_SIZE,
                                   &serialNumber, &maxComponentLen, &fsFlags,
-                                  fileSystem, BUFFER_SIZE);
+                                  fstype, BUFFER_SIZE);
 
     if (!valid && GetLastError() != ERROR_NOT_READY) {
       throw FSException("GetVolumeInformation", GetLastError());
@@ -62,7 +87,7 @@ public:
 
   bool isValid() const { return valid; }
   const char *getVolumeName() const { return volumeName; }
-  const char *getFileSystem() const { return fileSystem; }
+  const char *getFileSystem() const { return fstype; }
   DWORD getSerialNumber() const { return serialNumber; }
 };
 
@@ -169,8 +194,16 @@ public:
       VolumeInfo volInfo(normalizedPath);
       if (volInfo.isValid()) {
         metadata.label = volInfo.getVolumeName();
-        metadata.fileSystem = volInfo.getFileSystem();
-        metadata.uuid = FormatVolumeUUID(volInfo.getSerialNumber());
+        metadata.fstype = volInfo.getFileSystem();
+
+        // Get volume GUID instead of using serial number
+        try {
+          metadata.uuid = GetVolumeGUID(normalizedPath);
+        } catch (const FSException &) {
+          // If getting GUID fails, fall back to serial number (it's probably
+          // a remote volume)
+          metadata.uuid = FormatVolumeSerialNumber(volInfo.getSerialNumber());
+        }
 
         // Get disk space information
         DiskSpaceInfo diskInfo(normalizedPath);

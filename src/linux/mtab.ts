@@ -1,6 +1,11 @@
 // src/linux/mtab.ts
 
-import { basename } from "path";
+import {
+  isSystemVolume,
+  MountPoint,
+  SystemVolumeConfig,
+  toMountPoint,
+} from "../mount_point.js";
 import { toInt } from "../number.js";
 import { normalizeLinuxPath } from "../path.js";
 import { extractRemoteInfo } from "../remote_info.js";
@@ -8,6 +13,7 @@ import {
   decodeEscapeSequences,
   encodeEscapeSequences,
   isBlank,
+  toNotBlank,
 } from "../string.js";
 import { VolumeMetadata } from "../volume_metadata.js";
 
@@ -41,6 +47,19 @@ export interface MountEntry {
   fs_passno: number | undefined;
 }
 
+export function mountEntryToMountPoint(
+  entry: MountEntry,
+  options: Partial<SystemVolumeConfig>,
+): MountPoint | undefined {
+  return toMountPoint(
+    {
+      mountPoint: entry.fs_file,
+      fstype: toNotBlank(entry.fs_vfstype) ?? toNotBlank(entry.fs_spec)!,
+    },
+    options,
+  );
+}
+
 export type MtabVolumeMetadata = Omit<
   VolumeMetadata,
   "size" | "used" | "available" | "label" | "uuid" | "status"
@@ -48,12 +67,13 @@ export type MtabVolumeMetadata = Omit<
 
 export function mountEntryToPartialVolumeMetadata(
   entry: MountEntry,
+  options: Partial<SystemVolumeConfig> = {},
 ): MtabVolumeMetadata {
   return {
     mountPoint: entry.fs_file,
-    mountName: basename(entry.fs_file),
-    fileSystem: entry.fs_vfstype,
+    fstype: entry.fs_vfstype,
     mountFrom: entry.fs_spec,
+    isSystemVolume: isSystemVolume(entry.fs_file, entry.fs_vfstype, options),
     remote: false, // < default to false
     ...extractRemoteInfo(entry.fs_spec),
   };

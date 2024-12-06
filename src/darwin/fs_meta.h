@@ -4,7 +4,6 @@
 
 #include "../common/error_utils.h"
 #include "../common/metadata_worker.h"
-#include "../common/mount_point.h"
 #include "../common/volume_mount_points.h"
 
 namespace FSMeta {

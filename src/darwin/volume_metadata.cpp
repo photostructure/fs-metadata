@@ -138,7 +138,7 @@ private:
     metadata.available = static_cast<double>(blockSize * availBlocks);
     metadata.used = static_cast<double>(blockSize * (totalBlocks - freeBlocks));
 
-    metadata.fileSystem = fs.f_fstypename;
+    metadata.fstype = fs.f_fstypename;
     metadata.mountFrom = fs.f_mntfromname;
     metadata.mountName = fs.f_mntonname;
     metadata.status = "ready";

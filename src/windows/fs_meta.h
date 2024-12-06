@@ -3,11 +3,15 @@
 #include "../common/volume_metadata.h"
 #include "../common/volume_mount_points.h"
 #include <functional>
-#include <napi.h>
 #include <utility>
 #include <windows.h> // for MAX_PATH
 
 namespace FSMeta {
+// Forward declarations of the main interface functions
+Napi::Value GetVolumeMountPoints(Napi::Env env);
+Napi::Value GetVolumeMetadata(const Napi::Env &env,
+                              const std::string &mountPoint,
+                              const Napi::Object &options);
 
 constexpr size_t ERROR_BUFFER_SIZE = 256;
 constexpr size_t BUFFER_SIZE = MAX_PATH + 1;
