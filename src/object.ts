@@ -7,7 +7,17 @@ import { isNotBlank, isString } from "./string.js";
  */
 export function isObject(value: unknown): value is object {
   // typeof null is 'object', so we need to check for that case YAY JAVASCRIPT
-  return typeof value === "object" && value != null && !Array.isArray(value);
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Map a value to another value, or undefined if the value is undefined
+ */
+export function map<T, U>(
+  obj: T | undefined,
+  fn: (value: T) => U,
+): U | undefined {
+  return obj == null ? undefined : fn(obj);
 }
 
 /**
@@ -37,13 +47,15 @@ export function pick<T extends object, K extends keyof T>(
   }
   return copy;
 }
-
-export function compactValues(obj: unknown): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj ?? {})) {
+export function compactValues<T extends object>(
+  obj: T | undefined,
+): Partial<T> {
+  const result = {} as Partial<T>;
+  if (obj == null || !isObject(obj)) return {};
+  for (const [key, value] of Object.entries(obj)) {
     // skip blank strings and nullish values:
     if (value != null && (!isString(value) || isNotBlank(value))) {
-      result[key] = value;
+      result[key as keyof T] = value as T[keyof T];
     }
   }
   return result;
