@@ -53,7 +53,7 @@
     "lint:fix": "eslint --fix",
     "fmt": "run-p fmt:*",
     "// fmt:cpp": "on ubuntu: `sudo apt install clang-format`",
-    "fmt:cpp": "clang-format --style=LLVM -i src/*/*.cpp src/*/*.h || true",
+    "fmt:cpp": "clang-format --style=LLVM -i src/*.cpp src/*/*.cpp src/*/*.h || true",
     "fmt:js": "prettier --write \"scripts/**/*.?js\" \"*.?js\"",
     "fmt:json": "prettier --write \"**/*.json\"",
     "fmt:pkg": "npm pkg fix",
