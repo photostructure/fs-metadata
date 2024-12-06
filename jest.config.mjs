@@ -30,11 +30,16 @@ const config = {
   coverageThreshold: {
     // These are low because we're doing integration tests and there are quite
     // different codepaths for macOS, Windows, and Linux
+
+    // As of 20241205, Windows (which is the lowest due to not testing the POSIX
+    // codepaths) is at { stmts: 82, branch: 75, funcs: 87, lines: 82 } so this
+    // gives us a little wiggle room
+
     global: {
+      statements: 75,
       branches: 70,
       functions: 80,
       lines: 75,
-      statements: 75,
     },
   },
   verbose: true,
