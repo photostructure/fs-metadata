@@ -1,6 +1,9 @@
 // src/glob.ts
 
 import { isWindows } from "./platform.js";
+import { isNotBlank } from "./string.js";
+
+const cache = new Map<string, RegExp>();
 
 /**
  * Compiles an array of glob patterns into a single regular expression.
@@ -22,7 +25,36 @@ export function compileGlob(
   if (patterns == null || patterns.length === 0) {
     return NeverMatchRE;
   }
+  const patternsKey = JSON.stringify(patterns);
+  {
+    const prior = cache.get(patternsKey);
+    if (prior != null) {
+      return prior;
+    }
+  }
 
+  const sorted = patterns.slice().filter(isNotBlank).sort();
+  const sortedKey = JSON.stringify(sorted);
+  {
+    const prior = cache.get(sortedKey);
+    if (prior != null) {
+      cache.set(patternsKey, prior);
+      return prior;
+    }
+  }
+
+  const result = _compileGlob(sorted);
+  if (cache.size > 256) {
+    // avoid unbounded memory usage
+    cache.clear();
+  }
+
+  cache.set(patternsKey, result);
+  cache.set(sortedKey, result);
+  return result;
+}
+
+function _compileGlob(patterns: string[] | readonly string[]): RegExp {
   const regexPatterns = patterns.map((pattern) => {
     let regex = "";
     let i = 0;
