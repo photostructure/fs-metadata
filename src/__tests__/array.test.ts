@@ -1,18 +1,16 @@
 // src/__tests__/array.test.ts
 
 import { jest } from "@jest/globals";
-import { asyncFilter, times, uniq, uniqBy } from "../array.js";
+import { asyncFilter, compact, times, uniq, uniqBy } from "../array.js";
 import { delay } from "../async.js";
 
 describe("Array", () => {
   describe("asyncFilter", () => {
-    // Test empty array
     it("should return empty array when input is empty", async () => {
       const result = await asyncFilter([], async () => true);
       expect(result).toEqual([]);
     });
 
-    // Test filtering numbers
     it("should filter numbers based on async predicate", async () => {
       const numbers = [1, 2, 3, 4, 5];
       const isEvenAsync = async (num: number) => {
@@ -24,7 +22,6 @@ describe("Array", () => {
       expect(result).toEqual([2, 4]);
     });
 
-    // Test filtering objects
     it("should filter objects based on async predicate", async () => {
       interface User {
         id: number;
@@ -50,21 +47,18 @@ describe("Array", () => {
       ]);
     });
 
-    // Test with predicate that always returns true
     it("should return all elements when predicate always returns true", async () => {
       const input = ["a", "b", "c"];
       const result = await asyncFilter(input, async () => true);
       expect(result).toEqual(input);
     });
 
-    // Test with predicate that always returns false
     it("should return empty array when predicate always returns false", async () => {
       const input = ["a", "b", "c"];
       const result = await asyncFilter(input, async () => false);
       expect(result).toEqual([]);
     });
 
-    // Test concurrent execution
     it("should execute predicates concurrently", async () => {
       jest.retryTimes(3);
       const delays = [50, 40, 30, 20, 10];
@@ -87,7 +81,6 @@ describe("Array", () => {
       expect(times).not.toEqual(sorted);
     });
 
-    // Test error handling
     it("should handle predicate errors correctly", async () => {
       const input = [1, 2, 3];
       const errorPredicate = async (num: number) => {
@@ -102,7 +95,6 @@ describe("Array", () => {
       );
     });
 
-    // Test with mixed types using generics
     it("should work with union types", async () => {
       const mixedArray: (string | number)[] = ["a", 1, "b", 2];
       const isNumberAsync = async (item: string | number): Promise<boolean> => {
@@ -116,24 +108,20 @@ describe("Array", () => {
   });
 
   describe("uniq", () => {
-    // Test with an array of numbers
     it("should return unique numbers", () => {
       const numbers = [1, 2, 2, 3, 4, 4, 5];
       expect(uniq(numbers)).toEqual([1, 2, 3, 4, 5]);
     });
 
-    // Test with an array of strings
     it("should return unique strings", () => {
       const strings = ["a", "b", "b", "c", "a"];
       expect(uniq(strings)).toEqual(["a", "b", "c"]);
     });
 
-    // Test with an empty array
     it("should return an empty array when input is empty", () => {
       expect(uniq([])).toEqual([]);
     });
 
-    // Test with an array of objects
     it("should return unique objects based on reference", () => {
       const obj1 = { id: 1 };
       const obj2 = { id: 2 };
@@ -142,14 +130,12 @@ describe("Array", () => {
       expect(uniq(objects)).toEqual([obj1, obj2]);
     });
 
-    // Test with mixed types
     it("should return unique values for mixed types", () => {
       const mixedArray = [1, "a", 1, "b", "a"];
       expect(uniq(mixedArray)).toEqual([1, "a", "b"]);
     });
   });
 
-  // Tests for uniqBy function
   describe("uniqBy", () => {
     it("should return unique objects based on key function", () => {
       const objects = [
@@ -175,7 +161,6 @@ describe("Array", () => {
     });
   });
 
-  // Tests for times function
   describe("times", () => {
     it("should create an array of specified length with given value", () => {
       const result = times(5, () => 42);
@@ -196,6 +181,53 @@ describe("Array", () => {
       let counter = 0;
       const result = times(3, () => counter++);
       expect(result).toEqual([0, 1, 2]);
+    });
+  });
+  
+  describe("compact", () => {
+    it("should remove null and undefined values", () => {
+      const input = [1, null, 2, undefined, 3];
+      expect(compact(input)).toEqual([1, 2, 3]);
+    });
+
+    it("should handle empty array", () => {
+      expect(compact([])).toEqual([]);
+    });
+
+    it("should handle undefined input", () => {
+      expect(compact(undefined)).toEqual([]);
+    });
+
+    it("should preserve falsy values that aren't null/undefined", () => {
+      const input = [0, "", false, null, undefined];
+      expect(compact(input)).toEqual([0, "", false]);
+    });
+
+    it("should handle arrays of objects", () => {
+      const obj1 = { id: 1 };
+      const obj2 = { id: 2 };
+      const input = [obj1, null, obj2, undefined];
+      expect(compact(input)).toEqual([obj1, obj2]);
+    });
+
+    it("should handle nested arrays", () => {
+      const input = [[1], null, [2, 3], undefined];
+      expect(compact(input)).toEqual([[1], [2, 3]]);
+    });
+
+    it("should handle array of only null/undefined", () => {
+      const input = [null, undefined, null];
+      expect(compact(input)).toEqual([]);
+    });
+
+    it("should preserve order of elements", () => {
+      const input = ["a", null, "b", undefined, "c"];
+      expect(compact(input)).toEqual(["a", "b", "c"]);
+    });
+
+    it("should handle mixed data types", () => {
+      const input = [1, "string", null, { key: "value" }, undefined, true];
+      expect(compact(input)).toEqual([1, "string", { key: "value" }, true]);
     });
   });
 });

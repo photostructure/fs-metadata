@@ -46,3 +46,10 @@ export function uniqBy<T, K>(arr: T[], keyFn: (item: T) => K): T[] {
 export function times<T>(length: number, fn: (index: number) => T): T[] {
   return Array.from({ length }, (_, i) => fn(i));
 }
+
+/**
+ * @return a new array with elements that are not `null` or `undefined`.
+ */
+export function compact<T>(arr: (T | null | undefined)[] | undefined): T[] {
+  return arr == null ? [] : arr.filter((ea): ea is T => ea != null);
+}
