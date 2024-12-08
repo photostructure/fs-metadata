@@ -1,6 +1,7 @@
 import { availableParallelism } from "node:os";
 import { env } from "node:process";
 import { defer } from "./defer.js";
+import { toError } from "./error.js";
 import { gt0, isNumber, toInt } from "./number.js";
 import { isBlank } from "./string.js";
 
@@ -14,7 +15,7 @@ export class TimeoutError extends Error {
     this.name = "TimeoutError";
     // Capture the stack trace up to the calling site
     if (captureStackTrace && Error.captureStackTrace) {
-      Error.captureStackTrace(this, thenOrTimeout);
+      Error.captureStackTrace(this, withTimeout);
     }
   }
 }
@@ -31,13 +32,12 @@ export class TimeoutError extends Error {
  * specified time.
  * @throws {TypeError} if timeoutMs is not a number that is greater than 0.
  */
-export function thenOrTimeout<T>(
-  promise: Promise<T>,
-  opts: {
-    timeoutMs: number;
-    desc?: string;
-  },
-): Promise<T> {
+export function withTimeout<T>(opts: {
+  promise: Promise<T>;
+  timeoutMs: number;
+  desc?: string;
+}): Promise<T> {
+  // const start = Date.now();
   const desc = isBlank(opts.desc) ? "thenOrTimeout()" : opts.desc;
 
   if (!isNumber(opts.timeoutMs)) {
@@ -57,14 +57,21 @@ export function thenOrTimeout<T>(
   }
 
   if (timeoutMs === 0) {
-    return promise;
+    return opts.promise;
   }
 
   if (env["NODE_ENV"] === "test") {
     const ms = toInt(env["TEST_DELAY"]);
     if (gt0(ms)) {
-      promise = delay(ms).then(() => promise);
+      opts.promise = delay(ms).then(() => opts.promise);
     }
+    // opts.promise = opts.promise.then((result) => {
+    //   if (isObject(result)) {
+    //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    //     (result as any)["elapsedMs"] = Date.now() - start;
+    //   }
+    //   return result;
+    // });
   }
 
   let isResolved = false;
@@ -80,7 +87,7 @@ export function thenOrTimeout<T>(
     clearTimeout(timeoutId);
   });
 
-  const wrappedPromise = promise.then(
+  const wrappedPromise = opts.promise.then(
     (result) => {
       onSettled();
       return result;
@@ -154,4 +161,34 @@ export async function mapConcurrent<I, O>({
   }
 
   return Promise.all(results);
+}
+
+export async function withRetry<T>({
+  fn,
+  retries = 2,
+}: {
+  fn: () => Promise<T>;
+  retries?: number;
+}): Promise<T> {
+  let error: Error | undefined;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      error = toError(e);
+    }
+  }
+  throw error;
+}
+
+export async function retryWithTimeout<T>(opts: {
+  fn: () => Promise<T>;
+  timeoutMs: number;
+  retries: number;
+  desc?: string;
+}): Promise<T> {
+  return withRetry({
+    ...opts,
+    fn: () => withTimeout({ promise: opts.fn(), ...opts }),
+  });
 }

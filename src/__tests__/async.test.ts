@@ -1,9 +1,9 @@
 import { jest } from "@jest/globals";
 import { times } from "../array.js";
-import { delay, mapConcurrent, thenOrTimeout, TimeoutError } from "../async.js";
+import { delay, mapConcurrent, TimeoutError, withTimeout } from "../async.js";
 
 describe("async", () => {
-  describe("thenOrTimeout", () => {
+  describe("withTimeout", () => {
     const delayedReject = (ms: number): Promise<never> =>
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error("delayed rejection")), ms),
@@ -25,7 +25,8 @@ describe("async", () => {
 
         for (const timeoutMs of invalidTimeouts) {
           expect(() =>
-            thenOrTimeout(promise, {
+            withTimeout({
+              promise,
               timeoutMs: timeoutMs as number,
               desc: "timeoutMs: " + JSON.stringify(timeoutMs),
             }),
@@ -35,17 +36,20 @@ describe("async", () => {
 
       it("should throw TypeError for negative timeout", () => {
         const promise = Promise.resolve("test");
-        expect(() => thenOrTimeout(promise, { timeoutMs: -1 })).toThrow(
-          TypeError,
-        );
-        expect(() => thenOrTimeout(promise, { timeoutMs: -100 })).toThrow(
+        expect(() =>
+          withTimeout({
+            promise,
+            timeoutMs: -1,
+          }),
+        ).toThrow(TypeError);
+        expect(() => withTimeout({ promise, timeoutMs: -100 })).toThrow(
           TypeError,
         );
       });
 
       it("should handle zero timeout by returning original promise", async () => {
         const promise = Promise.resolve("test");
-        const result = thenOrTimeout(promise, { timeoutMs: 0 });
+        const result = withTimeout({ promise, timeoutMs: 0 });
         expect(result).toBe(promise);
         await expect(result).resolves.toBe("test");
       });
@@ -53,24 +57,23 @@ describe("async", () => {
 
     describe("Promise resolution", () => {
       it("should resolve when promise completes before timeout", async () => {
-        const result = thenOrTimeout(
-          delay(50).then(() => "success"),
-          {
-            timeoutMs: 200,
-          },
-        );
+        const result = withTimeout({
+          promise: delay(50).then(() => "success"),
+          timeoutMs: 200,
+        });
         await expect(result).resolves.toBe("success");
       });
 
       it("should handle immediate resolution", async () => {
         await expect(
-          thenOrTimeout(Promise.resolve("instant"), { timeoutMs: 200 }),
+          withTimeout({ promise: Promise.resolve("instant"), timeoutMs: 200 }),
         ).resolves.toBe("instant");
       });
 
       it("should handle immediate rejection", async () => {
         await expect(
-          thenOrTimeout(Promise.reject(new Error("instant failure")), {
+          withTimeout({
+            promise: Promise.reject(new Error("instant failure")),
             timeoutMs: 200,
           }),
         ).rejects.toThrow("instant failure");
@@ -88,7 +91,7 @@ describe("async", () => {
 
         for (const value of testValues) {
           await expect(
-            thenOrTimeout(Promise.resolve(value), { timeoutMs: 200 }),
+            withTimeout({ promise: Promise.resolve(value), timeoutMs: 200 }),
           ).resolves.toBe(value);
         }
       });
@@ -96,7 +99,7 @@ describe("async", () => {
 
     describe("Timeout behavior", () => {
       it("should reject with TimeoutError when promise exceeds timeout", async () => {
-        const result = thenOrTimeout(delay(200), { timeoutMs: 50 });
+        const result = withTimeout({ promise: delay(200), timeoutMs: 50 });
         await expect(result).rejects.toThrow(TimeoutError);
         await expect(result).rejects.toThrow(/timeout after 50ms/);
       });
@@ -104,7 +107,7 @@ describe("async", () => {
       it("should clear timeout when promise resolves", async () => {
         const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
 
-        await thenOrTimeout(delay(50), { timeoutMs: 200 });
+        await withTimeout({ promise: delay(50), timeoutMs: 200 });
 
         expect(clearTimeoutSpy).toHaveBeenCalled();
         clearTimeoutSpy.mockRestore();
@@ -114,7 +117,7 @@ describe("async", () => {
         const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
 
         await expect(
-          thenOrTimeout(delayedReject(50), { timeoutMs: 200 }),
+          withTimeout({ promise: delayedReject(50), timeoutMs: 200 }),
         ).rejects.toThrow("delayed rejection");
 
         expect(clearTimeoutSpy).toHaveBeenCalled();
@@ -129,7 +132,7 @@ describe("async", () => {
         ];
 
         const results = await Promise.allSettled(
-          promises.map((p) => thenOrTimeout(p, { timeoutMs: 100 })),
+          promises.map((p) => withTimeout({ promise: p, timeoutMs: 100 })),
         );
 
         expect(results[0]).toEqual(
@@ -155,11 +158,13 @@ describe("async", () => {
 
     describe("Nested timeouts", () => {
       it("should propagate inner timeout error when inner timeout is smaller", async () => {
-        const innerWrapped = thenOrTimeout(delay(300), {
+        const innerWrapped = withTimeout({
+          promise: delay(300),
           timeoutMs: 100,
           desc: "inner",
         });
-        const outerWrapped = thenOrTimeout(innerWrapped, {
+        const outerWrapped = withTimeout({
+          promise: innerWrapped,
           timeoutMs: 200,
           desc: "outer",
         });
@@ -170,11 +175,13 @@ describe("async", () => {
       });
 
       it("should use outer timeout error when outer timeout is smaller", async () => {
-        const innerWrapped = thenOrTimeout(delay(300), {
+        const innerWrapped = withTimeout({
+          promise: delay(300),
           timeoutMs: 200,
           desc: "inner",
         });
-        const outerWrapped = thenOrTimeout(innerWrapped, {
+        const outerWrapped = withTimeout({
+          promise: innerWrapped,
           timeoutMs: 100,
           desc: "outer",
         });
@@ -185,15 +192,18 @@ describe("async", () => {
       });
 
       it("should handle triple-wrapped timeouts correctly", async () => {
-        const wrap1 = thenOrTimeout(delay(400), {
+        const wrap1 = withTimeout({
+          promise: delay(400),
           timeoutMs: 100,
           desc: "first",
         });
-        const wrap2 = thenOrTimeout(wrap1, {
+        const wrap2 = withTimeout({
+          promise: wrap1,
           timeoutMs: 200,
           desc: "second",
         });
-        const wrap3 = thenOrTimeout(wrap2, {
+        const wrap3 = withTimeout({
+          promise: wrap2,
           timeoutMs: 300,
           desc: "third",
         });
@@ -202,11 +212,13 @@ describe("async", () => {
       });
 
       it("should handle same timeout values in nested wrappers", async () => {
-        const inner = thenOrTimeout(delay(300), {
+        const inner = withTimeout({
+          promise: delay(300),
           timeoutMs: 150,
           desc: "inner",
         });
-        const outer = thenOrTimeout(inner, {
+        const outer = withTimeout({
+          promise: inner,
           timeoutMs: 150,
           desc: "outer",
         });
@@ -215,14 +227,13 @@ describe("async", () => {
       });
 
       it("should resolve if promise completes before any timeout", async () => {
-        const inner = thenOrTimeout(
-          delay(50).then(() => "success"),
-          {
-            timeoutMs: 200,
-            desc: "inner",
-          },
-        );
-        const outer = thenOrTimeout(inner, {
+        const inner = withTimeout({
+          promise: delay(50).then(() => "success"),
+          timeoutMs: 200,
+          desc: "inner",
+        });
+        const outer = withTimeout({
+          promise: inner,
           timeoutMs: 300,
           desc: "outer",
         });
@@ -234,30 +245,30 @@ describe("async", () => {
     describe("Edge cases", () => {
       it("should handle floating point timeout values", async () => {
         const promise = Promise.resolve("test");
-        await expect(
-          thenOrTimeout(promise, { timeoutMs: 100.6 }),
-        ).resolves.toBe("test");
-        await expect(
-          thenOrTimeout(promise, { timeoutMs: 100.1 }),
-        ).resolves.toBe("test");
+        await expect(withTimeout({ promise, timeoutMs: 100.6 })).resolves.toBe(
+          "test",
+        );
+        await expect(withTimeout({ promise, timeoutMs: 100.1 })).resolves.toBe(
+          "test",
+        );
       });
 
       it("should handle very large timeout values", async () => {
         const promise = Promise.resolve("test");
         await expect(
-          thenOrTimeout(promise, { timeoutMs: Number.MAX_SAFE_INTEGER }),
+          withTimeout({ promise, timeoutMs: Number.MAX_SAFE_INTEGER }),
         ).resolves.toBe("test");
       });
 
       it("should handle promises that never settle", async () => {
         const neverSettle = new Promise(() => {});
-        const result = thenOrTimeout(neverSettle, { timeoutMs: 100 });
+        const result = withTimeout({ promise: neverSettle, timeoutMs: 100 });
         await expect(result).rejects.toThrow(TimeoutError);
       });
 
       it("should handle promises with no error handler", async () => {
         const promise = delayedReject(50);
-        const result = thenOrTimeout(promise, { timeoutMs: 200 });
+        const result = withTimeout({ promise, timeoutMs: 200 });
         await expect(result).rejects.toThrow("delayed rejection");
       });
     });
@@ -267,7 +278,7 @@ describe("async", () => {
         const timeoutSpy = jest.spyOn(global, "setTimeout");
         const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
 
-        await thenOrTimeout(delay(50), { timeoutMs: 200 });
+        await withTimeout({ promise: delay(50), timeoutMs: 200 });
 
         expect(clearTimeoutSpy).toHaveBeenCalled();
         expect(timeoutSpy).toHaveBeenCalledTimes(2); // One for delay, one for timeout
@@ -281,7 +292,7 @@ describe("async", () => {
         const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
 
         await expect(
-          thenOrTimeout(delayedReject(50), { timeoutMs: 200 }),
+          withTimeout({ promise: delayedReject(50), timeoutMs: 200 }),
         ).rejects.toThrow();
 
         expect(clearTimeoutSpy).toHaveBeenCalled();
