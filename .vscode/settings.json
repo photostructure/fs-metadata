@@ -118,6 +118,19 @@
     "map": "cpp",
     "ranges": "cpp",
     "span": "cpp",
-    "valarray": "cpp"
+    "valarray": "cpp",
+    "charconv": "cpp",
+    "chrono": "cpp",
+    "coroutine": "cpp",
+    "resumable": "cpp",
+    "format": "cpp",
+    "future": "cpp",
+    "list": "cpp",
+    "locale": "cpp",
+    "queue": "cpp",
+    "xhash": "cpp",
+    "xlocbuf": "cpp",
+    "xlocmes": "cpp",
+    "xtree": "cpp"
   }
 }
