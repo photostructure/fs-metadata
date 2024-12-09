@@ -73,23 +73,44 @@ const {
 
 ### Timeouts
 
-There is a [default timeout](https://photostructure.github.io/fs-metadata/variables/TimeoutMsDefault.html) applied to all operations. This may not be sufficient for some OSes and volumes--especially powered-down optical drives (which may take 10s of seconds to wake up). Disable timeouts by setting `{timeoutMs: 0}`.
+There is a [default
+timeout](https://photostructure.github.io/fs-metadata/variables/TimeoutMsDefault.html)
+applied to all operations. This may not be sufficient for some OSes and
+volumes--especially powered-down optical drives (which may take 10s of seconds
+to wake up).
 
-### Filtering
+Windows is notorious for blocking system calls if remote filesystems are in an
+unhealthy state due to the host machine being down or any network glitches. To
+combat this, we spin a thread per mountpoint request to determine the current
+health status of a given volume. Although this is certainly more expensive than
+making the call in the async N-API thread, this gives us the ability to reliably
+timeout operations that would normally hang for an arbitrary amount of time
+(between 20 seconds and a minute, in local testing).
 
-Linux and macOS have a (surprisingly large) number of mountpoints that are for internal use (especially if your Linux distribution uses `snap` and/or other loopback ~~hacks~~ systems).
+Note that the timeout duration may be applied per-operation or per-syscall, depending on the cross-platform implementation.
 
-This library tries to avoid those with a bunch of exclusion patterns--see the [Options](https://photostructure.github.io/fs-metadata/interfaces/Options.html) interface for details.
+### System volumes
 
-To disable these filters, provide an empty array for these `excluded*` fields, like so:
+Windows, Linux and macOS entertain volume mountpoints that are really only for
+system use.
 
-```ts
-const allMountPoints = await getVolumeMountPoints({
-  excludedFileSystemTypes: [],
-  excludedMountPointGlobs: [],
-  onlyDirectories: false,
-});
-```
+Windows has explicit, available metadata to denote a volume as a "system" or
+"reserved" device -- but `C:\`, as it typically hosts `C:\Windows`, is both a
+"system" volume as well as typically where user storage resides.
+
+On Linux and macOS, there are a litany of mountpoints that are for system-use
+only: pseudo devices, snap loopback devices, virtual memory partitions, recovery
+partitions, etcetera.
+
+This library contains a set of heuristics to try to mark these partitions as a
+"system" volume, so you can skip over those devices easier. Refer to the
+[Options](https://photostructure.github.io/fs-metadata/interfaces/Options.html)
+documentation for default values and how to customize these patterns.
+
+Note that
+[`getAllVolumeMetadata()`](https://photostructure.github.io/fs-metadata/functions/getAllVolumeMetadata.html)
+defaults to returning all volumes on Windows, and only non-system volumes
+everywhere else.
 
 ## Platform-Specific Behaviors
 
@@ -123,167 +144,34 @@ keep in mind:
 
 #### Windows
 
-- Size information from GetDiskFreeSpaceEx
-- Volume information (label, filesystem) from GetVolumeInformation
-- Remote status from GetDriveType
-- `fstype` will be `NTFS` for remote filesystems, as that's how Windows presents the local volume. Fixing this to be more accurate requires additional heuristics that have diminshing returns.
-- The UUID is the volume serial number that the operating system assigns when a hard disk is formatted, and **not the physical UUID assigned by the manufacturer**. This lets us avoid one more syscall (and it's a doozy, the Windows Management Instrumentation (WMI) Win32_PhysicalMedia function loves to hang).
+- Volume status from `GetDriveType`
+- Size information from `GetDiskFreeSpaceEx`
+- Volume information (label, filesystem) from `GetVolumeInformation`
+- `fstype` will be `NTFS` for remote filesystems, as that's how Windows presents
+  the local volume. Fixing this to be more accurate requires additional
+  heuristics that have diminshing returns.
+- The
+  [UUID](https://photostructure.github.io/fs-metadata/interfaces/VolumeMetadata.html#uuid)
+  is attempted to be extracted from the partition UUID, but if this is a remote
+  volume, or system permissions do not provide access to this, we will fall back
+  to returning the volume serial number that the operating system assigns. You
+  can tell that it's a serial number UUID in that it only contains 8 characters
+  (32 bits of entropy).
 
 #### macOS
 
-- Size calculations via statvfs
+- Size calculations via `statvfs`
 - Volume details through DiskArbitration framework
 - Network share detection via volume characteristics
-- Time Machine volume detection
 
 #### Linux
 
-- Size information from statvfs
-- Filesystem type from mount table
-- Block device metadata via libblkid
+- Size information from `statvfs`
+- Filesystem type from mount table and from `gio`
+- Block device metadata via `libblkid`
 - Network filesystem detection from mount options
 - Optional GIO integration for additional metadata
-
-### Filesystem Types
-
-#### Windows
-
-- NTFS
-- FAT32
-- exFAT
-- ReFS
-- Network shares (CIFS/SMB)
-
-#### macOS
-
-- APFS (default since macOS High Sierra)
-- HFS+ (legacy)
-- FAT32
-- exFAT
-- Network shares (AFP, SMB, NFS)
-
-#### Linux
-
-- ext2/3/4
-- XFS
-- Btrfs
-- ZFS
-- Network filesystems (NFS, CIFS)
-- Pseudo filesystems (procfs, sysfs) - excluded by default
-
-### Default Excluded Mount Points
-
-#### Windows
-
-- None by default
-
-#### macOS
-
-- `/dev`
-- `/dev/fd`
-- System volume internal mounts
-
-#### Linux
-
-- `/proc`
-- `/sys`
-- `/dev`
-- `/run`
-- Snap mounts
-- Other virtual filesystems
-
-### Network Share Metadata
-
-#### Windows
-
-- UNC paths parsed for host/share information
-- SMB/CIFS protocol support
-- Network status via GetDriveType
-
-#### macOS
-
-- AFP and SMB protocol support
-- Network status via volume characteristics
-- Host/share parsing from mount URLs
-
-#### Linux
-
-- NFS and CIFS support
-- Network detection from filesystem type
-- Remote info parsed from mount spec
-
-### Performance Considerations
-
-#### Windows
-
-- Drive letter enumeration is fast
-- Volume metadata queries may block
-
-#### macOS
-
-- DiskArbitration queries are generally fast
-- Network volume operations may be slow
-
-#### Linux
-
-- Mount table parsing is fast
-- Block device operations may block
-- GIO operations are asynchronous
-
-### Error Handling
-
-#### Windows
-
-- Access denied errors for restricted volumes
-- Network timeout errors for disconnected shares
-- Invalid drive letter errors
-
-#### macOS
-
-- DiskArbitration framework errors
-- Network disconnection handling
-- Volume unmount detection
-
-#### Linux
-
-- Mount table parsing errors
-- Block device access errors
-- GIO operation failures
-- Network filesystem timeouts
-
-### Configuration Options
-
-Common options across platforms:
-
-- Timeout duration
-- Excluded mount point patterns
-- Directory-only filter
-
-Platform-specific options:
-
-- Linux: Mount table path selection
-- Linux: GIO support enable/disable
-- Windows: Network share handling
-- macOS: Time Machine volume handling
-
-### Recommendations
-
-#### Windows
-
-- Handle access denied errors gracefully
-- Check drive type before operations
-
-#### macOS
-
-- Monitor volume mount/unmount notifications
-- Handle Time Machine volumes appropriately
-- Check network status before operations
-
-#### Linux
-
-- Use default mount table when possible
-- Enable GIO support if available
-- Handle remote filesystem timeouts
+- Backfills with `lsblk` metadata if native code fails
 
 ## Building from Source
 
@@ -302,7 +190,8 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please feel free to submit a Pull Request. For major
+changes, please open an issue first to discuss what you would like to change.
 
 Please make sure to update tests and documentation as appropriate.
 
