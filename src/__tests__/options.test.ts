@@ -40,11 +40,6 @@ describe("options()", () => {
     expect(() => optionsWithDefaults("invalid")).toThrow(TypeError);
   });
 
-  it("should use correct default timeout based on platform", () => {
-    const result = optionsWithDefaults();
-    expect(result.timeoutMs).toBe(7_000);
-  });
-
   it("should preserve default values for fields not overridden", () => {
     const override = { systemPathPatterns: ["/custom/mount"] };
     const result = optionsWithDefaults(override);

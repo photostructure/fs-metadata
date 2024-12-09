@@ -183,7 +183,7 @@ describe("Array", () => {
       expect(result).toEqual([0, 1, 2]);
     });
   });
-  
+
   describe("compact", () => {
     it("should remove null and undefined values", () => {
       const input = [1, null, 2, undefined, 3];

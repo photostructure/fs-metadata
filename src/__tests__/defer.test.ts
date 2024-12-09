@@ -69,10 +69,10 @@ describe("defer", () => {
   });
 
   it("should preserve function context", () => {
-    class Test{
+    class Test {
       value = "test";
-      deferred = defer(() =>this.value);
-    };
+      deferred = defer(() => this.value);
+    }
 
     expect(new Test().deferred()).toBe("test");
   });
