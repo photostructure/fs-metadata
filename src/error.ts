@@ -2,7 +2,19 @@
 
 import { isNumber } from "./number.js";
 import { compactValues, map, omit } from "./object.js";
-import { isNotBlank } from "./string.js";
+import { isBlank, isNotBlank } from "./string.js";
+
+function toMessage(context: string, cause: unknown): string {
+  const causeStr =
+    cause instanceof Error
+      ? cause.message
+      : typeof cause === "string"
+        ? cause
+        : cause
+          ? JSON.stringify(cause)
+          : "";
+  return context + (isBlank(causeStr) ? "" : ": " + causeStr);
+}
 
 export class WrappedError extends Error {
   errno?: number;
@@ -20,18 +32,7 @@ export class WrappedError extends Error {
       path?: string;
     },
   ) {
-    let message = context;
-    if (options?.cause != null) {
-      if (options.cause instanceof Error) {
-        message += ": " + options.cause.message;
-      } else if (isNotBlank(options.cause)) {
-        message += ": " + options.cause;
-      } else {
-        message += ": " + JSON.stringify(options.cause);
-      }
-    }
-
-    super(message);
+    super(toMessage(context, options?.cause));
 
     const cause = map(options?.cause, toError);
     const opts = { ...compactValues(cause), ...compactValues(options) };

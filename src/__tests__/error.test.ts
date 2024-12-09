@@ -20,7 +20,7 @@ describe("WrappedError", () => {
   });
 
   it("should handle non-Error and non-string causes", () => {
-    const cause = { key: "value" };
+    const cause: unknown = { key: "value" };
     const error = new WrappedError("Context message", { cause });
     expect(error.toString()).toBe('Error: Context message: {"key":"value"}');
     expect(error.cause).toBeInstanceOf(Error);
