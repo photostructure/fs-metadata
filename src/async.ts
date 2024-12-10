@@ -1,7 +1,6 @@
 import { availableParallelism } from "node:os";
 import { env } from "node:process";
 import { defer } from "./defer.js";
-import { toError } from "./error.js";
 import { gt0, isNumber, toInt } from "./number.js";
 import { isBlank } from "./string.js";
 
@@ -23,7 +22,7 @@ export class TimeoutError extends Error {
  * Rejects the promise with a TimeoutError if it does not resolve within the
  * specified time.
  *
- * @param promise The promise
+ * @param promise The promise to wrap.
  * @param timeoutMs The timeout in milliseconds. Timeouts are disabled if this is 0.
  * @returns A promise that resolves when the input promise resolves, or rejects
  * with a TimeoutError if the input promise does not resolve within the
@@ -65,13 +64,6 @@ export function withTimeout<T>(opts: {
     if (gt0(ms)) {
       opts.promise = delay(ms).then(() => opts.promise);
     }
-    // opts.promise = opts.promise.then((result) => {
-    //   if (isObject(result)) {
-    //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    //     (result as any)["elapsedMs"] = Date.now() - start;
-    //   }
-    //   return result;
-    // });
   }
 
   let isResolved = false;
@@ -161,34 +153,4 @@ export async function mapConcurrent<I, O>({
   }
 
   return Promise.all(results);
-}
-
-export async function withRetry<T>({
-  fn,
-  retries = 2,
-}: {
-  fn: () => Promise<T>;
-  retries?: number;
-}): Promise<T> {
-  let error: Error | undefined;
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (e) {
-      error = toError(e);
-    }
-  }
-  throw error;
-}
-
-export async function retryWithTimeout<T>(opts: {
-  fn: () => Promise<T>;
-  timeoutMs: number;
-  retries: number;
-  desc?: string;
-}): Promise<T> {
-  return withRetry({
-    ...opts,
-    fn: () => withTimeout({ promise: opts.fn(), ...opts }),
-  });
 }

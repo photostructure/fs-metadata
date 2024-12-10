@@ -47,39 +47,44 @@ describe("async", () => {
         );
       });
 
-      it("should handle zero timeout by returning original promise", async () => {
+      it("should handle various valid timeout values", async () => {
         const promise = Promise.resolve("test");
-        const result = withTimeout({ promise, timeoutMs: 0 });
-        expect(result).toBe(promise);
-        await expect(result).resolves.toBe("test");
+        // Zero timeout
+        const zeroResult = withTimeout({ promise, timeoutMs: 0 });
+        expect(zeroResult).toBe(promise);
+        await expect(zeroResult).resolves.toBe("test");
+
+        // Floating point timeouts
+        await expect(withTimeout({ promise, timeoutMs: 100.6 })).resolves.toBe(
+          "test",
+        );
+        await expect(withTimeout({ promise, timeoutMs: 100.1 })).resolves.toBe(
+          "test",
+        );
+
+        // Very large timeout
+        await expect(
+          withTimeout({ promise, timeoutMs: Number.MAX_SAFE_INTEGER }),
+        ).resolves.toBe("test");
       });
     });
 
-    describe("Promise resolution", () => {
-      it("should resolve when promise completes before timeout", async () => {
-        const result = withTimeout({
-          promise: delay(50).then(() => "success"),
-          timeoutMs: 200,
-        });
-        await expect(result).resolves.toBe("success");
-      });
+    describe("Promise handling", () => {
+      it("should handle various resolution scenarios", async () => {
+        // Normal resolution before timeout
+        await expect(
+          withTimeout({
+            promise: delay(50).then(() => "success"),
+            timeoutMs: 200,
+          }),
+        ).resolves.toBe("success");
 
-      it("should handle immediate resolution", async () => {
+        // Immediate resolution
         await expect(
           withTimeout({ promise: Promise.resolve("instant"), timeoutMs: 200 }),
         ).resolves.toBe("instant");
-      });
 
-      it("should handle immediate rejection", async () => {
-        await expect(
-          withTimeout({
-            promise: Promise.reject(new Error("instant failure")),
-            timeoutMs: 200,
-          }),
-        ).rejects.toThrow("instant failure");
-      });
-
-      it("should resolve with the correct value when promise resolves", async () => {
+        // Test different value types
         const testValues = [
           "string value",
           123,
@@ -94,6 +99,35 @@ describe("async", () => {
             withTimeout({ promise: Promise.resolve(value), timeoutMs: 200 }),
           ).resolves.toBe(value);
         }
+      });
+      it("should handle immediate rejection", async () => {
+        await expect(
+          withTimeout({
+            promise: Promise.reject(new Error("instant failure")),
+            timeoutMs: 200,
+          }),
+        ).rejects.toThrow("instant failure");
+      });
+
+      it("should handle delayed rejection", async () => {
+        await expect(
+          withTimeout({ promise: delayedReject(50), timeoutMs: 200 }),
+        ).rejects.toThrow("delayed rejection");
+      });
+
+      it("should handle never settling promise", async () => {
+        const neverSettle = new Promise(() => {});
+        await expect(
+          withTimeout({ promise: neverSettle, timeoutMs: 100 }),
+        ).rejects.toThrow(TimeoutError);
+      });
+
+      it("should resolve when promise completes before timeout", async () => {
+        const result = withTimeout({
+          promise: delay(50).then(() => "success"),
+          timeoutMs: 200,
+        });
+        await expect(result).resolves.toBe("success");
       });
     });
 
