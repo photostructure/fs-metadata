@@ -10,17 +10,9 @@ export type {
   GetVolumeMountPointOptions,
   MountPoint,
   SystemVolumeConfig,
-  VolumeHealthStatus,
-} from "./mount_point.js";
-
-export {
-  Degraded,
-  Disconnected,
-  Healthy,
-  Inaccessible,
-  Unknown,
 } from "./mount_point.js";
 export {
+  IncludeSystemVolumesDefault,
   LinuxMountTablePathsDefault,
   optionsWithDefaults as options,
   OptionsDefault,
@@ -29,6 +21,13 @@ export {
   TimeoutMsDefault,
 } from "./options.js";
 export type { Options } from "./options.js";
+export type {
+  StringEnum,
+  StringEnumKeys,
+  StringEnumType,
+} from "./string_enum.js";
+export { VolumeHealthStatuses } from "./volume_health_status.js";
+export type { VolumeHealthStatus } from "./volume_health_status.js";
 export type { VolumeMetadata } from "./volume_metadata.js";
 
 const impl = new ExportsImpl(dirname(fileURLToPath(import.meta.url)));

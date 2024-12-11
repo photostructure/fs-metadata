@@ -1,40 +1,19 @@
 // src/mount_point.ts
 
 import { uniqBy } from "./array.js";
+import { withTimeout } from "./async.js";
 import { compileGlob } from "./glob.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
 import { NativeBindingsFn } from "./native_bindings.js";
 import { compactValues, isObject } from "./object.js";
 import {
   Options,
-  optionsWithDefaults,
   SystemFsTypesDefault,
   SystemPathPatternsDefault,
 } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
 import { isNotBlank, sortObjectsByLocale } from "./string.js";
-
-/** Volume is "OK": accessible and functioning normally */
-export const Healthy = "healthy" as const;
-
-/** Volume exists but can't be accessed (permissions/locks) */
-export const Inaccessible = "inaccessible" as const;
-
-/** Network volume that's offline */
-export const Disconnected = "disconnected" as const;
-
-/** Volume has errors or performance issues */
-export const Degraded = "degraded" as const;
-
-/** Status can't be determined */
-export const Unknown = "unknown" as const;
-
-export type VolumeHealthStatus =
-  | typeof Healthy
-  | typeof Inaccessible
-  | typeof Disconnected
-  | typeof Degraded
-  | typeof Unknown;
+import { VolumeHealthStatus } from "./volume_health_status.js";
 
 /**
  * A mount point is a location in the file system where a volume is mounted.
@@ -51,7 +30,7 @@ export interface MountPoint {
    * Note: on Windows this may show as "ntfs" for remote filesystems, as that
    * is how the filesystem is presented to the OS.
    */
-  fstype: string;
+  fstype?: string;
 
   /**
    * On Windows, returns the health status of the volume.
@@ -63,13 +42,13 @@ export interface MountPoint {
    * If there are non-critical errors while extracting metadata, those error
    * messages may be added to this field (say, from blkid or gio).
    *
-   * @see {@link VolumeHealthStatus} for all possible values.
+   * @see {@link VolumeHealthStatuses} for values returned by Windows.
    */
-  status?: VolumeHealthStatus;
+  status?: VolumeHealthStatus | string;
 
   /**
    * Indicates if this volume is primarily for system use (e.g., swap, snap
-   * loopbacks, EFI boot, system directories).
+   * loopbacks, EFI boot, or only system directories).
    *
    * Note: This is a best-effort classification and is not 100% accurate.
    *
@@ -80,8 +59,7 @@ export interface MountPoint {
 
 export function isMountPoint(obj: unknown): obj is MountPoint {
   if (!isObject(obj)) return false;
-  const { mountPoint, fstype } = obj as Partial<MountPoint>;
-  return isNotBlank(mountPoint) && isNotBlank(fstype);
+  return "mountPoint" in obj && isNotBlank(obj.mountPoint);
 }
 
 export function toMountPoint(
@@ -89,10 +67,10 @@ export function toMountPoint(
   options: Partial<SystemVolumeConfig> = {},
 ): MountPoint | undefined {
   return isMountPoint(mp)
-    ? ({
+    ? (compactValues({
         isSystemVolume: isSystemVolume(mp.mountPoint, mp.fstype, options),
         ...compactValues(mp),
-      } as MountPoint)
+      }) as MountPoint)
     : undefined;
 }
 
@@ -112,30 +90,42 @@ export type SystemVolumeConfig = Pick<
  */
 export function isSystemVolume(
   mountPoint: string,
-  fstype: string,
+  fstype: string | undefined,
   config: Partial<SystemVolumeConfig> = {},
 ): boolean {
   return (
-    (config.systemFsTypes ?? SystemFsTypesDefault).has(fstype) ||
+    (isNotBlank(fstype) &&
+      (config.systemFsTypes ?? SystemFsTypesDefault).has(fstype)) ||
     compileGlob(config.systemPathPatterns ?? SystemPathPatternsDefault).test(
       mountPoint,
     )
   );
 }
 
-export type GetVolumeMountPointOptions = Pick<Options, "timeoutMs"> &
-  Partial<SystemVolumeConfig>;
+export type GetVolumeMountPointOptions = Partial<
+  Pick<Options, "timeoutMs" | "linuxMountTablePaths"> & SystemVolumeConfig
+>;
 
 /**
  * Helper function for {@link ExportsImpl.getVolumeMountPoints}.
  */
 export async function getVolumeMountPoints(
+  opts: Required<GetVolumeMountPointOptions>,
   nativeFn: NativeBindingsFn,
-  opts: GetVolumeMountPointOptions,
 ): Promise<MountPoint[]> {
-  const o = optionsWithDefaults(opts);
+  const p = _getVolumeMountPoints(opts, nativeFn);
+  // we rely on the native bindings on Windows to do proper timeouts
+  return isWindows
+    ? p
+    : withTimeout({ desc: "getVolumeMountPoints", ...opts, promise: p });
+}
+
+async function _getVolumeMountPoints(
+  o: Required<GetVolumeMountPointOptions>,
+  nativeFn: NativeBindingsFn,
+): Promise<MountPoint[]> {
   const arr = await (isWindows || isMacOS
-    ? (await nativeFn()).getVolumeMountPoints()
+    ? (await nativeFn()).getVolumeMountPoints(o)
     : getLinuxMountPoints(nativeFn, o));
   const result = arr
     .map((ea) => toMountPoint(ea, o))

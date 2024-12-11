@@ -1,15 +1,18 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 // src/__tests__/fs_metadata.test.ts
 
 import { jest } from "@jest/globals";
-import { times } from "../array.js";
+import { times, uniq } from "../array.js";
 import { TimeoutError } from "../async.js";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
   MountPoint,
+  VolumeMetadata,
 } from "../index.js";
-import { omit } from "../object.js";
+import { omit, pick } from "../object.js";
+import { IncludeSystemVolumesDefault } from "../options.js";
 import { isLinux, isMacOS, isWindows } from "../platform.js";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
 import { sortByLocale } from "../string.js";
@@ -61,10 +64,10 @@ describe("Filesystem Metadata", () => {
       });
     }
 
-    it("should return sorted mount points", async () => {
+    it("should return unique, sorted mount points", async () => {
       const arr = await getVolumeMountPoints();
       const mountPoints = arr.map((ea) => ea.mountPoint);
-      const sorted = sortByLocale([...mountPoints]);
+      const sorted = uniq(sortByLocale([...mountPoints]));
       expect(mountPoints).toEqual(sorted);
     });
   });
@@ -94,13 +97,15 @@ describe("Filesystem Metadata", () => {
     it("handles non-existant mount points (from native)", async () => {
       await expect(getVolumeMetadata("/nonexistent")).rejects.toThrow(
         isWindows
-          ? /ENOENT: no such file or directory/
-          : /ENOENT|statvfs|Failed to get volume (statistics|information)/,
+          ? /ENOENT|not accessible/i
+          : /ENOENT|statvfs|Failed to get volume (statistics|information)/i,
       );
     });
 
     it("handles non-existant mount points (from js)", async () => {
-      await expect(getVolumeMetadata("/nonexistent")).rejects.toThrow(/ENOENT/);
+      await expect(getVolumeMetadata("/nonexistent")).rejects.toThrow(
+        /ENOENT|not accessible/i,
+      );
     });
   });
 
@@ -125,10 +130,12 @@ describe("Filesystem Metadata", () => {
 
       const arr = await Promise.all(
         inputs.map(async (ea) => {
+          // throw in some expected timeouts just to test more code paths
+          const timeoutMs = pickRandom([1, undefined]) as number;
           try {
-            return await getVolumeMetadata(ea);
+            return await getVolumeMetadata(ea, { timeoutMs });
           } catch (err) {
-            if (ea === expectedMountPoint) {
+            if (ea === expectedMountPoint && timeoutMs !== 1) {
               // we don't expect an error from the expected mount point! Those
               // should fail the test!
               throw err;
@@ -139,7 +146,9 @@ describe("Filesystem Metadata", () => {
 
       for (const ea of arr) {
         if (ea instanceof Error) {
-          expect(String(ea)).toMatch(/EACCES|ENOTDIR|ENOENT/i);
+          expect(String(ea)).toMatch(
+            /EACCES|ENOTDIR|ENOENT|timeout|not accessible/i,
+          );
         } else if (ea.mountPoint === expectedMountPoint) {
           // it's true that some metadata (like free space) can change between
           // calls. We don't expect it, but by omitting these fields, we don't
@@ -165,13 +174,29 @@ describe("Filesystem Metadata", () => {
 
   describe("getAllVolumeMetadata()", () => {
     it("should get metadata for all volumes", async () => {
-      const expectedMountPoints = await getVolumeMountPoints();
-      const all = await getAllVolumeMetadata();
-      expect(
-        expectedMountPoints
-          .filter((ea) => !ea.isSystemVolume)
-          .map((ea) => ea.mountPoint),
-      ).toEqual(all.map((m) => m.mountPoint));
+      const allMountPoints = await getVolumeMountPoints();
+      const healthyMountPoints = allMountPoints.filter(
+        (ea) => (ea.status ?? "healthy") === "healthy",
+      );
+      const expectedMountPoints = IncludeSystemVolumesDefault
+        ? healthyMountPoints
+        : healthyMountPoints.filter((ea) => !ea.isSystemVolume);
+
+      const all = (await getAllVolumeMetadata()).filter(
+        (ea): ea is VolumeMetadata =>
+          !("error" in ea) && (ea.status ?? "healthy") === "healthy",
+      );
+      expect(expectedMountPoints).toEqual(
+        all.map((ea) =>
+          pick(
+            ea as VolumeMetadata,
+            "mountPoint",
+            "isSystemVolume",
+            "fstype",
+            "status",
+          ),
+        ),
+      );
       for (const ea of all) {
         if (!("error" in ea)) {
           assertMetadata(ea);
@@ -180,27 +205,32 @@ describe("Filesystem Metadata", () => {
     });
   });
 
-  describe("Timeout Handling", () => {
-    beforeEach(() => {
-      process.env["TEST_DELAY"] = "10";
-    });
-    afterEach(() => {
-      delete process.env["TEST_DELAY"];
-    });
-    const rootPath = isWindows ? "C:\\" : "/";
+  // We rely on native timeouts on Windows and that doesn't support TEST_DELAY
+  // (which is required to deflake these tests)
 
-    it("should handle getVolumeMountPoints() timeout", async () => {
-      await expect(
-        getVolumeMountPoints({ timeoutMs: 1 }),
-      ).rejects.toBeInstanceOf(TimeoutError);
-    });
+  if (!isWindows) {
+    describe("Timeout Handling", () => {
+      beforeEach(() => {
+        process.env["TEST_DELAY"] = "10";
+      });
+      afterEach(() => {
+        delete process.env["TEST_DELAY"];
+      });
+      const rootPath = isWindows ? "C:\\" : "/";
 
-    it("should handle getVolumeMetadata() timeout", async () => {
-      await expect(
-        getVolumeMetadata(rootPath, { timeoutMs: 1 }),
-      ).rejects.toBeInstanceOf(TimeoutError);
+      it("should handle getVolumeMountPoints() timeout", async () => {
+        await expect(
+          getVolumeMountPoints({ timeoutMs: 1 }),
+        ).rejects.toBeInstanceOf(TimeoutError);
+      });
+
+      it("should handle getVolumeMetadata() timeout", async () => {
+        await expect(
+          getVolumeMetadata(rootPath, { timeoutMs: 1 }),
+        ).rejects.toBeInstanceOf(TimeoutError);
+      });
     });
-  });
+  }
 
   describe("Error Handling", () => {
     it("should handle invalid paths appropriately", async () => {
@@ -216,7 +246,7 @@ describe("Filesystem Metadata", () => {
 
       for (const path of invalidPaths) {
         await expect(getVolumeMetadata(path as string)).rejects.toThrow(
-          /ENOENT|Invalid/i,
+          /ENOENT|invalid|not accessible/i,
         );
       }
     });
@@ -227,7 +257,7 @@ describe("Filesystem Metadata", () => {
 
     it("should correctly identify network filesystems", async () => {
       for (const mp of await getVolumeMountPoints()) {
-        if (!mp.isSystemVolume) {
+        if (!mp.isSystemVolume && mp.status === "healthy") {
           const meta = await getVolumeMetadata(mp.mountPoint);
           if (meta.remote) {
             expect(meta.isSystemVolume).toBe(false);

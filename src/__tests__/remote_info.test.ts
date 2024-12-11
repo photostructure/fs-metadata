@@ -91,7 +91,7 @@ describe("remote_info tests", () => {
         uri: "smb://user@host/share",
         protocol: "smb",
         remoteHost: "host",
-        remoteShare: "/share",
+        remoteShare: "share",
         remoteUser: "user",
       });
     });

@@ -17,9 +17,12 @@ import {
   MountPoint,
 } from "./mount_point.js";
 import type { NativeBindings } from "./native_bindings.js";
-import { toGt0 } from "./number.js";
 import { type Options, optionsWithDefaults } from "./options.js";
-import { getVolumeMetadata, type VolumeMetadata } from "./volume_metadata.js";
+import {
+  getAllVolumeMetadata,
+  getVolumeMetadata,
+  type VolumeMetadata,
+} from "./volume_metadata.js";
 
 /**
  * Glue code between the native bindings and the rest of the library to make
@@ -56,19 +59,16 @@ export class ExportsImpl {
    *
    * Only readable directories are included in the results.
    *
+   * Note that on Windows, `timeoutMs` will be used **per system call** and not
+   * for the entire operation.
+   *
    * @param opts Optional filesystem operation settings to override default
    * values
-   *
    */
-  readonly getVolumeMountPoints = async (
-    opts?: Partial<GetVolumeMountPointOptions>,
-  ): Promise<MountPoint[]> => {
-    const o = optionsWithDefaults(opts);
-    return thenOrTimeout(getVolumeMountPoints(this.#nativeFn, o), {
-      timeoutMs: o.timeoutMs,
-      desc: "getVolumeMountPoints()",
-    });
-  };
+  readonly getVolumeMountPoints = (
+    opts: Partial<GetVolumeMountPointOptions> = {},
+  ): Promise<MountPoint[]> =>
+    getVolumeMountPoints(optionsWithDefaults(opts), this.#nativeFn);
 
   /**
    * Get metadata for the volume at the given mount point.
@@ -78,14 +78,12 @@ export class ExportsImpl {
    */
   readonly getVolumeMetadata = (
     mountPoint: string,
-    opts?: Partial<Pick<Options, "timeoutMs">>,
-  ): Promise<VolumeMetadata> => {
-    const o = optionsWithDefaults(opts);
-    return thenOrTimeout(getVolumeMetadata(mountPoint, this.#nativeFn, o), {
-      timeoutMs: o.timeoutMs,
-      desc: "getVolumeMetadata()",
-    });
-  };
+    opts: Partial<Pick<Options, "timeoutMs">> = {},
+  ): Promise<VolumeMetadata> =>
+    getVolumeMetadata(
+      { ...optionsWithDefaults(opts), mountPoint },
+      this.#nativeFn,
+    );
 
   /**
    * Retrieves metadata for all mounted volumes with optional filtering and
@@ -93,38 +91,23 @@ export class ExportsImpl {
    *
    * @param opts - Optional configuration object
    * @param opts.includeSystemVolumes - If true, includes system volumes in the
-   * results. Defaults to false.
+   * results. Defaults to true on Windows and false elsewhere.
    * @param opts.maxConcurrency - Maximum number of concurrent operations.
    * Defaults to the system's available parallelism: see
    * {@link https://nodejs.org/api/os.html#osavailableparallelism | os.availableParallelism()}
-   * @param opts.timeoutMs - Maximum time to wait for each
-   * {@link getVolumeMetadata} to complete. Defaults to
-   * {@link TimeoutMsDefault}.
+   * @param opts.timeoutMs - Maximum time to wait for
+   * {@link getVolumeMountPoints}, as well as **each** {@link getVolumeMetadata}
+   * to complete. Defaults to {@link TimeoutMsDefault}
    * @returns Promise that resolves to an array of either VolumeMetadata objects
    * or error objects containing the mount point and error
    * @throws Never - errors are caught and returned as part of the result array
    */
-  readonly getAllVolumeMetadata = async (
+  readonly getAllVolumeMetadata = (
     opts?: Partial<Options> & {
       includeSystemVolumes?: boolean;
       maxConcurrency?: number;
-      timeoutMs?: number;
     },
-  ): Promise<(VolumeMetadata | { mountPoint: string; error: Error })[]> => {
-    const arr = await this.getVolumeMountPoints(opts);
-    return mapConcurrent({
-      maxConcurrency: toGt0(opts?.maxConcurrency) ?? availableParallelism(),
-      items:
-        (opts?.includeSystemVolumes ?? false)
-          ? arr
-          : arr.filter((ea) => !ea.isSystemVolume),
-      fn: async (mp) =>
-        this.getVolumeMetadata(mp.mountPoint, opts).catch((error) => ({
-          mountPoint: mp.mountPoint,
-          error,
-        })),
-    }) as Promise<(VolumeMetadata | { mountPoint: string; error: Error })[]>;
-  };
+  ) => getAllVolumeMetadata(optionsWithDefaults(opts), this.#nativeFn);
 
   /**
    * Check if a file or directory is hidden.

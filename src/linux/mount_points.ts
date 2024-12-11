@@ -1,5 +1,6 @@
 // src/linux/mount_points.ts
 import { readFile } from "node:fs/promises";
+import { debug } from "../debuglog.js";
 import { toError, WrappedError } from "../error.js";
 import { isMountPoint, type MountPoint } from "../mount_point.js";
 import type { NativeBindingsFn } from "../native_bindings.js";
@@ -17,7 +18,7 @@ export async function getLinuxMountPoints(
     const points = await (await native()).getGioMountPoints?.();
     if (points != null) gioMountPoints.push(...points);
   } catch (error) {
-    console.warn("Failed to get GIO mount points: " + error);
+    debug("Failed to get GIO mount points: %s", error);
     // GIO support not compiled in or failed, continue with just mtab mounts
   }
 
@@ -37,7 +38,7 @@ export async function getLinuxMountPoints(
   }
 
   throw new WrappedError(
-    `Failed to read any mount points (tried: ${JSON.stringify(o.linuxMountTablePaths)})`,
+    `Failed to read any linuxMountTablePaths (tried: ${JSON.stringify(o.linuxMountTablePaths)})`,
     { cause },
   );
 }
@@ -62,7 +63,7 @@ export async function getLinuxMtabMetadata(
   }
 
   throw new WrappedError(
-    `Failed to find mount point ${mountPoint}: (tried: ${JSON.stringify(inputs)})`,
+    `Failed to find mount point ${mountPoint} in an linuxMountTablePaths (tried: ${JSON.stringify(inputs)})`,
     caughtError,
   );
 }

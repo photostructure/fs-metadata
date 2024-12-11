@@ -4,8 +4,13 @@ import { ExportsImpl } from "./exports.js";
 
 // IMPORTANT: KEEP THESE IN SYNC WITH index.ts!
 export type { HiddenMetadata, HideMethod } from "./hidden.js";
-export type { MountPoint, SystemVolumeConfig } from "./mount_point.js";
+export type {
+  GetVolumeMountPointOptions,
+  MountPoint,
+  SystemVolumeConfig,
+} from "./mount_point.js";
 export {
+  IncludeSystemVolumesDefault,
   LinuxMountTablePathsDefault,
   optionsWithDefaults as options,
   OptionsDefault,
@@ -14,6 +19,13 @@ export {
   TimeoutMsDefault,
 } from "./options.js";
 export type { Options } from "./options.js";
+export type {
+  StringEnum,
+  StringEnumKeys,
+  StringEnumType,
+} from "./string_enum.js";
+export { VolumeHealthStatuses } from "./volume_health_status.js";
+export type { VolumeHealthStatus } from "./volume_health_status.js";
 export type { VolumeMetadata } from "./volume_metadata.js";
 
 const impl = new ExportsImpl(__dirname);
