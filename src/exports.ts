@@ -1,7 +1,6 @@
 // index.ts
 import NodeGypBuild from "node-gyp-build";
-import { availableParallelism } from "node:os";
-import { mapConcurrent, thenOrTimeout } from "./async.js";
+import { debug, debugLogContext, isDebugEnabled } from "./debuglog.js";
 import { defer } from "./defer.js";
 import { findAncestorDir } from "./fs.js";
 import {
@@ -30,15 +29,26 @@ import { getVolumeMetadata, type VolumeMetadata } from "./volume_metadata.js";
 export class ExportsImpl {
   constructor(readonly _dirname: string) {}
 
-  readonly #nativeFn = defer(async () => {
-    const dir = await findAncestorDir(this._dirname, "binding.gyp");
-    if (dir == null) {
-      throw new Error(
-        "Could not find bindings.gyp in any ancestor directory of " +
-          this._dirname,
-      );
+  readonly #nativeFn = defer<Promise<NativeBindings>>(async () => {
+    const start = Date.now();
+    try {
+      const dir = await findAncestorDir(this._dirname, "binding.gyp");
+      if (dir == null) {
+        throw new Error(
+          "Could not find bindings.gyp in any ancestor directory of " +
+            this._dirname,
+        );
+      }
+      const bindings = NodeGypBuild(dir) as NativeBindings;
+      bindings.setDebugLogging(isDebugEnabled());
+      bindings.setDebugPrefix(debugLogContext() + ":native");
+      return bindings;
+    } catch (error) {
+      debug("Loading native bindings failed: %s", error);
+      throw error;
+    } finally {
+      debug(`Native bindings took %d ms to load`, Date.now() - start);
     }
-    return NodeGypBuild(dir) as NativeBindings;
   });
 
   /**

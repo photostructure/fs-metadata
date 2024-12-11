@@ -2,6 +2,7 @@
 #include <napi.h>
 #include <string>
 
+#include "common/debug_log.h"
 #if defined(_WIN32)
 #include "windows/fs_meta.h"
 #include "windows/hidden.h"
@@ -17,6 +18,29 @@
 
 namespace {
 
+Napi::Value SetDebugLogging(const Napi::CallbackInfo &info) {
+  Napi::Env env = info.Env();
+
+  if (info.Length() < 1 || !info[0].IsBoolean()) {
+    throw Napi::TypeError::New(env, "Boolean argument expected");
+  }
+
+  FSMeta::Debug::enableDebugLogging = info[0].As<Napi::Boolean>();
+  return env.Undefined();
+}
+
+Napi::Value SetDebugPrefix(const Napi::CallbackInfo &info) {
+  Napi::Env env = info.Env();
+
+  if (info.Length() < 1 || !info[0].IsString()) {
+    throw Napi::TypeError::New(env, "String argument expected");
+  }
+
+  // Set the debug prefix directly
+  FSMeta::Debug::SetDebugPrefix(info[0].As<Napi::String>().Utf8Value());
+  return env.Undefined();
+}
+
 #ifdef ENABLE_GIO
 Napi::Value GetGioMountPoints(const Napi::CallbackInfo &info) {
   Napi::Env env = info.Env();
@@ -25,24 +49,14 @@ Napi::Value GetGioMountPoints(const Napi::CallbackInfo &info) {
 #endif
 
 #if defined(_WIN32) || defined(__APPLE__)
+// Fix: Remove extra parameter and use correct signature
 Napi::Value GetVolumeMountPoints(const Napi::CallbackInfo &info) {
   return FSMeta::GetVolumeMountPoints(info);
 }
 #endif
 
 Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
-  Napi::Env env = info.Env();
-
-  if (info.Length() < 1 || !info[0].IsString()) {
-    throw Napi::TypeError::New(env, "String expected for mountPoint");
-  }
-
-  std::string mountPoint = info[0].As<Napi::String>();
-  Napi::Object options = info.Length() > 1 && info[1].IsObject()
-                             ? info[1].As<Napi::Object>()
-                             : Napi::Object::New(env);
-
-  return FSMeta::GetVolumeMetadata(env, mountPoint, options);
+  return FSMeta::GetVolumeMetadata(info);
 }
 
 #if defined(_WIN32) || defined(__APPLE__)
@@ -56,6 +70,9 @@ Napi::Value SetHiddenAttribute(const Napi::CallbackInfo &info) {
 #endif
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+  exports.Set("setDebugLogging", Napi::Function::New(env, SetDebugLogging));
+  exports.Set("setDebugPrefix", Napi::Function::New(env, SetDebugPrefix));
+
 #if defined(_WIN32) || defined(__APPLE__)
   exports.Set("getVolumeMountPoints",
               Napi::Function::New(env, GetVolumeMountPoints));

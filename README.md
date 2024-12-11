@@ -65,11 +65,15 @@ const {
 // Usage is the same as the ESM example above
 ```
 
-## Documentation
+## API
 
 [Read the API here](https://photostructure.github.io/fs-metadata/modules.html)
 
 ## Options
+
+### Debug logging
+
+Set the environment variable `NODE_DEBUG=fs-meta` or `NODE_DEBUG=photostructure:fs-metadata`. We query the native [debuglog](https://nodejs.org/api/util.html#utildebuglogsection-callback) to see if debug logging is enabled. Debug messages from both the javascript and native sides will be emitted to `stderr`.
 
 ### Timeouts
 
