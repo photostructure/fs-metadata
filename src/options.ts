@@ -1,6 +1,7 @@
 // src/options.ts
 
-import { isObject } from "./object.js";
+import { compactValues, isObject } from "./object.js";
+import { isWindows } from "./platform.js";
 
 /**
  * Configuration options for filesystem operations.
@@ -46,9 +47,9 @@ export interface Options {
  * Default timeout in milliseconds for {@link Options.timeoutMs}.
  *
  * Note that this timeout may be insufficient for some devices, like spun-down
- * optical drives.
+ * optical drives or network shares that need to spin up or reconnect.
  */
-export const TimeoutMsDefault = 7_000 as const;
+export const TimeoutMsDefault = 5_000 as const;
 
 /**
  * System paths and globs that indicate system volumes
@@ -67,6 +68,12 @@ export const SystemPathPatternsDefault = [
   "/run/user/*/gvfs",
   "/snap/**",
   "/sys/**",
+
+  // windows for linux:
+  "/mnt/wslg/distro",
+  "/mnt/wslg/doc",
+  "/mnt/wslg/versions.txt",
+  "/usr/lib/wsl/drivers",
 
   // MacOS stuff:
   "/private/var/vm", // macOS swap
@@ -94,6 +101,7 @@ export const SystemFsTypesDefault = new Set([
   "devtmpfs",
   "efivarfs",
   "fusectl",
+  "fuse.snapfuse",
   "hugetlbfs",
   "mqueue",
   "none",
@@ -112,7 +120,11 @@ export const LinuxMountTablePathsDefault = [
   "/etc/mtab",
 ];
 
-export const OnlyDirectoriesDefault = true;
+/**
+ * Should {@link getAllVolumeMetadata()} include system volumes by
+ * default?
+ */
+export const IncludeSystemVolumesDefault = isWindows;
 
 /**
  * Default {@link Options} object.
@@ -130,7 +142,9 @@ export const OptionsDefault: Options = {
  * Create an {@link Options} object using default values from
  * {@link OptionsDefault} for missing fields.
  */
-export function optionsWithDefaults(overrides: Partial<Options> = {}): Options {
+export function optionsWithDefaults<T extends Options>(
+  overrides: Partial<T> = {},
+): T {
   if (!isObject(overrides)) {
     throw new TypeError(
       "options(): expected an object, got " +
@@ -142,6 +156,6 @@ export function optionsWithDefaults(overrides: Partial<Options> = {}): Options {
 
   return {
     ...OptionsDefault,
-    ...overrides,
+    ...(compactValues(overrides) as T),
   };
 }
