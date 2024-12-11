@@ -1,6 +1,6 @@
 import { availableParallelism } from "node:os";
 import { env } from "node:process";
-import { defer } from "./defer.js";
+import { debug, isDebugEnabled } from "./debuglog.js";
 import { gt0, isNumber, toInt } from "./number.js";
 import { isBlank } from "./string.js";
 
@@ -36,7 +36,7 @@ export function withTimeout<T>(opts: {
   timeoutMs: number;
   desc?: string;
 }): Promise<T> {
-  // const start = Date.now();
+  const start = Date.now();
   const desc = isBlank(opts.desc) ? "thenOrTimeout()" : opts.desc;
 
   if (!isNumber(opts.timeoutMs)) {
@@ -66,40 +66,52 @@ export function withTimeout<T>(opts: {
     }
   }
 
-  let isResolved = false;
-  let timeoutId: NodeJS.Timeout;
+  let state: undefined | "resolved" | "rejected" | "timed out";
+  let timeoutId: NodeJS.Timeout | undefined;
 
   // Create error with proper stack trace
   const timeoutError = new TimeoutError(
     `${desc}: timeout after ${timeoutMs}ms`,
   );
 
-  const onSettled = defer(() => {
-    isResolved = true;
-    clearTimeout(timeoutId);
-  });
+  /**
+   * @return true if `newState` "won", and the caller needs to take
+   * responsibility
+   */
+  const onSettled = (newState: typeof state) => {
+    if (state != null) {
+      // no-op, already settled
+      return false;
+    }
+    state = newState;
+    if (isDebugEnabled()) {
+      debug("[thenOrTimeout] %s: %s in %d ms", desc, state, Date.now() - start);
+    }
+    if (timeoutId != null) {
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
+    }
+    return true;
+  };
 
   const wrappedPromise = opts.promise.then(
     (result) => {
-      onSettled();
+      onSettled("resolved");
       return result;
     },
     (error) => {
-      onSettled();
-      throw error;
+      // only throw if we haven't already settled
+      if (onSettled("rejected")) throw error;
     },
-  );
+  ) as Promise<T>;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      if (!isResolved) {
+      if (onSettled("timed out")) {
         reject(timeoutError);
       }
     }, timeoutMs);
   });
-
-  // Handle potential unhandled rejection in timeoutPromise
-  void timeoutPromise.catch(() => {});
 
   return Promise.race([wrappedPromise, timeoutPromise]);
 }

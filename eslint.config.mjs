@@ -15,4 +15,10 @@ export default [
   { ignores: [".tsup", "build", "coverage", "dist*", "docs"] },
   pluginJs.configs.recommended,
   ...ts_eslint.configs.recommended,
+  ...ts_eslint.configs.strict,
+  {
+    rules: {
+      "@typescript-eslint/no-shadow": "error",
+    },
+  },
 ];

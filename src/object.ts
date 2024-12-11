@@ -27,13 +27,18 @@ export function omit<T extends object, K extends keyof T>(
   obj: T,
   ...keys: K[]
 ): Omit<T, K> {
-  const copy = { ...obj };
-  for (const key of keys) {
-    delete copy[key];
-  }
-  return copy;
-}
+  const result = {} as Omit<T, K>;
+  const keysSet = new Set(keys);
 
+  // OH THE TYPING HUGEMANATEE
+  for (const key of Object.keys(obj) as Array<keyof Omit<T, K>>) {
+    if (!keysSet.has(key as unknown as K)) {
+      result[key] = obj[key];
+    }
+  }
+
+  return result;
+}
 /**
  * Pick the specified fields from an object
  */

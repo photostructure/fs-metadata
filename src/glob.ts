@@ -104,7 +104,7 @@ function _compileGlob(patterns: string[] | readonly string[]): RegExp {
       }
 
       // Escape other regex special characters
-      if (/[+^${}()|[\]\\]/.test(pattern[i]!)) {
+      if (/[+^${}()|[\]\\]/.test(pattern[i] as string)) {
         regex += "\\" + pattern[i];
         i++;
         continue;

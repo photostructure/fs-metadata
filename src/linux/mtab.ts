@@ -36,7 +36,7 @@ export interface MountEntry {
   /**
    * Mount options
    */
-  fs_mntops: string;
+  fs_mntops: string | undefined;
   /**
    * Dump frequency
    */
@@ -54,7 +54,8 @@ export function mountEntryToMountPoint(
   return toMountPoint(
     {
       mountPoint: entry.fs_file,
-      fstype: toNotBlank(entry.fs_vfstype) ?? toNotBlank(entry.fs_spec)!,
+      fstype:
+        toNotBlank(entry.fs_vfstype) ?? toNotBlank(entry.fs_spec) ?? "unknown",
     },
     options,
   );
@@ -103,11 +104,11 @@ export function parseMtab(content: string): MountEntry[] {
       continue; // Skip malformed lines
     }
     entries.push({
-      fs_spec: fields[0]!,
+      fs_spec: fields[0] as string,
       // normalizeLinuxPath DOES NOT resolve()!
       fs_file: normalizeLinuxPath(fields[1] ?? ""),
-      fs_vfstype: fields[2]!,
-      fs_mntops: fields[3]!,
+      fs_vfstype: fields[2] as string,
+      fs_mntops: fields[3],
       fs_freq: toInt(fields[4]),
       fs_passno: toInt(fields[5]),
     });

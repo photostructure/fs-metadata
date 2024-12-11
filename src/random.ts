@@ -26,6 +26,7 @@ export function shuffle<T>(a: T[]): T[] {
     // Pick a random index from 0 to i
     const j = Math.floor(Math.random() * (i + 1));
     // Swap elements at indices i and j
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     [a[i], a[j]] = [a[j]!, a[i]!];
   }
   return a;
