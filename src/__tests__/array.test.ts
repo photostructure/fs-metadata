@@ -63,13 +63,13 @@ describe("Array", () => {
       jest.retryTimes(3);
       const delays = [50, 40, 30, 20, 10];
 
-      const times: [number, number][] = [];
+      const resultTimes: [number, number][] = [];
 
       const results = await asyncFilter(delays, async (ms) => {
         const start = Date.now();
         await delay(ms);
         const end = Date.now();
-        times.push([start, end]);
+        resultTimes.push([start, end]);
         return true;
       });
       console.log({ times });
@@ -77,8 +77,8 @@ describe("Array", () => {
 
       // Rather than checking on full elapsed time, we check that the start and
       // delay times are not in order, indicating concurrent execution
-      const sorted = times.flat().sort((a, b) => a - b);
-      expect(times).not.toEqual(sorted);
+      const sorted = resultTimes.flat().sort((a, b) => a - b);
+      expect(resultTimes).not.toEqual(sorted);
     });
 
     it("should handle predicate errors correctly", async () => {

@@ -1,5 +1,5 @@
-import { ttlCache } from "../cache.js";
 import { jest } from "@jest/globals";
+import { ttlCache } from "../cache.js";
 
 // src/cache.test.ts
 
