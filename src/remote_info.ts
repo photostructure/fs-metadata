@@ -1,3 +1,4 @@
+import { debug } from "./debuglog.js";
 import { compactValues, isObject } from "./object.js";
 import { isWindows } from "./platform.js";
 import { isBlank, isNotBlank } from "./string.js";
@@ -118,16 +119,20 @@ export function extractRemoteInfo(
       protocol,
       remote: true,
       ...(fsSpec.match(regex)?.groups ?? {}),
-    }) as unknown as RemoteInfo;
-    if (isRemoteInfo(o)) return o;
+    });
+    if (isRemoteInfo(o)) {
+      debug("[extractRemoteInfo] matched pattern: %o", o);
+      return o;
+    }
   }
 
   // Let's try URL last, as nfs mounts are URI-ish
   try {
     // try to parse fsSpec as a uri:
-    const url = new URL(fsSpec);
-    if (url != null) {
-      const protocol = normalizeProtocol(url.protocol);
+    const parsed = new URL(fsSpec);
+    if (parsed != null) {
+      debug("[extractRemoteInfo] parsed URL: %o", parsed);
+      const protocol = normalizeProtocol(parsed.protocol);
       if (!isRemoteFsType(protocol)) {
         // don't set remoteUser, remoteHost, or remoteShare, it's not remote!
         return {
@@ -139,9 +144,10 @@ export function extractRemoteInfo(
           uri: fsSpec,
           protocol,
           remote: true,
-          remoteUser: url.username,
-          remoteHost: url.hostname,
-          remoteShare: url.pathname,
+          remoteUser: parsed.username,
+          remoteHost: parsed.hostname,
+          // URL pathname includes leading slash:
+          remoteShare: parsed.pathname.replace(/^\//, ""),
         }) as unknown as RemoteInfo;
       }
     }
