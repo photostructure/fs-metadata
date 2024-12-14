@@ -1,22 +1,28 @@
 import { dirname, resolve } from "node:path";
 import { isWindows } from "./platform.js";
-import { toNotBlank } from "./string.js";
+import { isBlank } from "./string.js";
 
-export function normalizePath(mountPoint: string): string {
+export function normalizePath(mountPoint: string): string | undefined {
   const result = isWindows
     ? normalizeWindowsPath(mountPoint)
-    : normalizeLinuxPath(mountPoint);
+    : normalizePosixPath(mountPoint);
 
   // Make sure the native code doesn't see anything weird:
-  return resolve(result);
+  return result != null ? resolve(result) : undefined;
 }
 
 /**
- * Normalizes a Linux mount point by removing any trailing slashes. This is a
- * no-op for root mount points.
+ * Normalizes a Linux or macOS mount point by removing any trailing slashes.
+ * This is a no-op for root mount points.
  */
-export function normalizeLinuxPath(mountPoint: string): string {
-  return toNotBlank(mountPoint.replace(/\/+$/, "")) ?? "/";
+export function normalizePosixPath(
+  mountPoint: string | undefined,
+): string | undefined {
+  return isBlank(mountPoint)
+    ? undefined
+    : mountPoint === "/"
+      ? mountPoint
+      : mountPoint.replace(/\/+$/, "");
 }
 
 /**
@@ -38,5 +44,5 @@ export function normalizeWindowsPath(mountPoint: string): string {
  */
 export function isRootDirectory(path: string): boolean {
   const n = normalizePath(path);
-  return isWindows ? dirname(n) === n : n === "/";
+  return n == null ? false : isWindows ? dirname(n) === n : n === "/";
 }

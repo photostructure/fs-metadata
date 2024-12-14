@@ -6,7 +6,7 @@ import {
   SystemVolumeConfig,
 } from "../mount_point.js";
 import { toInt } from "../number.js";
-import { normalizeLinuxPath } from "../path.js";
+import { normalizePosixPath } from "../path.js";
 import { extractRemoteInfo } from "../remote_info.js";
 import {
   decodeEscapeSequences,
@@ -50,7 +50,7 @@ export function mountEntryToMountPoint(
   entry: MountEntry,
   options: Partial<SystemVolumeConfig>,
 ): MountPoint | undefined {
-  const mountPoint = normalizeLinuxPath(entry.fs_file);
+  const mountPoint = normalizePosixPath(entry.fs_file);
   const fstype = toNotBlank(entry.fs_vfstype) ?? toNotBlank(entry.fs_spec);
   return mountPoint == null || fstype == null
     ? undefined
@@ -103,7 +103,7 @@ export function parseMtab(content: string): MountEntry[] {
     if (!fields || fields.length < 3) {
       continue; // Skip malformed lines
     }
-    const fs_file = normalizeLinuxPath(fields[1]);
+    const fs_file = normalizePosixPath(fields[1]);
     if (fs_file != null) {
       entries.push({
         fs_spec: fields[0] as string,

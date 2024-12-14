@@ -1,24 +1,24 @@
-import { normalizeLinuxPath, normalizeWindowsPath } from "../path.js";
+import { normalizePosixPath, normalizeWindowsPath } from "../path.js";
 
 describe("mount_point", () => {
   describe("normalizeLinuxPath", () => {
     it("removes trailing slash from regular paths", () => {
-      expect(normalizeLinuxPath("/home/")).toBe("/home");
-      expect(normalizeLinuxPath("/usr/local/")).toBe("/usr/local");
+      expect(normalizePosixPath("/home/")).toBe("/home");
+      expect(normalizePosixPath("/usr/local/")).toBe("/usr/local");
     });
 
     it("preserves root path", () => {
-      expect(normalizeLinuxPath("/")).toBe("/");
+      expect(normalizePosixPath("/")).toBe("/");
     });
 
     it("preserves paths without trailing slash", () => {
-      expect(normalizeLinuxPath("/home")).toBe("/home");
-      expect(normalizeLinuxPath("/usr/local")).toBe("/usr/local");
+      expect(normalizePosixPath("/home")).toBe("/home");
+      expect(normalizePosixPath("/usr/local")).toBe("/usr/local");
     });
 
     it("handles multiple trailing slashes", () => {
-      expect(normalizeLinuxPath("/home//")).toBe("/home");
-      expect(normalizeLinuxPath("/usr////")).toBe("/usr");
+      expect(normalizePosixPath("/home//")).toBe("/home");
+      expect(normalizePosixPath("/usr////")).toBe("/usr");
     });
   });
 
