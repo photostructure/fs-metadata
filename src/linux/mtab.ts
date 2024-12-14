@@ -1,10 +1,6 @@
 // src/linux/mtab.ts
 
-import {
-  isSystemVolume,
-  MountPoint,
-  SystemVolumeConfig,
-} from "../mount_point.js";
+import { MountPoint } from "../mount_point.js";
 import { toInt } from "../number.js";
 import { normalizePosixPath } from "../path.js";
 import { extractRemoteInfo } from "../remote_info.js";
@@ -14,6 +10,7 @@ import {
   isBlank,
   toNotBlank,
 } from "../string.js";
+import { isSystemVolume, SystemVolumeConfig } from "../system_volume.js";
 import { VolumeMetadata } from "../volume_metadata.js";
 
 /**

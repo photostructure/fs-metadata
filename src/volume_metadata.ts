@@ -1,26 +1,20 @@
 // src/volume_metadata.ts
 
-import { availableParallelism } from "node:os";
 import { mapConcurrent, withTimeout } from "./async.js";
 import { debug } from "./debuglog.js";
 import { WrappedError } from "./error.js";
-import { statAsync } from "./fs.js";
+import { canReaddir } from "./fs.js";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
 import { getLinuxMtabMetadata } from "./linux/mount_points.js";
 import {
   MtabVolumeMetadata,
   mountEntryToPartialVolumeMetadata,
 } from "./linux/mtab.js";
-import {
-  MountPoint,
-  getVolumeMountPoints,
-  isSystemVolume,
-} from "./mount_point.js";
+import { MountPoint, getVolumeMountPoints } from "./mount_point.js";
 import {
   GetVolumeMetadataOptions,
   NativeBindingsFn,
 } from "./native_bindings.js";
-import { toGt0 } from "./number.js";
 import { compactValues } from "./object.js";
 import {
   IncludeSystemVolumesDefault,
@@ -35,6 +29,7 @@ import {
   isRemoteFsType,
 } from "./remote_info.js";
 import { isBlank, isNotBlank } from "./string.js";
+import { assignSystemVolume } from "./system_volume.js";
 import { parseUNCPath } from "./unc.js";
 import { extractUUID } from "./uuid.js";
 import { VolumeHealthStatuses } from "./volume_health_status.js";
@@ -52,15 +47,15 @@ export interface VolumeMetadata extends RemoteInfo, MountPoint {
   /**
    * Total size in bytes
    */
-  size: number;
+  size?: number;
   /**
    * Used size in bytes
    */
-  used: number;
+  used?: number;
   /**
    * Available size in bytes
    */
-  available: number;
+  available?: number;
 
   /**
    * Path to the device or service that the mountpoint is from.
@@ -102,12 +97,15 @@ export async function getVolumeMetadata(
     );
   }
 
-  o.mountPoint = normalizePath(o.mountPoint);
   const p = _getVolumeMetadata(o, nativeFn);
   // we rely on the native bindings on Windows to do proper timeouts
   return isWindows
     ? p
-    : withTimeout({ desc: "getVolumeMetadata", ...o, promise: p });
+    : withTimeout({
+        desc: "getVolumeMetadata()",
+        timeoutMs: o.timeoutMs,
+        promise: p,
+      });
 }
 
 async function _getVolumeMetadata(
@@ -115,51 +113,55 @@ async function _getVolumeMetadata(
   nativeFn: NativeBindingsFn,
 ): Promise<VolumeMetadata> {
   o = optionsWithDefaults(o);
-  // This will throw an error if the mount point is not accessible:
-  const s = await withTimeout({
-    desc: "statAsync",
-    promise: statAsync(o.mountPoint),
-    timeoutMs: o.timeoutMs,
-  }).catch((cause) => {
-    throw new WrappedError(`mountPoint ${o.mountPoint} is not accessible`, {
-      name: "IOError",
-      cause,
-      path: o.mountPoint,
-    });
-  });
-  if (!s.isDirectory()) {
-    throw new WrappedError(`mountPoint ${o.mountPoint} is not a directory`, {
-      name: "IOError",
-      code: "ENOTDIR",
-      path: o.mountPoint,
-    });
+  const norm = normalizePath(o.mountPoint);
+  if (norm == null) {
+    throw new Error("Invalid mountPoint: " + JSON.stringify(o.mountPoint));
   }
+  o.mountPoint = norm;
+
+  debug(
+    "[getVolumeMetadata] starting metadata collection for %s",
+    o.mountPoint,
+  );
+  debug("[getVolumeMetadata] options: %o", o);
+
+  // This will throw an error if the mount point is not accessible:
+  const status = (await canReaddir(o.mountPoint, o.timeoutMs)) ?? "healthy";
+
+  debug("[getVolumeMetadata] readdir status: %s", status);
 
   let remote: boolean = false;
   // Get filesystem info from mtab first on Linux
   let mtabInfo: undefined | MtabVolumeMetadata;
   let device: undefined | string;
   if (isLinux) {
+    debug("[getVolumeMetadata] collecting Linux mtab info");
     try {
       const m = await getLinuxMtabMetadata(o.mountPoint, o);
       mtabInfo = mountEntryToPartialVolumeMetadata(m, o);
+      debug("[getVolumeMetadata] mtab info: %o", mtabInfo);
       if (mtabInfo.remote) {
         remote = true;
       }
       if (isNotBlank(m.fs_spec)) {
         device = m.fs_spec;
       }
-    } catch {
+    } catch (err) {
+      debug("[getVolumeMetadata] failed to get mtab info: " + err);
       // this may be a GIO mount. Ignore the error and continue.
     }
   }
 
   if (isNotBlank(device)) {
     o.device = device;
+    debug("[getVolumeMetadata] using device: %s", device);
   }
+
+  debug("[getVolumeMetadata] requesting native metadata");
   const metadata = (await (
     await nativeFn()
   ).getVolumeMetadata(o)) as VolumeMetadata;
+  debug("[getVolumeMetadata] native metadata: %o", metadata);
 
   // Some OS implementations leave it up to us to extract remote info:
   const remoteInfo =
@@ -168,11 +170,22 @@ async function _getVolumeMetadata(
     extractRemoteInfo(metadata.mountFrom) ??
     (isWindows ? parseUNCPath(o.mountPoint) : undefined);
 
+  debug("[getVolumeMetadata] extracted remote info: %o", remoteInfo);
+
   remote ||=
     isRemoteFsType(metadata.fstype) ||
     (remoteInfo?.remote ?? metadata.remote ?? false);
 
+  debug("[getVolumeMetadata] assembling: %o", {
+    status,
+    mtabInfo,
+    remoteInfo,
+    metadata,
+    mountPoint: o.mountPoint,
+    remote,
+  });
   const result = compactValues({
+    status, // < let the implementation's status win by having this first
     ...compactValues(mtabInfo),
     ...compactValues(remoteInfo),
     ...compactValues(metadata),
@@ -182,23 +195,18 @@ async function _getVolumeMetadata(
 
   // Backfill if blkid or gio failed us:
   if (isLinux && isNotBlank(device)) {
-    if (isBlank(result.uuid)) {
-      // Sometimes blkid doesn't have the UUID in cache. Try to get it from
-      // /dev/disk/by-uuid:
-      result.uuid = (await getUuidFromDevDisk(device)) ?? "";
-    }
-    if (isBlank(result.label)) {
-      result.label = (await getLabelFromDevDisk(device)) ?? "";
-    }
+    // Sometimes blkid doesn't have the UUID in cache. Try to get it from
+    // /dev/disk/by-uuid:
+    result.uuid ??= (await getUuidFromDevDisk(device)) ?? "";
+    result.label ??= (await getLabelFromDevDisk(device)) ?? "";
   }
 
-  // this is a backstop and should not override the value from native code
-  // (which is going to be more accurate):
-  result.isSystemVolume ??= isSystemVolume(o.mountPoint, result.fstype, o);
+  assignSystemVolume(result, o);
 
   // Fix microsoft's UUID format:
   result.uuid = extractUUID(result.uuid) ?? result.uuid ?? "";
 
+  debug("[getVolumeMetadata] final result for %s: %o", o.mountPoint, result);
   return compactValues(result) as VolumeMetadata;
 }
 
@@ -210,7 +218,10 @@ export async function getAllVolumeMetadata(
   nativeFn: NativeBindingsFn,
 ): Promise<VolumeMetadata[]> {
   const o = optionsWithDefaults(opts);
+  debug("[getAllVolumeMetadata] starting with options: %o", o);
+
   const arr = await getVolumeMountPoints(o, nativeFn);
+  debug("[getAllVolumeMetadata] found %d mount points", arr.length);
 
   const unhealthyMountPoints = arr
     .filter(
@@ -218,7 +229,9 @@ export async function getAllVolumeMetadata(
     )
     .map((ea) => ({
       mountPoint: ea.mountPoint,
-      error: new Error(ea.status),
+      error: new WrappedError("volume not healthy: " + ea.status, {
+        name: "Skipped",
+      }),
     }));
 
   const includeSystemVolumes =
@@ -230,7 +243,7 @@ export async function getAllVolumeMetadata(
         .filter((ea) => ea.isSystemVolume)
         .map((ea) => ({
           mountPoint: ea.mountPoint,
-          error: new Error("system volume"),
+          error: new WrappedError("system volume", { name: "Skipped" }),
         }));
 
   const healthy = arr.filter(
@@ -241,10 +254,15 @@ export async function getAllVolumeMetadata(
     allMountPoints: arr.map((ea) => ea.mountPoint),
     healthyMountPoints: healthy.map((ea) => ea.mountPoint),
   });
-  const maxConcurrency = toGt0(opts?.maxConcurrency) ?? availableParallelism();
+
+  debug(
+    "[getAllVolumeMetadata] processing %d healthy volumes with max concurrency %d",
+    healthy.length,
+    o.maxConcurrency,
+  );
 
   const results = await (mapConcurrent({
-    maxConcurrency,
+    maxConcurrency: o.maxConcurrency,
     items:
       (opts?.includeSystemVolumes ?? IncludeSystemVolumesDefault)
         ? healthy
@@ -256,6 +274,7 @@ export async function getAllVolumeMetadata(
       })),
   }) as Promise<(VolumeMetadata | { mountPoint: string; error: Error })[]>);
 
+  debug("[getAllVolumeMetadata] completed processing all volumes");
   return arr.map(
     (result) =>
       (results.find((ea) => ea.mountPoint === result.mountPoint) ??

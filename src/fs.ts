@@ -63,13 +63,13 @@ export function existsSync(path: string): boolean {
 }
 
 /**
- * @return void if `dir` exists and is a directory and at least one entry can be read.
+ * @return `true` if `dir` exists and is a directory and at least one entry can be read.
  * @throws {Error} if `dir` does not exist or is not a directory or cannot be read.
  */
 export async function canReaddir(
   dir: string,
   timeoutMs: number,
-): Promise<void> {
+): Promise<true> {
   return withTimeout({
     desc: "canReaddir()",
     promise: _canReaddir(dir),
@@ -77,11 +77,12 @@ export async function canReaddir(
   });
 }
 
-async function _canReaddir(dir: string) {
+async function _canReaddir(dir: string): Promise<true> {
   let d: Dir | undefined = undefined;
   try {
     d = await opendir(dir);
     await d.read();
+    return true;
   } finally {
     if (d != null) void d.close();
   }

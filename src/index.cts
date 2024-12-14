@@ -4,11 +4,7 @@ import { ExportsImpl } from "./exports.js";
 
 // IMPORTANT: KEEP THESE IN SYNC WITH index.ts!
 export type { HiddenMetadata, HideMethod } from "./hidden.js";
-export type {
-  GetVolumeMountPointOptions,
-  MountPoint,
-  SystemVolumeConfig,
-} from "./mount_point.js";
+export type { GetVolumeMountPointOptions, MountPoint } from "./mount_point.js";
 export {
   IncludeSystemVolumesDefault,
   LinuxMountTablePathsDefault,
@@ -24,6 +20,7 @@ export type {
   StringEnumKeys,
   StringEnumType,
 } from "./string_enum.js";
+export type { SystemVolumeConfig } from "./system_volume.js";
 export { VolumeHealthStatuses } from "./volume_health_status.js";
 export type { VolumeHealthStatus } from "./volume_health_status.js";
 export type { VolumeMetadata } from "./volume_metadata.js";

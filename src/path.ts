@@ -2,7 +2,11 @@ import { dirname, resolve } from "node:path";
 import { isWindows } from "./platform.js";
 import { isBlank } from "./string.js";
 
-export function normalizePath(mountPoint: string): string | undefined {
+export function normalizePath(
+  mountPoint: string | undefined,
+): string | undefined {
+  if (isBlank(mountPoint)) return undefined;
+
   const result = isWindows
     ? normalizeWindowsPath(mountPoint)
     : normalizePosixPath(mountPoint);

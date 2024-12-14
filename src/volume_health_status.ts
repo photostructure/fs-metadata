@@ -1,3 +1,7 @@
+import { TimeoutError } from "./async.js";
+import { debug } from "./debuglog.js";
+import { canReaddir } from "./fs.js";
+import { isObject } from "./object.js";
 import { stringEnum, StringEnumKeys } from "./string_enum.js";
 
 /**
@@ -10,7 +14,6 @@ import { stringEnum, StringEnumKeys } from "./string_enum.js";
  * - `disconnected`: Network volume that's offline
  * - `unknown`: Status can't be determined
  */
-
 export const VolumeHealthStatuses = stringEnum(
   "healthy",
   "timeout",
@@ -20,3 +23,32 @@ export const VolumeHealthStatuses = stringEnum(
 );
 
 export type VolumeHealthStatus = StringEnumKeys<typeof VolumeHealthStatuses>;
+
+/**
+ * Attempt to read a directory to determine if it's accessible, and if an error
+ * is thrown, convert to a health status.
+ * @returns the "health status" of the directory, based on the success of `readdir(dir)`.
+ * @throws never
+ */
+export async function directoryStatus(
+  dir: string,
+  timeoutMs: number,
+  test: typeof canReaddir = canReaddir,
+): Promise<VolumeHealthStatus> {
+  try {
+    if (await test(dir, timeoutMs)) {
+      return VolumeHealthStatuses.healthy;
+    }
+  } catch (error) {
+    debug("[directoryStatus] %s: %s", dir, error);
+    if (error instanceof TimeoutError) {
+      return VolumeHealthStatuses.timeout;
+    }
+    if (isObject(error) && "code" in error) {
+      if (error.code === "EPERM" || error.code === "EACCES") {
+        return VolumeHealthStatuses.inaccessible;
+      }
+    }
+  }
+  return VolumeHealthStatuses.unknown;
+}

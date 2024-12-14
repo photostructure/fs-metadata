@@ -25,15 +25,16 @@ export function uniq<T>(arr: T[]): T[] {
 }
 
 /**
+ * Remove duplicate elements from an array based on a key function.
+ * @param keyFn A function that returns a key for each element. Elements that
+ * the key function returns nullish will be removed from the returned array.
  * @return a new array omitting duplicate elements based on a key function.
  */
-export function uniqBy<T, K>(arr: T[], keyFn: (item: T) => K): T[] {
+export function uniqBy<T, K>(arr: T[], keyFn: (item: T) => K | undefined): T[] {
   const seen = new Set<K>();
   return arr.filter((item) => {
     const key = keyFn(item);
-    if (seen.has(key)) {
-      return false;
-    }
+    if (key == null || seen.has(key)) return false;
     seen.add(key);
     return true;
   });

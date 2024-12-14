@@ -139,7 +139,7 @@ describe("fs", () => {
       await mkdir(dirPath);
       await writeFile(join(dirPath, "test.txt"), "test");
 
-      await expect(canReaddir(dirPath, 1000)).resolves.toBeUndefined();
+      await expect(canReaddir(dirPath, 1000)).resolves.toBe(true);
     });
 
     it("should reject for non-existent directory", async () => {

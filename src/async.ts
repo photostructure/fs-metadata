@@ -35,7 +35,6 @@ export async function withTimeout<T>(opts: {
   promise: Promise<T>;
   timeoutMs: number;
 }): Promise<T> {
-  const start = Date.now();
   const desc = isBlank(opts.desc) ? "thenOrTimeout()" : opts.desc;
 
   if (!isNumber(opts.timeoutMs)) {

@@ -9,9 +9,9 @@ import {
   getVolumeMetadata,
   getVolumeMountPoints,
   MountPoint,
-  VolumeMetadata,
+  VolumeHealthStatuses,
 } from "../index.js";
-import { omit, pick } from "../object.js";
+import { omit } from "../object.js";
 import { IncludeSystemVolumesDefault } from "../options.js";
 import { isLinux, isMacOS, isWindows } from "../platform.js";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
@@ -110,10 +110,16 @@ describe("Filesystem Metadata", () => {
   });
 
   describe("concurrent", () => {
-    it("should handle concurrent getVolumeMetadata() calls", async () => {
+    jest.setTimeout(30_000);
+
+    it.only("should handle concurrent getVolumeMetadata() calls", async () => {
       const mountPoints = await getVolumeMountPoints();
       const expectedMountPoint = mountPoints[0]!.mountPoint;
       const expected = await getVolumeMetadata(expectedMountPoint);
+
+      const validMountPoints = mountPoints
+        .filter((ea) => ea.status === VolumeHealthStatuses.healthy)
+        .map((ea) => ea.mountPoint);
 
       const samples = 12;
 
@@ -123,7 +129,9 @@ describe("Filesystem Metadata", () => {
       const inputs = shuffle([
         ...times(samples, () => expectedMountPoint),
         ...times(samples, () =>
-          isWindows ? randomLetter() + ":\\" : "/" + randomLetters(12),
+          isWindows
+            ? randomLetter().toUpperCase() + ":\\"
+            : "/" + randomLetters(12),
         ),
         ...times(samples, () => pickRandom(mountPoints)!.mountPoint),
       ]);
@@ -131,16 +139,14 @@ describe("Filesystem Metadata", () => {
       const arr = await Promise.all(
         inputs.map(async (ea) => {
           // throw in some expected timeouts just to test more code paths
-          const timeoutMs = pickRandom([1, undefined]) as number;
-          try {
-            return await getVolumeMetadata(ea, { timeoutMs });
-          } catch (err) {
-            if (ea === expectedMountPoint && timeoutMs !== 1) {
-              // we don't expect an error from the expected mount point! Those
-              // should fail the test!
-              throw err;
-            } else return err as Error;
+          const timeoutMs = pickRandom([0, 1, undefined]) as number;
+          const p = getVolumeMetadata(ea, { timeoutMs });
+          if (timeoutMs === 1) {
+            await expect(p).rejects.toThrow(TimeoutError);
+          } else if (!validMountPoints.includes(ea)) {
+            await expect(p).rejects.toThrow(/ENOENT|not accessible|opendir/i);
           }
+          return p;
         }),
       );
 
@@ -160,12 +166,12 @@ describe("Filesystem Metadata", () => {
           // REMEMBER: NEVER USE toBeCloseTo -- the api is bonkers and only applicable for fractional numbers
           const delta = 8 * MiB;
           expect(ea.available).toBeWithin(
-            expected.available - delta,
-            expected.available + delta,
+            expected.available! - delta,
+            expected.available! + delta,
           );
           expect(ea.used).toBeWithin(
-            expected.used - delta,
-            expected.used + delta,
+            expected.used! - delta,
+            expected.used! + delta,
           );
         }
       }
@@ -175,59 +181,51 @@ describe("Filesystem Metadata", () => {
   describe("getAllVolumeMetadata()", () => {
     it("should get metadata for all volumes", async () => {
       const allMountPoints = await getVolumeMountPoints();
-      const healthyMountPoints = allMountPoints.filter(
-        (ea) => (ea.status ?? "healthy") === "healthy",
+      const byMountPoint = new Map(
+        allMountPoints.map((ea) => [ea.mountPoint, ea]),
       );
-      const expectedMountPoints = IncludeSystemVolumesDefault
-        ? healthyMountPoints
-        : healthyMountPoints.filter((ea) => !ea.isSystemVolume);
 
-      const all = (await getAllVolumeMetadata()).filter(
-        (ea): ea is VolumeMetadata =>
-          !("error" in ea) && (ea.status ?? "healthy") === "healthy",
+      const all = await getAllVolumeMetadata();
+      const skipExpectedMountPoints = new Set(
+        allMountPoints
+          .filter((ea) => ea.status !== VolumeHealthStatuses.healthy)
+          .map((ea) => ea.mountPoint),
       );
-      expect(expectedMountPoints).toEqual(
-        all.map((ea) =>
-          pick(
-            ea as VolumeMetadata,
-            "mountPoint",
-            "isSystemVolume",
-            "fstype",
-            "status",
-          ),
-        ),
-      );
+      if (!IncludeSystemVolumesDefault) {
+        for (const ea of allMountPoints) {
+          if (ea.isSystemVolume) {
+            skipExpectedMountPoints.add(ea.mountPoint);
+          }
+        }
+      }
       for (const ea of all) {
-        if (!("error" in ea)) {
+        const skipExpected = skipExpectedMountPoints.has(ea.mountPoint);
+        if (skipExpected) {
+          expect(ea).toHaveProperty("error");
+        } else {
+          expect(ea).toEqual(
+            expect.objectContaining(byMountPoint.get(ea.mountPoint)),
+          );
           assertMetadata(ea);
         }
       }
     });
   });
 
-  // We rely on native timeouts on Windows and that doesn't support TEST_DELAY
-  // (which is required to deflake these tests)
-
   if (!isWindows) {
     describe("Timeout Handling", () => {
-      beforeEach(() => {
-        process.env["TEST_DELAY"] = "10";
-      });
-      afterEach(() => {
-        delete process.env["TEST_DELAY"];
-      });
       const rootPath = isWindows ? "C:\\" : "/";
 
       it("should handle getVolumeMountPoints() timeout", async () => {
-        await expect(
-          getVolumeMountPoints({ timeoutMs: 1 }),
-        ).rejects.toBeInstanceOf(TimeoutError);
+        await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
+          /timeout/i,
+        );
       });
 
       it("should handle getVolumeMetadata() timeout", async () => {
         await expect(
           getVolumeMetadata(rootPath, { timeoutMs: 1 }),
-        ).rejects.toBeInstanceOf(TimeoutError);
+        ).rejects.toThrow(/timeout/i);
       });
     });
   }

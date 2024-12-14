@@ -1,19 +1,21 @@
 // src/mount_point.ts
 
 import { uniqBy } from "./array.js";
-import { withTimeout } from "./async.js";
-import { compileGlob } from "./glob.js";
+import { mapConcurrent, withTimeout } from "./async.js";
+import { debug } from "./debuglog.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
 import { NativeBindingsFn } from "./native_bindings.js";
-import { compactValues, isObject } from "./object.js";
-import {
-  Options,
-  SystemFsTypesDefault,
-  SystemPathPatternsDefault,
-} from "./options.js";
+import { isObject } from "./object.js";
+import { Options } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
-import { isNotBlank, sortObjectsByLocale } from "./string.js";
-import { VolumeHealthStatus } from "./volume_health_status.js";
+import {
+  isBlank,
+  isNotBlank,
+  sortObjectsByLocale,
+  toNotBlank,
+} from "./string.js";
+import { assignSystemVolume, SystemVolumeConfig } from "./system_volume.js";
+import { directoryStatus, VolumeHealthStatus } from "./volume_health_status.js";
 
 /**
  * A mount point is a location in the file system where a volume is mounted.
@@ -62,48 +64,9 @@ export function isMountPoint(obj: unknown): obj is MountPoint {
   return "mountPoint" in obj && isNotBlank(obj.mountPoint);
 }
 
-export function toMountPoint(
-  mp: MountPoint | undefined,
-  options: Partial<SystemVolumeConfig> = {},
-): MountPoint | undefined {
-  return isMountPoint(mp)
-    ? (compactValues({
-        isSystemVolume: isSystemVolume(mp.mountPoint, mp.fstype, options),
-        ...compactValues(mp),
-      }) as MountPoint)
-    : undefined;
-}
-
-/**
- * Configuration for system volume detection
- *
- * @see {@link MountPoint.isSystemVolume}
- */
-export type SystemVolumeConfig = Pick<
-  Options,
-  "systemPathPatterns" | "systemFsTypes"
->;
-
-/**
- * Determines if a mount point represents a system volume based on its path and
- * filesystem type
- */
-export function isSystemVolume(
-  mountPoint: string,
-  fstype: string | undefined,
-  config: Partial<SystemVolumeConfig> = {},
-): boolean {
-  return (
-    (isNotBlank(fstype) &&
-      (config.systemFsTypes ?? SystemFsTypesDefault).has(fstype)) ||
-    compileGlob(config.systemPathPatterns ?? SystemPathPatternsDefault).test(
-      mountPoint,
-    )
-  );
-}
-
 export type GetVolumeMountPointOptions = Partial<
-  Pick<Options, "timeoutMs" | "linuxMountTablePaths"> & SystemVolumeConfig
+  Pick<Options, "timeoutMs" | "linuxMountTablePaths" | "maxConcurrency"> &
+    SystemVolumeConfig
 >;
 
 /**
@@ -124,12 +87,50 @@ async function _getVolumeMountPoints(
   o: Required<GetVolumeMountPointOptions>,
   nativeFn: NativeBindingsFn,
 ): Promise<MountPoint[]> {
-  const arr = await (isWindows || isMacOS
-    ? (await nativeFn()).getVolumeMountPoints(o)
+  debug("[getVolumeMountPoints] gathering mount points with options: %o", o);
+
+  const result = await (isWindows || isMacOS
+    ? (async () => {
+        debug("[getVolumeMountPoints] using native implementation");
+        const points = await (await nativeFn()).getVolumeMountPoints(o);
+        debug(
+          "[getVolumeMountPoints] native returned %d mount points",
+          points.length,
+        );
+        return points;
+      })()
     : getLinuxMountPoints(nativeFn, o));
-  const result = arr
-    .map((ea) => toMountPoint(ea, o))
-    .filter((ea) => ea != null);
-  const uniq = uniqBy(result, (ea) => ea.mountPoint);
-  return sortObjectsByLocale(uniq, (ea) => ea.mountPoint);
+
+  debug("[getVolumeMountPoints] raw mount points: %o", result);
+  const uniq = uniqBy(result, (ea) => toNotBlank(ea.mountPoint));
+  debug("[getVolumeMountPoints] found %d unique mount points", uniq.length);
+  const results = sortObjectsByLocale(uniq, (ea) => ea.mountPoint);
+  debug(
+    "[getVolumeMountPoints] getting status for %d mount points",
+    results.length,
+  );
+
+  await mapConcurrent({
+    maxConcurrency: o.maxConcurrency,
+    items: results,
+    fn: async (mp) => {
+      assignSystemVolume(mp, o);
+
+      if (isBlank(mp.status)) {
+        debug("[getVolumeMountPoints] checking status of %s", mp.mountPoint);
+        mp.status = await directoryStatus(mp.mountPoint, o.timeoutMs);
+        debug(
+          "[getVolumeMountPoints] status for %s: %s",
+          mp.mountPoint,
+          mp.status,
+        );
+      }
+    },
+  });
+
+  debug(
+    "[getVolumeMountPoints] completed with %d mount points",
+    results.length,
+  );
+  return results;
 }
