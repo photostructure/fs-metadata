@@ -1,4 +1,6 @@
-import { normalizePosixPath, normalizeWindowsPath } from "../path.js";
+// src/path.test.ts
+
+import { normalizePosixPath, normalizeWindowsPath } from "./path.js";
 
 describe("mount_point", () => {
   describe("normalizeLinuxPath", () => {

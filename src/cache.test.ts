@@ -1,7 +1,7 @@
-import { jest } from "@jest/globals";
-import { ttlCache } from "../cache.js";
-
 // src/cache.test.ts
+
+import { jest } from "@jest/globals";
+import { ttlCache } from "./cache.js";
 
 describe("ttlCache", () => {
   beforeEach(() => {

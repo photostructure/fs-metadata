@@ -1,3 +1,5 @@
+// src/path.ts
+
 import { dirname, resolve } from "node:path";
 import { isWindows } from "./platform.js";
 import { isBlank } from "./string.js";

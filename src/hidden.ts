@@ -1,3 +1,5 @@
+// src/hidden.ts
+
 import { rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { WrappedError } from "./error.js";

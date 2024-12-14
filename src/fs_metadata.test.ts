@@ -1,23 +1,23 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-// src/__tests__/fs_metadata.test.ts
+// src/fs_metadata.test.ts
 
 import { jest } from "@jest/globals";
-import { times, uniq } from "../array.js";
-import { TimeoutError } from "../async.js";
+import { times, uniq } from "./array.js";
+import { TimeoutError } from "./async.js";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
   MountPoint,
   VolumeHealthStatuses,
-} from "../index.js";
-import { omit } from "../object.js";
-import { IncludeSystemVolumesDefault } from "../options.js";
-import { isLinux, isMacOS, isWindows } from "../platform.js";
-import { pickRandom, randomLetter, randomLetters, shuffle } from "../random.js";
-import { sortByLocale } from "../string.js";
-import { assertMetadata } from "../test-utils/assert.js";
-import { MiB } from "../units.js";
+} from "./index.js";
+import { omit } from "./object.js";
+import { IncludeSystemVolumesDefault } from "./options.js";
+import { isLinux, isMacOS, isWindows } from "./platform.js";
+import { pickRandom, randomLetter, randomLetters, shuffle } from "./random.js";
+import { sortByLocale } from "./string.js";
+import { assertMetadata } from "./test-utils/assert.js";
+import { MiB } from "./units.js";
 
 describe("Filesystem Metadata", () => {
   jest.setTimeout(15_000);

@@ -1,20 +1,20 @@
-// src/__tests__/memory.test.ts
+// src/memory.test.ts
 
 import { jest } from "@jest/globals";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { delay } from "../async.js";
+import { delay } from "./async.js";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
   isHidden,
   setHidden,
-} from "../index.js";
-import { randomLetters } from "../random.js";
-import { validateHidden } from "../test-utils/hidden-tests.js";
-import { tmpDirNotHidden } from "../test-utils/platform.js";
+} from "./index.js";
+import { randomLetters } from "./random.js";
+import { validateHidden } from "./test-utils/hidden-tests.js";
+import { tmpDirNotHidden } from "./test-utils/platform.js";
 
 // Enable garbage collection access
 declare const global: {

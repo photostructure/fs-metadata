@@ -1,4 +1,6 @@
-import { defer } from "../defer.js";
+// src/defer.test.ts
+
+import { defer } from "./defer.js";
 
 describe("defer", () => {
   it("should compute value only on first access", () => {

@@ -1,13 +1,6 @@
-import {
-  gt0,
-  gte0,
-  // src/__tests__/number.test.ts
-  isNumber,
-  lte,
-  toGt0,
-  toGte0,
-  toInt,
-} from "../number.js";
+// src/number.test.ts
+
+import { gt0, gte0, isNumber, lte, toGt0, toGte0, toInt } from "./number.js";
 
 describe("number", () => {
   describe("isNumber", () => {

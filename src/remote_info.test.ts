@@ -1,9 +1,11 @@
+// src/remote_info.test.ts
+
 import {
   extractRemoteInfo,
   isRemoteFsType,
   normalizeProtocol,
   parseURL,
-} from "../remote_info.js";
+} from "./remote_info.js";
 
 describe("remote_info tests", () => {
   describe("normalizeProtocol", () => {

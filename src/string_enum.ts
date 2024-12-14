@@ -1,4 +1,5 @@
 // src/string_enum.ts
+
 // See https://basarat.gitbooks.io/typescript/content/docs/types/literal-types.html
 
 export type StringEnumType<T extends string> = {

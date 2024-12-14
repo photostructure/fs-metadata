@@ -1,6 +1,6 @@
-// src/__tests__/glob.test.ts
+// src/glob.test.ts
 
-import { compileGlob } from "../glob.js";
+import { compileGlob } from "./glob.js";
 
 describe("compileGlob", () => {
   // Test basic literal matching

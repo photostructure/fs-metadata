@@ -1,4 +1,6 @@
-import { extractUUID } from "../uuid.js";
+// src/uuid.test.ts
+
+import { extractUUID } from "./uuid.js";
 
 describe("extractUUID", () => {
   // Valid UUID formats

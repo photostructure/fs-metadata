@@ -1,6 +1,6 @@
-// __tests__/options.test.ts
+// src/options.test.ts
 
-import { OptionsDefault, optionsWithDefaults } from "../options.js";
+import { OptionsDefault, optionsWithDefaults } from "./options.js";
 
 describe("options()", () => {
   it("should return default FsOptions when no overrides are provided", () => {

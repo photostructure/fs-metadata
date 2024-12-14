@@ -1,9 +1,9 @@
-// src/__tests__/linux_mtab.test.ts
+// src/linux/mtab.test.ts
 import {
   formatMtab,
   mountEntryToPartialVolumeMetadata,
   parseMtab,
-} from "../linux/mtab.js";
+} from "./mtab.js";
 
 describe("mtab", () => {
   describe("parseMtab()", () => {

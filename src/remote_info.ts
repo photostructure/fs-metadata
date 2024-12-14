@@ -1,3 +1,5 @@
+// src/remote_info.ts
+
 import { debug } from "./debuglog.js";
 import { compactValues, isObject } from "./object.js";
 import { isWindows } from "./platform.js";

@@ -1,6 +1,7 @@
-import { stringEnum, StringEnumKeys } from "../string_enum.js";
-
 // src/string_enum.test.ts
+
+import { stringEnum, StringEnumKeys } from "./string_enum.js";
+
 
 describe("stringEnum", () => {
   // Basic functionality tests

@@ -1,6 +1,6 @@
-// src/__tests__/object.test.ts
+// src/object.test.ts
 
-import { compactValues, omit, pick } from "../object.js";
+import { compactValues, omit, pick } from "./object.js";
 
 describe("object", () => {
   describe("omit", () => {

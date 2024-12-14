@@ -1,4 +1,4 @@
-// src/__tests__/string.test.ts
+// src/string.test.ts
 
 import {
   decodeEscapeSequences,
@@ -10,7 +10,7 @@ import {
   sortObjectsByLocale,
   toNotBlank,
   toS,
-} from "../string.js";
+} from "./string.js";
 
 describe("decodeOctalEscapes", () => {
   it("decodes simple space character \\040", () => {

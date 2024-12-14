@@ -1,8 +1,10 @@
+// src/linux/dev_disk.test.ts
+
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getBasenameLinkedTo } from "../linux/dev_disk.js";
 import { describePlatform } from "../test-utils/platform.js";
+import { getBasenameLinkedTo } from "./dev_disk.js";
 
 /*
 Rather than fooling around with mocks, we're going to create a temporary

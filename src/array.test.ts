@@ -1,8 +1,8 @@
-// src/__tests__/array.test.ts
+// src/array.test.ts
 
 import { jest } from "@jest/globals";
-import { asyncFilter, compact, times, uniq, uniqBy } from "../array.js";
-import { delay } from "../async.js";
+import { asyncFilter, compact, times, uniq, uniqBy } from "./array.js";
+import { delay } from "./async.js";
 
 describe("Array", () => {
   describe("asyncFilter", () => {

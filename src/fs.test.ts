@@ -1,3 +1,5 @@
+// src/fs.test.ts
+
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +9,7 @@ import {
   existsSync,
   findAncestorDir,
   isDirectory,
-} from "../fs.js";
+} from "./fs.js";
 
 describe("fs", () => {
   let tempDir: string;

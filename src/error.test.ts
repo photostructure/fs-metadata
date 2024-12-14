@@ -1,4 +1,4 @@
-import { WrappedError } from "../error.js";
+import { WrappedError } from "./error.js";
 
 describe("WrappedError", () => {
   it("should set the correct message when cause is an Error", () => {

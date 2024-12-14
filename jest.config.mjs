@@ -26,7 +26,7 @@ const config = {
     argv.includes("--coverage") && !argv.includes("--no-coverage"),
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
-  coveragePathIgnorePatterns: ["/__tests__/", "/test-utils/"],
+  coveragePathIgnorePatterns: ["\\.test\\.ts$", "/test-utils/"],
   coverageThreshold: {
     // These are low because we're doing integration tests and there are quite
     // different codepaths for macOS, Windows, and Linux

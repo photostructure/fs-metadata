@@ -1,8 +1,10 @@
-import { TimeoutError } from "../async.js";
+// src/volume_health_status.test.ts
+
+import { TimeoutError } from "./async.js";
 import {
   directoryStatus,
   VolumeHealthStatuses,
-} from "../volume_health_status.js";
+} from "./volume_health_status.js";
 
 describe("directoryStatus", () => {
   it("should pass directory and timeout to test function", async () => {

@@ -1,4 +1,6 @@
-import { parseUNCPath } from "../unc.js";
+// src/unc.test.ts
+
+import { parseUNCPath } from "./unc.js";
 
 describe("parseUNCPath", () => {
   // Valid UNC paths
