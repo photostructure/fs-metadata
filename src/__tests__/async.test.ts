@@ -24,35 +24,36 @@ describe("async", () => {
         ];
 
         for (const timeoutMs of invalidTimeouts) {
-          expect(() =>
+          await expect(
             withTimeout({
               promise,
               timeoutMs: timeoutMs as number,
               desc: "timeoutMs: " + JSON.stringify(timeoutMs),
             }),
-          ).toThrow(TypeError);
+          ).rejects.toThrow(TypeError);
         }
       });
 
-      it("should throw TypeError for negative timeout", () => {
+      it("should throw TypeError for negative timeout", async () => {
         const promise = Promise.resolve("test");
-        expect(() =>
+        await expect(
           withTimeout({
             promise,
             timeoutMs: -1,
           }),
-        ).toThrow(TypeError);
-        expect(() => withTimeout({ promise, timeoutMs: -100 })).toThrow(
-          TypeError,
-        );
+        ).rejects.toThrow(TypeError);
+        await expect(() =>
+          withTimeout({ promise, timeoutMs: -100 }),
+        ).rejects.toThrow(TypeError);
       });
 
       it("should handle various valid timeout values", async () => {
         const promise = Promise.resolve("test");
+
         // Zero timeout
-        const zeroResult = withTimeout({ promise, timeoutMs: 0 });
-        expect(zeroResult).toBe(promise);
-        await expect(zeroResult).resolves.toBe("test");
+        await expect(withTimeout({ promise, timeoutMs: 0 })).resolves.toBe(
+          "test",
+        );
 
         // Floating point timeouts
         await expect(withTimeout({ promise, timeoutMs: 100.6 })).resolves.toBe(
@@ -123,11 +124,12 @@ describe("async", () => {
       });
 
       it("should resolve when promise completes before timeout", async () => {
-        const result = withTimeout({
-          promise: delay(50).then(() => "success"),
-          timeoutMs: 200,
-        });
-        await expect(result).resolves.toBe("success");
+        await expect(
+          withTimeout({
+            promise: delay(50).then(() => "success"),
+            timeoutMs: 200,
+          }),
+        ).resolves.toBe("success");
       });
     });
 

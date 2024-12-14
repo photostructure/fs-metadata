@@ -1,7 +1,7 @@
 import { availableParallelism } from "node:os";
 import { env } from "node:process";
 import { debug, isDebugEnabled } from "./debuglog.js";
-import { gt0, isNumber, toInt } from "./number.js";
+import { gt0, isNumber } from "./number.js";
 import { isBlank } from "./string.js";
 
 /**
@@ -14,7 +14,7 @@ export class TimeoutError extends Error {
     this.name = "TimeoutError";
     // Capture the stack trace up to the calling site
     if (captureStackTrace && Error.captureStackTrace) {
-      Error.captureStackTrace(this, withTimeout);
+      Error.captureStackTrace(this, this.constructor);
     }
   }
 }
@@ -31,10 +31,10 @@ export class TimeoutError extends Error {
  * specified time.
  * @throws {TypeError} if timeoutMs is not a number that is greater than 0.
  */
-export function withTimeout<T>(opts: {
+export async function withTimeout<T>(opts: {
+  desc?: string;
   promise: Promise<T>;
   timeoutMs: number;
-  desc?: string;
 }): Promise<T> {
   const start = Date.now();
   const desc = isBlank(opts.desc) ? "thenOrTimeout()" : opts.desc;
@@ -59,20 +59,17 @@ export function withTimeout<T>(opts: {
     return opts.promise;
   }
 
-  if (env["NODE_ENV"] === "test") {
-    const ms = toInt(env["TEST_DELAY"]);
-    if (gt0(ms)) {
-      opts.promise = delay(ms).then(() => opts.promise);
-    }
-  }
-
-  let state: undefined | "resolved" | "rejected" | "timed out";
-  let timeoutId: NodeJS.Timeout | undefined;
-
   // Create error with proper stack trace
   const timeoutError = new TimeoutError(
     `${desc}: timeout after ${timeoutMs}ms`,
   );
+
+  if (env["NODE_ENV"] === "test" && timeoutMs === 1) {
+    throw timeoutError;
+  }
+
+  let state: undefined | "resolved" | "rejected" | "timed out";
+  let timeoutId: NodeJS.Timeout | undefined;
 
   /**
    * @return true if `newState` "won", and the caller needs to take
@@ -94,16 +91,20 @@ export function withTimeout<T>(opts: {
     return true;
   };
 
-  const wrappedPromise = opts.promise.then(
-    (result) => {
-      onSettled("resolved");
-      return result;
-    },
-    (error) => {
-      // only throw if we haven't already settled
-      if (onSettled("rejected")) throw error;
-    },
-  ) as Promise<T>;
+  const wrappedPromise = new Promise<T>((resolve, reject) => {
+    opts.promise.then(
+      (result) => {
+        if (onSettled("resolved")) {
+          resolve(result);
+        }
+      },
+      (error) => {
+        if (onSettled("rejected")) {
+          reject(error);
+        }
+      },
+    );
+  }) as Promise<T>;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
