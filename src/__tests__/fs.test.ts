@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  canReaddir,
   canStatAsync,
   existsSync,
   findAncestorDir,
@@ -129,6 +130,36 @@ describe("fs", () => {
     it("should return undefined if the directory is the root", async () => {
       const result = await findAncestorDir(tempDir, "file.txt");
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe("canReaddir", () => {
+    it("should resolve for readable directory", async () => {
+      const dirPath = join(tempDir, "readableDir");
+      await mkdir(dirPath);
+      await writeFile(join(dirPath, "test.txt"), "test");
+
+      await expect(canReaddir(dirPath, 1000)).resolves.toBeUndefined();
+    });
+
+    it("should reject for non-existent directory", async () => {
+      const nonExistentPath = join(tempDir, "does-not-exist");
+
+      await expect(canReaddir(nonExistentPath, 1000)).rejects.toThrow();
+    });
+
+    it("should reject for file path", async () => {
+      const filePath = join(tempDir, "test.txt");
+      await writeFile(filePath, "test");
+
+      await expect(canReaddir(filePath, 1000)).rejects.toThrow();
+    });
+
+    it("should reject on timeout", async () => {
+      const dirPath = join(tempDir, "timeoutDir");
+      await mkdir(dirPath);
+
+      await expect(canReaddir(dirPath, 1)).rejects.toThrow(/timeout/i);
     });
   });
 });

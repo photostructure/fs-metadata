@@ -21,6 +21,7 @@
     "napi",
     "passno",
     "preprebuildify",
+    "rootfs",
     "securityfs",
     "squashfs",
     "sysfs",

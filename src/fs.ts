@@ -1,8 +1,15 @@
 // src/fs.ts
 
-import { type PathLike, type StatOptions, Stats, statSync } from "node:fs";
-import { stat } from "node:fs/promises";
+import {
+  type Dir,
+  type PathLike,
+  type StatOptions,
+  Stats,
+  statSync,
+} from "node:fs";
+import { opendir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { withTimeout } from "./async.js";
 
 /**
  * Wrapping node:fs/promises.stat() so we can mock it in tests.
@@ -53,4 +60,29 @@ export async function findAncestorDir(
 
 export function existsSync(path: string): boolean {
   return statSync(path, { throwIfNoEntry: false }) != null;
+}
+
+/**
+ * @return void if `dir` exists and is a directory and at least one entry can be read.
+ * @throws {Error} if `dir` does not exist or is not a directory or cannot be read.
+ */
+export async function canReaddir(
+  dir: string,
+  timeoutMs: number,
+): Promise<void> {
+  return withTimeout({
+    desc: "canReaddir()",
+    promise: _canReaddir(dir),
+    timeoutMs,
+  });
+}
+
+async function _canReaddir(dir: string) {
+  let d: Dir | undefined = undefined;
+  try {
+    d = await opendir(dir);
+    await d.read();
+  } finally {
+    if (d != null) void d.close();
+  }
 }
