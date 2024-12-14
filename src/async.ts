@@ -1,6 +1,5 @@
 import { availableParallelism } from "node:os";
 import { env } from "node:process";
-import { debug, isDebugEnabled } from "./debuglog.js";
 import { gt0, isNumber } from "./number.js";
 import { isBlank } from "./string.js";
 
@@ -68,53 +67,27 @@ export async function withTimeout<T>(opts: {
     throw timeoutError;
   }
 
-  let state: undefined | "resolved" | "rejected" | "timed out";
   let timeoutId: NodeJS.Timeout | undefined;
 
-  /**
-   * @return true if `newState` "won", and the caller needs to take
-   * responsibility
-   */
-  const onSettled = (newState: typeof state) => {
-    if (state != null) {
-      // no-op, already settled
-      return false;
-    }
-    state = newState;
-    if (isDebugEnabled()) {
-      debug("[thenOrTimeout] %s: %s in %d ms", desc, state, Date.now() - start);
-    }
-    if (timeoutId != null) {
-      clearTimeout(timeoutId);
-      timeoutId = undefined;
-    }
-    return true;
-  };
-
-  const wrappedPromise = new Promise<T>((resolve, reject) => {
-    opts.promise.then(
-      (result) => {
-        if (onSettled("resolved")) {
-          resolve(result);
-        }
-      },
-      (error) => {
-        if (onSettled("rejected")) {
-          reject(error);
-        }
-      },
-    );
-  }) as Promise<T>;
+  opts.promise
+    .finally(() => {
+      if (timeoutId != null) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+    })
+    .catch(() => {});
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      if (onSettled("timed out")) {
+      if (timeoutId != null) {
         reject(timeoutError);
       }
+      timeoutId = undefined;
     }, timeoutMs);
   });
 
-  return Promise.race([wrappedPromise, timeoutPromise]);
+  return Promise.race([opts.promise, timeoutPromise]);
 }
 
 /**
