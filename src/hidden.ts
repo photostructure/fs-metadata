@@ -81,10 +81,13 @@ export async function isHidden(
   pathname: string,
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
-  pathname = normalizePath(pathname);
+  const norm = normalizePath(pathname);
+  if (norm == null) {
+    throw new Error("Invalid pathname: " + JSON.stringify(pathname));
+  }
   return (
-    (LocalSupport.dotPrefix && isPosixHidden(pathname)) ||
-    (LocalSupport.systemFlag && isSystemHidden(pathname, nativeFn))
+    (LocalSupport.dotPrefix && isPosixHidden(norm)) ||
+    (LocalSupport.systemFlag && isSystemHidden(norm, nativeFn))
   );
 }
 
@@ -92,20 +95,26 @@ export async function isHiddenRecursive(
   path: string,
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
-  let p = normalizePath(path);
-  while (!isRootDirectory(p)) {
-    if (await isHidden(p, nativeFn)) {
+  let norm = normalizePath(path);
+  if (norm == null) {
+    throw new Error("Invalid path: " + JSON.stringify(path));
+  }
+  while (!isRootDirectory(norm)) {
+    if (await isHidden(norm, nativeFn)) {
       return true;
     }
-    p = dirname(p);
+    norm = dirname(norm);
   }
   return false;
 }
 
 export function createHiddenPosixPath(pathname: string, hidden: boolean) {
-  pathname = normalizePath(pathname);
-  const dir = dirname(pathname);
-  const srcBase = basename(pathname).replace(/^\./, "");
+  const norm = normalizePath(pathname);
+  if (norm == null) {
+    throw new Error("Invalid pathname: " + JSON.stringify(pathname));
+  }
+  const dir = dirname(norm);
+  const srcBase = basename(norm).replace(/^\./, "");
   const dest = join(dir, (hidden ? "." : "") + srcBase);
   return dest;
 }
@@ -158,10 +167,12 @@ export async function getHiddenMetadata(
   pathname: string,
   nativeFn: NativeBindingsFn,
 ): Promise<HiddenMetadata> {
-  pathname = normalizePath(pathname);
-
-  const dotPrefix = isPosixHidden(pathname);
-  const systemFlag = await isSystemHidden(pathname, nativeFn);
+  const norm = normalizePath(pathname);
+  if (norm == null) {
+    throw new Error("Invalid pathname: " + JSON.stringify(pathname));
+  }
+  const dotPrefix = isPosixHidden(norm);
+  const systemFlag = await isSystemHidden(norm, nativeFn);
   return {
     hidden: dotPrefix || systemFlag,
     dotPrefix,
@@ -181,7 +192,10 @@ export async function setHidden(
   pathname: string;
   actions: { dotPrefix: boolean; systemFlag: boolean };
 }> {
-  pathname = normalizePath(pathname);
+  let norm = normalizePath(pathname);
+  if (norm == null) {
+    throw new Error("Invalid pathname: " + JSON.stringify(pathname));
+  }
 
   if (method === "dotPrefix" && !LocalSupport.dotPrefix) {
     throw new Error("Dot prefix hiding is not supported on this platform");
@@ -192,12 +206,12 @@ export async function setHidden(
   }
 
   try {
-    await statAsync(pathname);
+    await statAsync(norm);
   } catch (cause) {
     throw new WrappedError("setHidden()", { cause });
   }
 
-  if (isWindows && isRootDirectory(pathname)) {
+  if (isWindows && isRootDirectory(norm)) {
     throw new Error("Cannot hide root directory on Windows");
   }
 
@@ -209,8 +223,8 @@ export async function setHidden(
   let acted = false;
 
   if (LocalSupport.dotPrefix && ["auto", "all", "dotPrefix"].includes(method)) {
-    if (isPosixHidden(pathname) !== hide) {
-      pathname = await setHiddenPosix(pathname, hide);
+    if (isPosixHidden(norm) !== hide) {
+      norm = await setHiddenPosix(norm, hide);
       actions.dotPrefix = true;
     }
     acted = true;
@@ -220,9 +234,9 @@ export async function setHidden(
     LocalSupport.systemFlag &&
     (["all", "systemFlag"].includes(method) || (!acted && method === "auto"))
   ) {
-    await (await nativeFn()).setHidden(pathname, hide);
+    await (await nativeFn()).setHidden(norm, hide);
     actions.systemFlag = true;
   }
 
-  return { pathname, actions };
+  return { pathname: norm, actions };
 }
