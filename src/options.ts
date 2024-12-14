@@ -1,5 +1,6 @@
 // src/options.ts
 
+import { availableParallelism } from "node:os";
 import { compactValues, isObject } from "./object.js";
 import { isWindows } from "./platform.js";
 
@@ -18,6 +19,13 @@ export interface Options {
    * @see {@link TimeoutMsDefault}.
    */
   timeoutMs: number;
+
+  /**
+   * Maximum number of concurrent filesystem operations.
+   *
+   * Defaults to {@link https://nodejs.org/api/os.html#osavailableparallelism | availableParallelism}.
+   */
+  maxConcurrency: number;
 
   /**
    * On Linux and macOS, mount point pathnames that matches any of these glob
@@ -107,6 +115,7 @@ export const SystemFsTypesDefault = new Set([
   "none",
   "proc",
   "pstore",
+  "rootfs",
   "securityfs",
   "snap*",
   "squashfs",
@@ -133,6 +142,7 @@ export const IncludeSystemVolumesDefault = isWindows;
  */
 export const OptionsDefault: Options = {
   timeoutMs: TimeoutMsDefault,
+  maxConcurrency: availableParallelism(),
   systemPathPatterns: [...SystemPathPatternsDefault],
   systemFsTypes: new Set(SystemFsTypesDefault),
   linuxMountTablePaths: LinuxMountTablePathsDefault,
