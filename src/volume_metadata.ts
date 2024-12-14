@@ -3,7 +3,6 @@
 import { mapConcurrent, withTimeout } from "./async.js";
 import { debug } from "./debuglog.js";
 import { WrappedError } from "./error.js";
-import { canReaddir } from "./fs.js";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
 import { getLinuxMtabMetadata } from "./linux/mount_points.js";
 import {
@@ -32,7 +31,10 @@ import { isBlank, isNotBlank } from "./string.js";
 import { assignSystemVolume } from "./system_volume.js";
 import { parseUNCPath } from "./unc.js";
 import { extractUUID } from "./uuid.js";
-import { VolumeHealthStatuses } from "./volume_health_status.js";
+import {
+  VolumeHealthStatuses,
+  directoryStatus,
+} from "./volume_health_status.js";
 
 /**
  * Metadata associated to a volume.
@@ -125,8 +127,11 @@ async function _getVolumeMetadata(
   );
   debug("[getVolumeMetadata] options: %o", o);
 
-  // This will throw an error if the mount point is not accessible:
-  const status = (await canReaddir(o.mountPoint, o.timeoutMs)) ?? "healthy";
+  const { status, error } = await directoryStatus(o.mountPoint, o.timeoutMs);
+  if (status !== VolumeHealthStatuses.healthy) {
+    debug("[getVolumeMetadata] directoryStatus error: %s", error);
+    throw error ?? new Error("Volume not healthy: " + status);
+  }
 
   debug("[getVolumeMetadata] readdir status: %s", status);
 

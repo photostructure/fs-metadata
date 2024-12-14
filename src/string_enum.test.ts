@@ -2,7 +2,6 @@
 
 import { stringEnum, StringEnumKeys } from "./string_enum.js";
 
-
 describe("stringEnum", () => {
   // Basic functionality tests
   it("creates enum with single value", () => {

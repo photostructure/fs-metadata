@@ -2,6 +2,7 @@
 
 import { TimeoutError } from "./async.js";
 import { debug } from "./debuglog.js";
+import { toError } from "./error.js";
 import { canReaddir } from "./fs.js";
 import { isObject } from "./object.js";
 import { stringEnum, StringEnumKeys } from "./string_enum.js";
@@ -36,21 +37,22 @@ export async function directoryStatus(
   dir: string,
   timeoutMs: number,
   test: typeof canReaddir = canReaddir,
-): Promise<VolumeHealthStatus> {
+): Promise<{ status: VolumeHealthStatus; error?: Error }> {
   try {
     if (await test(dir, timeoutMs)) {
-      return VolumeHealthStatuses.healthy;
+      return { status: VolumeHealthStatuses.healthy };
     }
   } catch (error) {
     debug("[directoryStatus] %s: %s", dir, error);
+    let status: VolumeHealthStatus = VolumeHealthStatuses.unknown;
     if (error instanceof TimeoutError) {
-      return VolumeHealthStatuses.timeout;
-    }
-    if (isObject(error) && "code" in error) {
+      status = VolumeHealthStatuses.timeout;
+    } else if (isObject(error) && error instanceof Error && "code" in error) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        return VolumeHealthStatuses.inaccessible;
+        status = VolumeHealthStatuses.inaccessible;
       }
     }
+    return { status, error: toError(error) };
   }
-  return VolumeHealthStatuses.unknown;
+  return { status: VolumeHealthStatuses.unknown };
 }

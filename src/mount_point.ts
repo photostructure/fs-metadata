@@ -118,7 +118,7 @@ async function _getVolumeMountPoints(
 
       if (isBlank(mp.status)) {
         debug("[getVolumeMountPoints] checking status of %s", mp.mountPoint);
-        mp.status = await directoryStatus(mp.mountPoint, o.timeoutMs);
+        mp.status = (await directoryStatus(mp.mountPoint, o.timeoutMs)).status;
         debug(
           "[getVolumeMountPoints] status for %s: %s",
           mp.mountPoint,

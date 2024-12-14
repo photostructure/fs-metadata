@@ -1,6 +1,10 @@
 //@ts-check
 
-import { argv } from "node:process";
+import { argv, platform } from "node:process";
+
+const otherPlatforms = ["linux", "darwin", "windows"]
+  .filter((ea) => ea !== (platform === "win32" ? "windows" : platform))
+  .map((ea) => `/${ea}/`);
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 const config = {
@@ -26,7 +30,12 @@ const config = {
     argv.includes("--coverage") && !argv.includes("--no-coverage"),
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
-  coveragePathIgnorePatterns: ["\\.test\\.ts$", "/test-utils/"],
+  coveragePathIgnorePatterns: [
+    "debuglog",
+    "\\.test\\.ts$",
+    "/test-utils/",
+    ...otherPlatforms,
+  ],
   coverageThreshold: {
     // These are low because we're doing integration tests and there are quite
     // different codepaths for macOS, Windows, and Linux
@@ -36,10 +45,10 @@ const config = {
     // gives us a little wiggle room
 
     global: {
-      statements: 75,
-      branches: 70,
-      functions: 80,
-      lines: 75,
+      statements: 80,
+      branches: 75,
+      functions: 90,
+      lines: 80,
     },
   },
   verbose: true,
