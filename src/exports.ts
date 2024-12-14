@@ -105,7 +105,6 @@ export class ExportsImpl {
   readonly getAllVolumeMetadata = (
     opts?: Partial<Options> & {
       includeSystemVolumes?: boolean;
-      maxConcurrency?: number;
     },
   ) => getAllVolumeMetadata(optionsWithDefaults(opts), this.#nativeFn);
 
