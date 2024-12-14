@@ -18,7 +18,7 @@ export function isNotBlank(input: unknown): input is string {
 /**
  * @return true iff the input is not a string or only has non-whitespace characters
  */
-export function isBlank(input: unknown): boolean {
+export function isBlank(input: unknown): input is undefined {
   return !isNotBlank(input);
 }
 
