@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 // src/test-utils/assert.ts
 import { isMacOS } from "../platform.js";
 import type { VolumeMetadata } from "../volume_metadata.js";
@@ -28,8 +29,8 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
       expect(metadata.size).toBeGreaterThan(0);
       expect(metadata.used).toBeGreaterThanOrEqual(0);
       expect(metadata.available).toBeGreaterThanOrEqual(0);
-      expect(metadata.used + metadata.available).toBeLessThanOrEqual(
-        metadata.size,
+      expect(metadata.used! + metadata.available!).toBeLessThanOrEqual(
+        metadata.size!,
       );
     }
 
