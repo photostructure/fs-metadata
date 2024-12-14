@@ -1,8 +1,11 @@
-// volume_metadata.cpp
+// src/windows/volume_metadata.cpp
+#include "../common/debug_log.h"
 #include "../common/metadata_worker.h"
+#include "drive_status.h"
 #include "error_utils.h"
 #include "fs_meta.h"
 #include "string.h"
+#include "system_volume.h"
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -117,123 +120,106 @@ public:
   }
 };
 
-void ValidatePath(const std::string &path) {
-  if (path.empty() || path.length() >= MAX_PATH) {
-    throw FSException("Invalid path length");
-  }
-}
-
-// Enhanced drive status determination
-DriveStatus GetDriveStatus(const std::string &path) {
-  UINT driveType = GetDriveTypeA(path.c_str());
-
-  std::string mountPoint = path;
-  if (mountPoint.back() != '\\') {
-    mountPoint += '\\';
-  }
-
-  try {
-    VolumeInfo volInfo(mountPoint);
-    if (volInfo.isValid()) {
-      return Healthy;
-    }
-
-    // Handle special cases based on drive type
-    switch (driveType) {
-    case DRIVE_REMOVABLE:
-      return Disconnected;
-    case DRIVE_FIXED:
-      return Error;
-    case DRIVE_REMOTE: {
-      WNetConnection conn(path);
-      return (conn.valid()) ? Healthy : Disconnected;
-    }
-    case DRIVE_CDROM:
-      return NoMedia;
-    case DRIVE_RAMDISK:
-      return Error;
-    case DRIVE_UNKNOWN:
-      return Unknown;
-    case DRIVE_NO_ROOT_DIR:
-      return Unavailable;
-    default:
-      return Unknown;
-    }
-  } catch (const FSException &) {
-    return Error;
-  }
-}
-
 } // anonymous namespace
 
-class GetVolumeMetadataWorker : public FSMeta::MetadataWorkerBase {
+class GetVolumeMetadataWorker : public MetadataWorkerBase {
 public:
   GetVolumeMetadataWorker(const std::string &mountPoint,
+                          const VolumeMetadataOptions &options,
                           const Napi::Promise::Deferred &deferred)
-      : MetadataWorkerBase(mountPoint, deferred) {
-    ValidatePath(mountPoint);
-  }
+      : MetadataWorkerBase(mountPoint, deferred), options_(options) {}
+
+private:
+  VolumeMetadataOptions options_;
 
   void Execute() override {
     try {
-      std::string normalizedPath = mountPoint;
-      if (normalizedPath.back() != '\\') {
-        normalizedPath += '\\';
-      }
-
       // Get drive status first
-      DriveStatus status = GetDriveStatus(mountPoint);
+      DriveStatus status = CheckDriveStatus(mountPoint);
       metadata.status = DriveStatusToString(status);
 
-      if (status == Disconnected || status == Unavailable || status == Error ||
-          status == NoMedia) {
-        return;
+      if (status != DriveStatus::Healthy) {
+        DEBUG_LOG(
+            "[GetVolumeMetadata] %s not healthy, skipping additional info",
+            mountPoint.c_str());
+        return; // Don't try to get additional info for non-healthy drives
       }
 
+      std::wstring widePath = PathConverter::ToWString(mountPoint);
+      metadata.isSystemVolume = IsSystemVolume(widePath.c_str());
+
+      DEBUG_LOG("[GetVolumeMetadata] %s {isSystemVolume: %s}",
+                mountPoint.c_str(), metadata.isSystemVolume ? "true" : "false");
+
       // Get volume information
-      VolumeInfo volInfo(normalizedPath);
+      VolumeInfo volInfo(mountPoint);
       if (volInfo.isValid()) {
         metadata.label = volInfo.getVolumeName();
         metadata.fstype = volInfo.getFileSystem();
+        DEBUG_LOG("[GetVolumeMetadata] %s {label: %s, fstype: %s}",
+                  mountPoint.c_str(), metadata.label.c_str(),
+                  metadata.fstype.c_str());
 
-        // Get volume GUID instead of using serial number
         try {
-          metadata.uuid = GetVolumeGUID(normalizedPath);
-        } catch (const FSException &) {
-          // If getting GUID fails, fall back to serial number (it's probably
-          // a remote volume)
+          metadata.uuid = GetVolumeGUID(mountPoint);
+          DEBUG_LOG("[GetVolumeMetadata] %s GetVolumeGUID(): {uuid: %s}",
+                    mountPoint.c_str(), metadata.uuid.c_str());
+        } catch (const FSException &e) {
+          DEBUG_LOG("[GetVolumeMetadata] %s GetVolumeGUID() failed: %s",
+                    mountPoint.c_str(), e.what());
           metadata.uuid = FormatVolumeSerialNumber(volInfo.getSerialNumber());
+          DEBUG_LOG("[GetVolumeMetadata] %s Backfilling UUID with "
+                    "lpVolumeSerialNumber %d {uuid: %s}",
+                    mountPoint.c_str(), volInfo.getSerialNumber(),
+                    metadata.uuid.c_str());
         }
 
         // Get disk space information
-        DiskSpaceInfo diskInfo(normalizedPath);
+        DiskSpaceInfo diskInfo(mountPoint);
         if (diskInfo.isValid()) {
           metadata.size = diskInfo.getTotalBytes();
           metadata.available = diskInfo.getFreeBytes();
           metadata.used = metadata.size - metadata.available;
+          DEBUG_LOG(
+              "[GetVolumeMetadata] %s {size: %.3f GB, available: %.3f GB}",
+              mountPoint.c_str(), metadata.size / 1e9,
+              metadata.available / 1e9);
         }
       }
 
       // Check if drive is remote
-      metadata.remote = (GetDriveTypeA(normalizedPath.c_str()) == DRIVE_REMOTE);
+      metadata.remote = (GetDriveTypeA(mountPoint.c_str()) == DRIVE_REMOTE);
+      DEBUG_LOG("[GetVolumeMetadata] %s {remote: %s}", mountPoint.c_str(),
+                metadata.remote ? "true" : "false");
 
       if (metadata.remote) {
         WNetConnection conn(mountPoint);
         if (conn.valid()) {
           metadata.mountFrom = conn.remotePath();
+          DEBUG_LOG("[GetVolumeMetadata] %s {mountFrom: %s}",
+                    mountPoint.c_str(), metadata.mountFrom.c_str());
         }
       }
     } catch (const std::exception &e) {
+      DEBUG_LOG("[GetVolumeMetadata] %s error: %s", mountPoint.c_str(),
+                e.what());
       SetError(e.what());
     }
   }
 }; // class GetVolumeMetadataWorker
 
-Napi::Value GetVolumeMetadata(const Napi::Env &env,
-                              const std::string &mountPoint,
-                              const Napi::Object &options) {
+Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
+  auto env = info.Env();
+
+  // Parse options using FromObject
+  VolumeMetadataOptions options;
+  if (info.Length() > 0 && info[0].IsObject()) {
+    options = VolumeMetadataOptions::FromObject(info[0].As<Napi::Object>());
+  }
+
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new GetVolumeMetadataWorker(mountPoint, deferred);
+  auto *worker =
+      new GetVolumeMetadataWorker(options.mountPoint, options, deferred);
   worker->Queue();
   return deferred.Promise();
 }

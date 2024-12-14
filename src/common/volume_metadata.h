@@ -4,6 +4,31 @@
 #include <string>
 
 namespace FSMeta {
+struct VolumeMetadataOptions {
+  std::string mountPoint;    // Required mount point path
+  uint32_t timeoutMs = 5000; // Optional timeout with default
+  std::string device;        // Optional device path
+
+  static VolumeMetadataOptions FromObject(const Napi::Object &obj) {
+    VolumeMetadataOptions options;
+
+    // Required mountPoint
+    if (!obj.Has("mountPoint") || !obj.Get("mountPoint").IsString()) {
+      throw Napi::TypeError::New(obj.Env(), "String expected for mountPoint");
+    }
+    options.mountPoint = obj.Get("mountPoint").As<Napi::String>();
+
+    // Optional parameters
+    if (obj.Has("timeoutMs")) {
+      options.timeoutMs = obj.Get("timeoutMs").As<Napi::Number>().Uint32Value();
+    }
+    if (obj.Has("device")) {
+      options.device = obj.Get("device").As<Napi::String>();
+    }
+
+    return options;
+  }
+};
 
 // Volume metadata structure
 struct VolumeMetadata {
@@ -20,6 +45,7 @@ struct VolumeMetadata {
   bool remote = false;
   std::string remoteHost;
   std::string remoteShare;
+  bool isSystemVolume = false;
 
   Napi::Object ToObject(Napi::Env env) const {
     auto result = Napi::Object::New(env);
@@ -86,17 +112,12 @@ struct VolumeMetadata {
       result.Set("remoteShare", env.Null());
     }
 
+    result.Set("isSystemVolume", Napi::Boolean::New(env, isSystemVolume));
+
     return result;
   }
 };
 
-struct VolumeMetadataOptions {
-  uint32_t timeoutMs = 5000;
-  std::string device;
-};
-
-Napi::Value GetVolumeMetadata(const Napi::Env &env,
-                              const std::string &mountPoint,
-                              const Napi::Object &options);
+Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info);
 
 } // namespace FSMeta

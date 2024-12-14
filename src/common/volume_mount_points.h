@@ -5,6 +5,19 @@
 
 namespace FSMeta {
 
+struct MountPointOptions {
+  uint32_t timeoutMs = 5000; // Default 5 second timeout
+
+  // Add static helper to parse from JS object
+  static MountPointOptions FromObject(const Napi::Object &obj) {
+    MountPointOptions options;
+    if (obj.Has("timeoutMs")) {
+      options.timeoutMs = obj.Get("timeoutMs").As<Napi::Number>().Uint32Value();
+    }
+    return options;
+  }
+};
+
 struct MountPoint {
   std::string mountPoint;
   std::string fstype;
@@ -14,11 +27,16 @@ struct MountPoint {
   Napi::Object ToObject(Napi::Env env) const {
     auto obj = Napi::Object::New(env);
 
-    obj.Set("mountPoint", mountPoint);
-    obj.Set("fstype", fstype);
-    obj.Set("status", status);
+    if (!mountPoint.empty()) {
+      obj.Set("mountPoint", mountPoint);
+    }
+    if (!fstype.empty()) {
+      obj.Set("fstype", fstype);
+    }
+    if (!status.empty()) {
+      obj.Set("status", status);
+    }
     obj.Set("isSystemVolume", isSystemVolume);
-
     return obj;
   }
 };

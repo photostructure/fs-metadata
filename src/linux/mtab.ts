@@ -4,7 +4,6 @@ import {
   isSystemVolume,
   MountPoint,
   SystemVolumeConfig,
-  toMountPoint,
 } from "../mount_point.js";
 import { toInt } from "../number.js";
 import { normalizeLinuxPath } from "../path.js";
@@ -51,14 +50,15 @@ export function mountEntryToMountPoint(
   entry: MountEntry,
   options: Partial<SystemVolumeConfig>,
 ): MountPoint | undefined {
-  return toMountPoint(
-    {
-      mountPoint: entry.fs_file,
-      fstype:
-        toNotBlank(entry.fs_vfstype) ?? toNotBlank(entry.fs_spec) ?? "unknown",
-    },
-    options,
-  );
+  const mountPoint = normalizeLinuxPath(entry.fs_file);
+  const fstype = toNotBlank(entry.fs_vfstype) ?? toNotBlank(entry.fs_spec);
+  return mountPoint == null || fstype == null
+    ? undefined
+    : {
+        mountPoint,
+        fstype,
+        isSystemVolume: isSystemVolume(mountPoint, fstype, options),
+      };
 }
 
 export type MtabVolumeMetadata = Omit<
@@ -103,15 +103,18 @@ export function parseMtab(content: string): MountEntry[] {
     if (!fields || fields.length < 3) {
       continue; // Skip malformed lines
     }
-    entries.push({
-      fs_spec: fields[0] as string,
-      // normalizeLinuxPath DOES NOT resolve()!
-      fs_file: normalizeLinuxPath(fields[1] ?? ""),
-      fs_vfstype: fields[2] as string,
-      fs_mntops: fields[3],
-      fs_freq: toInt(fields[4]),
-      fs_passno: toInt(fields[5]),
-    });
+    const fs_file = normalizeLinuxPath(fields[1]);
+    if (fs_file != null) {
+      entries.push({
+        fs_spec: fields[0] as string,
+        // normalizeLinuxPath DOES NOT resolve()!
+        fs_file,
+        fs_vfstype: fields[2] as string,
+        fs_mntops: fields[3],
+        fs_freq: toInt(fields[4]),
+        fs_passno: toInt(fields[5]),
+      });
+    }
   }
   return entries;
 }

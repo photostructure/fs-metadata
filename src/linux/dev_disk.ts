@@ -1,6 +1,9 @@
+// src/linux/dev_disk.ts
+
 import { Dirent } from "node:fs";
 import { readdir, readlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { debug } from "../debuglog.js";
 import { decodeEscapeSequences } from "../string.js";
 
 /**
@@ -8,10 +11,18 @@ import { decodeEscapeSequences } from "../string.js";
  * @param devicePath The device path to look up
  * @returns Promise that resolves to the UUID if found, empty string otherwise
  */
-export function getUuidFromDevDisk(devicePath: string) {
-  return getBasenameLinkedTo("/dev/disk/by-uuid", resolve(devicePath)).catch(
-    () => undefined,
-  );
+export async function getUuidFromDevDisk(devicePath: string) {
+  try {
+    const result = await getBasenameLinkedTo(
+      "/dev/disk/by-uuid",
+      resolve(devicePath),
+    );
+    debug("[getUuidFromDevDisk] result: %o", result);
+    return result;
+  } catch (error) {
+    debug("[getUuidFromDevDisk] failed: " + error);
+    return;
+  }
 }
 
 /**
@@ -19,10 +30,18 @@ export function getUuidFromDevDisk(devicePath: string) {
  * @param devicePath The device path to look up
  * @returns Promise that resolves to the label if found, empty string otherwise
  */
-export function getLabelFromDevDisk(devicePath: string) {
-  return getBasenameLinkedTo("/dev/disk/by-label", resolve(devicePath)).catch(
-    () => undefined,
-  );
+export async function getLabelFromDevDisk(devicePath: string) {
+  try {
+    const result = await getBasenameLinkedTo(
+      "/dev/disk/by-label",
+      resolve(devicePath),
+    );
+    debug("[getLabelFromDevDisk] result: %o", result);
+    return result;
+  } catch (error) {
+    debug("[getLabelFromDevDisk] failed: " + error);
+    return;
+  }
 }
 
 // only exposed for tests

@@ -2,6 +2,7 @@
 #ifdef ENABLE_GIO
 
 #include "gio_utils.h"
+#include "../common/debug_log.h"
 #include "gio_worker.h"
 #include <gio/gio.h>
 #include <memory>
@@ -41,15 +42,17 @@ Napi::Value GetMountPoints(Napi::Env env) {
 }
 
 void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
-  // Obtain the GVolumeMonitor singleton (do not unref)
+  DEBUG_LOG("[GIO] getting volume monitor for %s", mountPoint.c_str());
   GVolumeMonitor *monitor = g_volume_monitor_get();
   if (!monitor) {
+    DEBUG_LOG("[GIO] failed to get volume monitor");
     return;
   }
 
-  // Get the list of mounts
+  DEBUG_LOG("[GIO] getting mounts list");
   GList *mounts = g_volume_monitor_get_mounts(monitor);
   if (!mounts) {
+    DEBUG_LOG("[GIO] no mounts found");
     return;
   }
 
@@ -77,12 +80,15 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
     }
 
     if (mountPoint == path.get()) {
+      DEBUG_LOG("[GIO] found matching mount point: %s", path.get());
+
       // Get volume information
       GObjectPtr<GVolume> volume(g_mount_get_volume(mount));
       if (volume) {
         GCharPtr name(g_volume_get_name(volume.get()));
         if (name) {
           metadata.label = name.get();
+          DEBUG_LOG("[GIO] found volume label: %s", metadata.label.c_str());
         }
       }
 
@@ -106,6 +112,7 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
               drive.get(), G_DRIVE_IDENTIFIER_KIND_UNIX_DEVICE));
           if (unix_device) {
             metadata.fstype = unix_device.get();
+            DEBUG_LOG("[GIO] found fstype: %s", metadata.fstype.c_str());
           }
         }
       }

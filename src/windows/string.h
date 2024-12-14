@@ -20,4 +20,29 @@ inline std::string WideToUtf8(const WCHAR *wide) {
   return result;
 }
 
+class PathConverter {
+public:
+  static std::wstring ToWString(const std::string &path) {
+    if (path.empty()) {
+      return L"";
+    }
+
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, path.c_str(),
+                                   static_cast<int>(path.length()), nullptr, 0);
+
+    if (wlen == 0) {
+      return L"";
+    }
+
+    std::wstring wpath(wlen, 0);
+    if (!MultiByteToWideChar(CP_UTF8, 0, path.c_str(),
+                             static_cast<int>(path.length()), &wpath[0],
+                             wlen)) {
+      return L"";
+    }
+
+    return wpath;
+  }
+};
+
 } // namespace FSMeta
