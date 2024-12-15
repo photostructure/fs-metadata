@@ -20,6 +20,7 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
 
     if (metadata.fstype !== undefined) {
       expect(typeof metadata.fstype).toBe("string");
+      expect(metadata.fstype).toMatch(/^[^/]+$/);
     }
 
     // Size checks
