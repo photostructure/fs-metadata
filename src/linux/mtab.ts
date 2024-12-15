@@ -45,7 +45,6 @@ export interface MountEntry {
 
 export function mountEntryToMountPoint(
   entry: MountEntry,
-  options: Partial<SystemVolumeConfig>,
 ): MountPoint | undefined {
   const mountPoint = normalizePosixPath(entry.fs_file);
   const fstype = toNotBlank(entry.fs_vfstype) ?? toNotBlank(entry.fs_spec);
@@ -54,7 +53,6 @@ export function mountEntryToMountPoint(
     : {
         mountPoint,
         fstype,
-        isSystemVolume: isSystemVolume(mountPoint, fstype, options),
       };
 }
 
