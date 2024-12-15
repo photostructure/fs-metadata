@@ -4,9 +4,9 @@ import { rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { WrappedError } from "./error.js";
 import { canStatAsync, statAsync } from "./fs.js";
-import { NativeBindingsFn } from "./native_bindings.js";
 import { isRootDirectory, normalizePath } from "./path.js";
 import { isWindows } from "./platform.js";
+import { NativeBindingsFn } from "./types/native_bindings.js";
 
 /**
  * Represents the detailed state of a file or directory's hidden attribute
