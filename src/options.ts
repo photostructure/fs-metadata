@@ -49,6 +49,12 @@ export interface Options {
    * @see {@link LinuxMountTablePathsDefault} for the default values
    */
   linuxMountTablePaths: string[];
+
+  /**
+   * Should system volumes be included in result arrays? Defaults to true on
+   * Windows and false elsewhere.
+   */
+  includeSystemVolumes: boolean;
 }
 
 /**
@@ -146,6 +152,7 @@ export const OptionsDefault: Options = {
   systemPathPatterns: [...SystemPathPatternsDefault],
   systemFsTypes: new Set(SystemFsTypesDefault),
   linuxMountTablePaths: LinuxMountTablePathsDefault,
+  includeSystemVolumes: IncludeSystemVolumesDefault,
 } as const;
 
 /**

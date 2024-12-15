@@ -67,7 +67,13 @@ export function isMountPoint(obj: unknown): obj is MountPoint {
 }
 
 export type GetVolumeMountPointOptions = Partial<
-  Pick<Options, "timeoutMs" | "linuxMountTablePaths" | "maxConcurrency"> &
+  Pick<
+    Options,
+    | "timeoutMs"
+    | "linuxMountTablePaths"
+    | "maxConcurrency"
+    | "includeSystemVolumes"
+  > &
     SystemVolumeConfig
 >;
 
@@ -104,7 +110,10 @@ async function _getVolumeMountPoints(
     : getLinuxMountPoints(nativeFn, o));
 
   debug("[getVolumeMountPoints] raw mount points: %o", result);
-  const uniq = uniqBy(result, (ea) => toNotBlank(ea.mountPoint));
+  const filtered = o.includeSystemVolumes
+    ? result
+    : result.filter((ea) => !ea.isSystemVolume);
+  const uniq = uniqBy(filtered, (ea) => toNotBlank(ea.mountPoint));
   debug("[getVolumeMountPoints] found %d unique mount points", uniq.length);
   const results = sortObjectsByLocale(uniq, (ea) => ea.mountPoint);
   debug(
