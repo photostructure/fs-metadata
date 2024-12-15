@@ -1,6 +1,8 @@
 // src/mount_point.test.ts
 
+import { jest } from "@jest/globals";
 import { times, uniq } from "./array.js";
+import { TimeoutError } from "./async.js";
 import { getVolumeMountPoints } from "./index.js";
 import { MountPoint } from "./mount_point.js";
 import { isLinux, isWindows } from "./platform.js";
@@ -24,9 +26,17 @@ describe("Filesystem Metadata", () => {
     }
 
     it("should list mount points without errors", async () => {
-      const mountPoints = await getVolumeMountPoints();
-      assertMountPoints(mountPoints);
+      assertMountPoints(await getVolumeMountPoints());
     });
+
+    if (!isWindows) {
+      // < timeouts on windows are handled by the native bindings, and don't know about the magick "timeoutMs = 1" test option.
+      it("should timeout mount points if timeoutMs = 1", async () => {
+        await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
+          TimeoutError,
+        );
+      });
+    }
 
     it("should handle concurrent mountPoint requests", async () => {
       const expected = await getVolumeMountPoints();
