@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import { debug } from "../debuglog.js";
 import { toError, WrappedError } from "../error.js";
 import { isMountPoint, type MountPoint } from "../mount_point.js";
+import { compactValues } from "../object.js";
 import { optionsWithDefaults, type Options } from "../options.js";
+import { assignSystemVolume } from "../system_volume.js";
 import type { NativeBindingsFn } from "../types/native_bindings.js";
 import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab.js";
 
@@ -12,11 +14,12 @@ export async function getLinuxMountPoints(
   opts?: Pick<Options, "linuxMountTablePaths">,
 ): Promise<MountPoint[]> {
   const o = optionsWithDefaults(opts);
-  // Get GIO mounts if available from native module
-  const gioMountPoints: MountPoint[] = [];
+  const raw: MountPoint[] = [];
   try {
-    const points = await (await native()).getGioMountPoints?.();
-    if (points != null) gioMountPoints.push(...points);
+    // Get GIO mounts if available from native module
+    const arr = await (await native()).getGioMountPoints?.();
+    debug("[getLinuxMountPoints] GIO mount points: %o", arr);
+    if (arr != null) raw.push(...arr);
   } catch (error) {
     debug("Failed to get GIO mount points: %s", error);
     // GIO support not compiled in or failed, continue with just mtab mounts
@@ -26,21 +29,41 @@ export async function getLinuxMountPoints(
   for (const input of o.linuxMountTablePaths) {
     try {
       const mtabContent = await readFile(input, "utf8");
-      const mtabMounts = parseMtab(mtabContent)
-        .map((ea) => mountEntryToMountPoint(ea, o))
+      const arr = parseMtab(mtabContent)
+        .map((ea) => mountEntryToMountPoint(ea))
         .filter((ea) => ea != null);
-      if (mtabMounts.length > 0) {
-        return [...gioMountPoints, ...mtabMounts].filter(isMountPoint);
+      debug("[getLinuxMountPoints] %s mount points: %o", input, arr);
+      if (arr.length > 0) {
+        raw.push(...arr);
+        break;
       }
     } catch (error) {
       cause ??= toError(error);
     }
   }
 
-  throw new WrappedError(
-    `Failed to read any linuxMountTablePaths (tried: ${JSON.stringify(o.linuxMountTablePaths)})`,
-    { cause },
-  );
+  const byMountPoint = new Map<string, MountPoint>();
+  for (const ea of raw) {
+    const prior = byMountPoint.get(ea.mountPoint);
+    const merged = { ...compactValues(prior), ...compactValues(ea) };
+    if (isMountPoint(merged)) {
+      assignSystemVolume(merged, o);
+      byMountPoint.set(merged.mountPoint, merged);
+    }
+  }
+
+  if (byMountPoint.size === 0) {
+    throw new WrappedError(
+      `Failed to find any mount points (tried: ${JSON.stringify(o.linuxMountTablePaths)})`,
+      { cause },
+    );
+  }
+
+  const results = [...byMountPoint.values()];
+  debug("[getLinuxMountPoints] found %d mount points", results.length);
+  return o.includeSystemVolumes
+    ? results
+    : results.filter((ea) => !ea.isSystemVolume);
 }
 
 export async function getLinuxMtabMetadata(
