@@ -11,29 +11,6 @@
 namespace FSMeta {
 namespace gio {
 
-// Custom deleter for GObject types using g_object_unref
-template <typename T> struct GObjectDeleter {
-  void operator()(T *ptr) const {
-    if (ptr) {
-      g_object_unref(ptr);
-    }
-  }
-};
-
-// Custom deleter for g_free
-struct GFreeDeleter {
-  void operator()(void *ptr) const {
-    if (ptr) {
-      g_free(ptr);
-    }
-  }
-};
-
-// Smart pointer aliases
-template <typename T> using GObjectPtr = std::unique_ptr<T, GObjectDeleter<T>>;
-
-using GCharPtr = std::unique_ptr<char, GFreeDeleter>;
-
 Napi::Value GetMountPoints(Napi::Env env) {
   auto deferred = Napi::Promise::Deferred::New(env);
   auto *worker = new GioMountPointsWorker(deferred);

@@ -3,6 +3,7 @@
 
 #include "gio_worker.h"
 #include "../common/debug_log.h"
+#include "gio_utils.h"
 #include <gio/gio.h>
 #include <memory>
 #include <stdexcept>
@@ -46,23 +47,18 @@ void GioMountPointsWorker::Execute() {
         continue;
       }
 
-      char *path = g_file_get_path(root);
-      char *fs_type = g_mount_get_name(mount);
+      GCharPtr path(g_file_get_path(root));
+      GCharPtr fs_type(g_mount_get_name(mount));
 
       if (path && fs_type) {
-        DEBUG_LOG("[GioMountPoints] found mount point: %s (%s)", path, fs_type);
+        DEBUG_LOG("[GioMountPoints] found mount point: %s (%s)", path.get(),
+                  fs_type.get());
         MountPoint point{};
-        point.mountPoint = path;
-        point.fstype = fs_type;
+        point.mountPoint = path.get();
+        point.fstype = fs_type.get();
         mountPoints.push_back(point);
       }
 
-      if (path) {
-        g_free(path);
-      }
-      if (fs_type) {
-        g_free(fs_type);
-      }
       g_object_unref(root);
     }
 
