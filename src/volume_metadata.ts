@@ -191,9 +191,9 @@ async function _getVolumeMetadata(
   });
   const result = compactValues({
     status, // < let the implementation's status win by having this first
-    ...compactValues(mtabInfo),
     ...compactValues(remoteInfo),
     ...compactValues(metadata),
+    ...compactValues(mtabInfo),
     mountPoint: o.mountPoint,
     remote,
   }) as VolumeMetadata;
