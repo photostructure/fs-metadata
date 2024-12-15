@@ -2,7 +2,11 @@
   "extends": "./tsconfig.esm.json",
   "compilerOptions": {
     "types": ["node", "jest"],
-    "noEmit": true
+    "noEmit": true,
+    "sourceMap": true,
+    "inlineSources": true,
+    "inlineSourceMap": false,
+    "esModuleInterop": true
   },
   "include": ["src/**/*"],
   "files": ["node_modules/jest-extended/types/index.d.ts"],

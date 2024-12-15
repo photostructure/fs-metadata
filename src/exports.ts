@@ -16,8 +16,8 @@ import {
   getVolumeMountPoints,
   MountPoint,
 } from "./mount_point.js";
-import type { NativeBindings } from "./native_bindings.js";
 import { type Options, optionsWithDefaults } from "./options.js";
+import type { NativeBindings } from "./types/native_bindings.js";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,

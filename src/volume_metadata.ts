@@ -10,10 +10,6 @@ import {
   mountEntryToPartialVolumeMetadata,
 } from "./linux/mtab.js";
 import { MountPoint, getVolumeMountPoints } from "./mount_point.js";
-import {
-  GetVolumeMetadataOptions,
-  NativeBindingsFn,
-} from "./native_bindings.js";
 import { compactValues } from "./object.js";
 import {
   IncludeSystemVolumesDefault,
@@ -29,6 +25,10 @@ import {
 } from "./remote_info.js";
 import { isBlank, isNotBlank } from "./string.js";
 import { assignSystemVolume } from "./system_volume.js";
+import {
+  GetVolumeMetadataOptions,
+  NativeBindingsFn,
+} from "./types/native_bindings.js";
 import { parseUNCPath } from "./unc.js";
 import { extractUUID } from "./uuid.js";
 import {
@@ -294,3 +294,5 @@ export async function getAllVolumeMetadata(
         }) as VolumeMetadata,
   );
 }
+
+export const _ = undefined;

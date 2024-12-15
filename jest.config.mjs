@@ -11,10 +11,10 @@ const config = {
   displayName: "@photostructure/fs-metadata",
   testEnvironment: "jest-environment-node",
   roots: ["<rootDir>/src"],
+  coverageProvider: "v8",
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
-  // setupFiles: ["<rootDir>/.jest-setup.mjs"],
   transform: {
     "^.+\\.tsx?$": [
       "ts-jest",
@@ -30,10 +30,12 @@ const config = {
     argv.includes("--coverage") && !argv.includes("--no-coverage"),
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
+  collectCoverageFrom: ["src/**/*.ts"],
   coveragePathIgnorePatterns: [
     "debuglog",
     "\\.test\\.ts$",
     "/test-utils/",
+    "/types/",
     ...otherPlatforms,
   ],
   coverageThreshold: {
@@ -45,10 +47,10 @@ const config = {
     // gives us a little wiggle room
 
     global: {
-      statements: 80,
-      branches: 75,
-      functions: 90,
-      lines: 80,
+      statements: 90,
+      branches: 80,
+      functions: 95,
+      lines: 90,
     },
   },
   verbose: true,

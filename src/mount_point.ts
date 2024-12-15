@@ -4,7 +4,6 @@ import { uniqBy } from "./array.js";
 import { mapConcurrent, withTimeout } from "./async.js";
 import { debug } from "./debuglog.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
-import { NativeBindingsFn } from "./native_bindings.js";
 import { isObject } from "./object.js";
 import { Options } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
@@ -15,10 +14,13 @@ import {
   toNotBlank,
 } from "./string.js";
 import { assignSystemVolume, SystemVolumeConfig } from "./system_volume.js";
+import { NativeBindingsFn } from "./types/native_bindings.js";
 import { directoryStatus, VolumeHealthStatus } from "./volume_health_status.js";
 
 /**
  * A mount point is a location in the file system where a volume is mounted.
+ *
+ * @see https://en.wikipedia.org/wiki/Mount_(computing)
  */
 export interface MountPoint {
   /**
