@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
+#include <string>
 #include <string_view>
 
 namespace FSMeta {
