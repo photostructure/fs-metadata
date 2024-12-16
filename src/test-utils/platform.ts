@@ -19,7 +19,9 @@ export function describePlatform(...supported: NodeJS.Platform[]) {
 
 export function systemDrive() {
   if (isWindows) {
-    return normalizePath(toNotBlank(env["SystemDrive"] ?? "") ?? "C:\\") as string;
+    return normalizePath(
+      toNotBlank(env["SystemDrive"] ?? "") ?? "C:\\",
+    ) as string;
   } else {
     return "/";
   }
