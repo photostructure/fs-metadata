@@ -64,7 +64,7 @@ export interface MountPoint {
    * If there are non-critical errors while extracting metadata, those errors
    * may be added to this field.
    */
-  error?: string;
+  error?: Error | string;
 }
 
 export function isMountPoint(obj: unknown): obj is MountPoint {

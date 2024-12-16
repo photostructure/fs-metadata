@@ -82,11 +82,6 @@ export interface VolumeMetadata extends RemoteInfo, MountPoint {
    * volume serial number, rendered in lowercase hexadecimal.
    */
   uuid?: string;
-
-  /**
-   * If there are issues retrieving metadata, this will contain the error.
-   */
-  error?: Error;
 }
 
 export async function getVolumeMetadata(
