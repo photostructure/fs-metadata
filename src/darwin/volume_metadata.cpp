@@ -160,6 +160,16 @@ private:
   void GetDiskArbitrationInfo() {
     DEBUG_LOG("[GetVolumeMetadataWorker] Getting Disk Arbitration info for: %s",
               mountPoint.c_str());
+
+    // Check if this is a network filesystem
+    if (metadata.fstype == "smbfs" || metadata.fstype == "nfs" ||
+        metadata.fstype == "afpfs" || metadata.fstype == "webdav") {
+      // For network filesystems, we consider them healthy even without DA info
+      metadata.remote = true;
+      metadata.status = "healthy";
+      return;
+    }
+
     CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
     if (!session.isValid()) {
       DEBUG_LOG("[GetVolumeMetadataWorker] Failed to create DA session");
@@ -249,19 +259,25 @@ private:
     DEBUG_LOG("[GetVolumeMetadataWorker] Processing network volume");
     CFBooleanRef isNetworkVolume = (CFBooleanRef)CFDictionaryGetValue(
         description, kDADiskDescriptionVolumeNetworkKey);
-
     metadata.remote = CFBooleanGetValue(isNetworkVolume);
+
     CFURLRef url = (CFURLRef)CFDictionaryGetValue(
         description, kDADiskDescriptionVolumePathKey);
     if (!url) {
+      metadata.error = "Invalid URL";
+      return;
+    }
+    CFReleaser<CFStringRef> urlString(
+        CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle));
+    if (!urlString.isValid()) {
+      metadata.error = std::string("Invalid URL string: ") +
+                       CFStringToString(urlString.get());
       return;
     }
 
-    CFStringRef urlString = CFURLGetString(url);
-    if (!urlString) {
-      return;
-    }
-    metadata.uri = CFStringToString(urlString);
+    DEBUG_LOG("[GetVolumeMetadataWorker] URL path: %s",
+              CFStringToString(urlString.get()).c_str());
+    metadata.uri = CFStringToString(urlString.get());
   }
 };
 
