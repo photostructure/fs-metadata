@@ -67,7 +67,7 @@ jobs:
         with:
           platforms: linux/arm64
       - run: sudo apt-get update
-      - run: sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev
+      - run: sudo apt-get install -y build-essential libstdc++-dev libglib2.0-dev libblkid-dev uuid-dev
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
