@@ -36,10 +36,10 @@ export type VolumeHealthStatus = StringEnumKeys<typeof VolumeHealthStatuses>;
 export async function directoryStatus(
   dir: string,
   timeoutMs: number,
-  test: typeof canReaddir = canReaddir,
+  canReaddirImpl: typeof canReaddir = canReaddir,
 ): Promise<{ status: VolumeHealthStatus; error?: Error }> {
   try {
-    if (await test(dir, timeoutMs)) {
+    if (await canReaddirImpl(dir, timeoutMs)) {
       return { status: VolumeHealthStatuses.healthy };
     }
   } catch (error) {

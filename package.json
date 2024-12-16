@@ -50,7 +50,7 @@
     "tests": "run-s lint test test:memory",
     "test": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --coverage",
     "// test:memory:todo": "set up valgrind or similar",
-    "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --no-coverage src/__tests__/memory.test.ts",
+    "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --no-coverage src/memory.test.ts",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "fmt": "run-p fmt:*",

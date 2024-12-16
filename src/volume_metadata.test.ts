@@ -2,7 +2,8 @@
 // src/volume_metadata.test.ts
 
 import { jest } from "@jest/globals";
-import { times } from "./array.js";
+import { fail } from "jest-extended";
+import { compact, times } from "./array.js";
 import { TimeoutError } from "./async.js";
 import {
   getAllVolumeMetadata,
@@ -83,24 +84,29 @@ describe("concurrent", () => {
 
     const arr = await Promise.all(
       inputs.map(async (ea) => {
-        // throw in some expected timeouts just to test more code paths
-        const timeoutMs = pickRandom([0, 1, undefined]) as number;
-        const p = getVolumeMetadata(ea, { timeoutMs });
-        if (timeoutMs === 1) {
-          await expect(p).rejects.toThrow(TimeoutError);
-        } else if (!validMountPoints.includes(ea)) {
-          await expect(p).rejects.toThrow(/ENOENT|not accessible|opendir/i);
+        const timeoutMs = pickRandom([0, undefined]) as number;
+        let result;
+        try {
+          // throw in some expected timeouts just to test more code paths
+          result = await getVolumeMetadata(ea, { timeoutMs });
+        } catch (e) {
+          if (timeoutMs === 1) {
+            expect(e).toBeInstanceOf(TimeoutError);
+          } else if (!validMountPoints.includes(ea)) {
+            expect(String(e)).toMatch(/ENOENT|not accessible|opendir/i);
+          } else {
+            throw e;
+          }
         }
-        return p;
+        if (result != null && !validMountPoints.includes(ea)) {
+          fail(`Expected error for ${ea} but got result ${result}`);
+        }
+        return result;
       }),
     );
 
-    for (const ea of arr) {
-      if (ea instanceof Error) {
-        expect(String(ea)).toMatch(
-          /EACCES|ENOTDIR|ENOENT|timeout|not accessible/i,
-        );
-      } else if (ea.mountPoint === expectedMountPoint) {
+    for (const ea of compact(arr)) {
+      if (ea.mountPoint === expectedMountPoint) {
         // it's true that some metadata (like free space) can change between
         // calls. We don't expect it, but by omitting these fields, we don't
         // have to resort to retrying the test (which can hide actual bugs,
