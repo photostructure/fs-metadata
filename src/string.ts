@@ -22,7 +22,7 @@ export function isBlank(input: unknown): input is undefined {
   return !isNotBlank(input);
 }
 
-export function toNotBlank(input: string): string | undefined {
+export function toNotBlank(input: unknown): string | undefined {
   return isNotBlank(input) ? input : undefined;
 }
 

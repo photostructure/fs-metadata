@@ -136,7 +136,8 @@ async function _getVolumeMountPoints(
     fn: async (mp) => {
       assignSystemVolume(mp, o);
 
-      if (isBlank(mp.status)) {
+      if ((toNotBlank(mp.status) ?? "healthy") === "healthy") {
+        // trust but verify
         debug("[getVolumeMountPoints] checking status of %s", mp.mountPoint);
         mp.status = (await directoryStatus(mp.mountPoint, o.timeoutMs)).status;
         debug(
