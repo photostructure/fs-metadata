@@ -57,7 +57,8 @@ export async function withTimeout<T>(opts: {
     return opts.promise;
   }
 
-  // Create error with proper stack trace
+  // Create error here to captured the caller's stack trace. If we create it in
+  // the timeout callback, the stack trace will be truncated to this function.
   const timeoutError = new TimeoutError(
     `${desc}: timeout after ${timeoutMs}ms`,
   );
