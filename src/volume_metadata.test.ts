@@ -62,7 +62,7 @@ describe("concurrent", () => {
 
   it("should handle concurrent getVolumeMetadata() calls", async () => {
     const mountPoints = await getVolumeMountPoints();
-    const expectedMountPoint = mountPoints[0]!.mountPoint;
+    const expectedMountPoint = systemDrive();
     const expected = await getVolumeMetadata(expectedMountPoint);
 
     const validMountPoints = mountPoints
