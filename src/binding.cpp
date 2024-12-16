@@ -12,7 +12,8 @@
 #elif defined(__linux__)
 #include "common/volume_metadata.h"
 #ifdef ENABLE_GIO
-#include "linux/gio_utils.h"
+#include "linux/gio_mount_points.h"
+#include "linux/gio_volume_metadata.h"
 #endif
 #endif
 

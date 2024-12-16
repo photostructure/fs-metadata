@@ -8,7 +8,7 @@
 #include <sys/statvfs.h>
 
 #ifdef ENABLE_GIO
-#include "gio_utils.h"
+#include "gio_volume_metadata.h"
 #endif
 
 namespace FSMeta {

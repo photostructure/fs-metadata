@@ -42,7 +42,8 @@
                 {
                   "sources": [
                     "src/linux/gio_utils.cpp",
-                    "src/linux/gio_worker.cpp"
+                    "src/linux/gio_mount_points.cpp",
+                    "src/linux/gio_volume_metadata.cpp"
                   ],
                   "defines": [
                     "ENABLE_GIO=1"

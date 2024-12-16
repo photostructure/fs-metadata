@@ -1,4 +1,4 @@
-// src/linux/gio_worker.h
+// src/linux/gio_mount_points.h
 
 #pragma once
 
@@ -11,6 +11,11 @@
 
 namespace FSMeta {
 namespace gio {
+
+/**
+ * Get mount points asynchronously using GIO
+ */
+Napi::Value GetMountPoints(Napi::Env env);
 
 class GioMountPointsWorker : public Napi::AsyncWorker {
 public:
