@@ -4,7 +4,7 @@ import { uniqBy } from "./array.js";
 import { mapConcurrent, withTimeout } from "./async.js";
 import { debug } from "./debuglog.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
-import { isObject } from "./object.js";
+import { compactValues, isObject } from "./object.js";
 import { Options } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
 import {
@@ -110,9 +110,12 @@ async function _getVolumeMountPoints(
     : getLinuxMountPoints(nativeFn, o));
 
   debug("[getVolumeMountPoints] raw mount points: %o", result);
+  const compacted = result
+    .map((ea) => compactValues(ea) as MountPoint)
+    .filter((ea) => isNotBlank(ea.mountPoint));
   const filtered = o.includeSystemVolumes
-    ? result
-    : result.filter((ea) => !ea.isSystemVolume);
+    ? compacted
+    : compacted.filter((ea) => !ea.isSystemVolume);
   const uniq = uniqBy(filtered, (ea) => toNotBlank(ea.mountPoint));
   debug("[getVolumeMountPoints] found %d unique mount points", uniq.length);
   const results = sortObjectsByLocale(uniq, (ea) => ea.mountPoint);
