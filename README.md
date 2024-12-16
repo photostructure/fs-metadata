@@ -1,6 +1,6 @@
 # @photostructure/fs-metadata
 
-A cross-platform native Node.js module for retrieving filesystem metadata including mount points, volume information, and space utilization statistics.
+A cross-platform native Node.js module for retrieving filesystem metadata, including mount points, volume information, and space utilization statistics.
 
 Built and supported by [PhotoStructure](https://photostructure.com).
 
@@ -13,19 +13,32 @@ Built and supported by [PhotoStructure](https://photostructure.com).
 
 ## Features
 
-- List all mounted volumes/drives on the system
-- Get detailed volume metadata including:
-  - Total size, used space, and available space
-  - Filesystem type and volume label
-  - Volume UUID (when available)
-  - Remote/network share information
 - Cross-platform support:
-  - Windows (x64, arm64)
-  - macOS (x64, arm64)
-  - Linux (x64, arm64) (including Gnome GIO/`GVfs` mounts, if available)
-- Written in modern TypeScript with full type definitions
-- Native async implementations avoid blocking the event loop
-- Support for both ESM and CJS consumers
+  - Windows 10+ (x64, arm64)
+  - macOS 14+ (x64, arm64)
+  - Ubuntu 22+ (x64, arm64) (with Gnome GIO/`GVfs` mount support when available)
+
+- [List all mounted volumes/drives](https://photostructure.github.io/fs-metadata/functions/getVolumeMountPoints.html)
+
+- [Get detailed volume metadata](https://photostructure.github.io/fs-metadata/functions/getVolumeMetadata.html)
+
+- File and directory hidden attribute support:
+  - [Get](https://photostructure.github.io/fs-metadata/functions/isHidden.html) and [set](https://photostructure.github.io/fs-metadata/functions/setHidden.html) hidden attributes
+  - POSIX-style support (macOS and Linux)
+  - Filesystem metadata support (macOS and Windows)
+  - [Recursive hidden checks](https://photostructure.github.io/fs-metadata/functions/isHiddenRecursive.html)
+  - [Hidden metadata queries](https://photostructure.github.io/fs-metadata/functions/getHiddenMetadata.html)
+
+- ESM and CJS support
+
+- Full TypeScript type definitions
+
+- Non-blocking async native implementations
+
+- Timeout handling for wedged network volumes
+
+- Compatible with all current Node.js and Electron versions via [Node-API v9](https://nodejs.org/api/n-api.html#node-api) and [prebuildify](https://github.com/prebuild/prebuildify)
+
 - Comprehensive test coverage
 
 ## Installation
@@ -45,13 +58,10 @@ import {
 // List all mounted volumes
 const mountPoints = await getVolumeMountPoints();
 console.dir({ mountPoints });
-// Example output: ['C:\\', 'D:\\'] on Windows
-// Example output: ['/', '/home', '/Users'] on Unix-like systems
 
 // Get metadata for a specific volume
-const metadata = await getVolumeMetadata("C:\\"); // Windows
-// Or for Unix-like systems:
-// const metadata = await getVolumeMetadata('/');
+const volumeMetadata = await getVolumeMetadata(mountPoints[0]);
+console.dir({ volumeMetadata });
 ```
 
 If you're using CommonJS:
@@ -62,7 +72,8 @@ const {
   getVolumeMetadata,
 } = require("@photostructure/fs-metadata");
 
-// Usage is the same as the ESM example above
+// Usage is the same as the ESM example above 
+// (except of course no top-level awaits!)
 ```
 
 ## API
@@ -71,50 +82,28 @@ const {
 
 ## Options
 
-### Debug logging
+### Debug Logging
 
-Set the environment variable `NODE_DEBUG=fs-meta` or `NODE_DEBUG=photostructure:fs-metadata`. We query the native [debuglog](https://nodejs.org/api/util.html#utildebuglogsection-callback) to see if debug logging is enabled. Debug messages from both the javascript and native sides will be emitted to `stderr`.
+Set `NODE_DEBUG=fs-meta` or `NODE_DEBUG=photostructure:fs-metadata`. The native [debuglog](https://nodejs.org/api/util.html#utildebuglogsection-callback) determines if debug logging is enabled. Debug messages from both JavaScript and native code are sent to `stderr`.
 
 ### Timeouts
 
-There is a [default
-timeout](https://photostructure.github.io/fs-metadata/variables/TimeoutMsDefault.html)
-applied to all operations. This may not be sufficient for some OSes and
-volumes--especially powered-down optical drives (which may take 10s of seconds
-to wake up).
+Operations use a [default timeout](https://photostructure.github.io/fs-metadata/variables/TimeoutMsDefault.html), which may need adjustment for slower devices like optical drives (which can take 30+ seconds to spin up).
 
-Windows is notorious for blocking system calls if remote filesystems are in an
-unhealthy state due to the host machine being down or any network glitches. To
-combat this, we spin a thread per mountpoint request to determine the current
-health status of a given volume. Although this is certainly more expensive than
-making the call in the async N-API thread, this gives us the ability to reliably
-timeout operations that would normally hang for an arbitrary amount of time
-(between 20 seconds and a minute, in local testing).
+Windows can block system calls when remote filesystems are unhealthy due to host downtime or network issues. To handle this, we use a separate thread per mountpoint to check volume health status. While this approach uses more resources than the async N-API thread, it enables reliable timeouts for operations that would otherwise hang indefinitely.
 
-Note that the timeout duration may be applied per-operation or per-syscall, depending on the cross-platform implementation.
+Timeout duration may apply per-operation or per-system call, depending on the implementation.
 
-### System volumes
+### System Volumes
 
-Windows, Linux and macOS entertain volume mountpoints that are really only for
-system use.
+Each platform handles system volumes differently:
 
-Windows has explicit, available metadata to denote a volume as a "system" or
-"reserved" device -- but `C:\`, as it typically hosts `C:\Windows`, is both a
-"system" volume as well as typically where user storage resides.
+- Windows provides explicit metadata for "system" or "reserved" devices, though `C:\` is both a system volume and typical user storage
+- Linux and macOS include various system-only mountpoints: pseudo devices, snap loopback devices, virtual memory partitions, and recovery partitions
 
-On Linux and macOS, there are a litany of mountpoints that are for system-use
-only: pseudo devices, snap loopback devices, virtual memory partitions, recovery
-partitions, etcetera.
+This library uses heuristics to identify system volumes. See [Options](https://photostructure.github.io/fs-metadata/interfaces/Options.html) for default values and customization.
 
-This library contains a set of heuristics to try to mark these partitions as a
-"system" volume, so you can skip over those devices easier. Refer to the
-[Options](https://photostructure.github.io/fs-metadata/interfaces/Options.html)
-documentation for default values and how to customize these patterns.
-
-Note that
-[`getAllVolumeMetadata()`](https://photostructure.github.io/fs-metadata/functions/getAllVolumeMetadata.html)
-defaults to returning all volumes on Windows, and only non-system volumes
-everywhere else.
+Note: [`getAllVolumeMetadata()`](https://photostructure.github.io/fs-metadata/functions/getAllVolumeMetadata.html) returns all volumes on Windows but only non-system volumes elsewhere by default.
 
 ## Platform-Specific Behaviors
 
@@ -180,10 +169,9 @@ keep in mind:
 ## Building from Source
 
 Requirements:
-
-- Supported Node.js version
+- Node.js (supported version)
 - Python 3
-- C++ build tools:
+- Platform-specific C++ build tools:
   - Windows: Visual Studio Build Tools
   - macOS: Xcode Command Line Tools
   - Linux: GCC and development headers
