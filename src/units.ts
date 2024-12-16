@@ -18,7 +18,6 @@ export const MiB = 1024 * KiB;
  */
 export const GiB = 1024 * MiB;
 
-
 export function fmtBytes(bytes: number): string {
   if (bytes < KiB) {
     return `${bytes} B`;
