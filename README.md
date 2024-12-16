@@ -166,27 +166,7 @@ keep in mind:
 - Optional GIO integration for additional metadata
 - Backfills with `lsblk` metadata if native code fails
 
-## Building from Source
-
-Requirements:
-- Node.js (supported version)
-- Python 3
-- Platform-specific C++ build tools:
-  - Windows: Visual Studio Build Tools
-  - macOS: Xcode Command Line Tools
-  - Linux: GCC and development headers
-
 ## License
 
 MIT
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major
-changes, please open an issue first to discuss what you would like to change.
-
-Please make sure to update tests and documentation as appropriate.
-
-## Security
-
-If you discover a security vulnerability, please send an email to [security@photostructure.com](mailto:security@photostructure.com)
