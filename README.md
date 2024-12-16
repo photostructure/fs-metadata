@@ -168,5 +168,12 @@ keep in mind:
 
 ## License
 
-MIT
+[MIT](https://github.com/photostructure/fs-metadata/blob/main/LICENSE.txt)
 
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/photostructure/fs-metadata/blob/main/CONTRIBUTING.md) on GitHub.
+
+## Security
+
+See [SECURITY.md](https://github.com/photostructure/fs-metadata/blob/main/SECURITY.md) on GitHub.
