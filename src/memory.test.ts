@@ -56,7 +56,7 @@ describeMemory("Memory Tests", () => {
       if (i % Math.floor(iterations / 5) === 0) {
         const currentMemory = await getMemoryUsage();
         console.log(
-          `Memory after iteration ${i}: ${fmtBytes(currentMemory)} (delta: ${fmtBytes(currentMemory - initialMemory)})`,
+          `Memory after iteration ${i}: ${fmtBytes(currentMemory)} (diff: ${fmtBytes(currentMemory - initialMemory)})`,
         );
         // Allow some variance but fail on large increases
         expect(currentMemory - initialMemory).toBeLessThan(errorMarginBytes);
@@ -65,10 +65,11 @@ describeMemory("Memory Tests", () => {
 
     // Final memory check
     const finalMemory = await getMemoryUsage();
-    console.log(`Initial memory: ${fmtBytes(initialMemory)}`);
-    console.log(`Final memory: ${fmtBytes(finalMemory)}`);
-    console.log(`Difference: ${fmtBytes(finalMemory - initialMemory)}`);
-
+    console.dir({
+      initial: fmtBytes(initialMemory),
+      final: fmtBytes(finalMemory),
+      diff: fmtBytes(finalMemory - initialMemory),
+    });
     expect(finalMemory - initialMemory).toBeLessThan(errorMarginBytes);
   }
 
