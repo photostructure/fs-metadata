@@ -12,11 +12,10 @@ import {
   isHidden,
   setHidden,
 } from "./index.js";
-import { isMacOS } from "./platform.js";
 import { randomLetters } from "./random.js";
 import { validateHidden } from "./test-utils/hidden-tests.js";
 import { tmpDirNotHidden } from "./test-utils/platform.js";
-import { MiB } from "./units.js";
+import { fmtBytes, MiB } from "./units.js";
 
 // Enable garbage collection access
 declare const global: {
@@ -32,17 +31,22 @@ describeMemory("Memory Tests", () => {
   const iterations = 200;
 
   // Helper to get memory usage after GC
-  function getMemoryUsage(): number {
+  async function getMemoryUsage(): Promise<number> {
+    await delay(100);
     global.gc();
+    await delay(100);
     return process.memoryUsage().heapUsed;
   }
 
   // Helper to check if memory usage is stable
   async function checkMemoryUsage(
     operation: () => Promise<unknown>,
-    errorMarginBytes: number = (isMacOS ? 7 : 5) * MiB,
+    errorMarginBytes: number = 5 * MiB,
   ) {
-    const initialMemory = getMemoryUsage();
+    // warm up memory consumption:
+    await operation();
+    // __then__ take a snapshot
+    const initialMemory = await getMemoryUsage();
 
     // Run operations
     for (let i = 0; i < iterations; i++) {
@@ -50,19 +54,20 @@ describeMemory("Memory Tests", () => {
 
       // Check every 10 iterations
       if (i % Math.floor(iterations / 5) === 0) {
-        await delay(1); // < Allow GC to settle
-        const currentMemory = getMemoryUsage();
-        console.log(`Memory after iteration ${i}: ${currentMemory} bytes`);
+        const currentMemory = await getMemoryUsage();
+        console.log(
+          `Memory after iteration ${i}: ${fmtBytes(currentMemory)} (delta: ${fmtBytes(currentMemory - initialMemory)})`,
+        );
         // Allow some variance but fail on large increases
         expect(currentMemory - initialMemory).toBeLessThan(errorMarginBytes);
       }
     }
 
     // Final memory check
-    const finalMemory = getMemoryUsage();
-    console.log(`Initial memory: ${initialMemory} bytes`);
-    console.log(`Final memory: ${finalMemory} bytes`);
-    console.log(`Difference: ${finalMemory - initialMemory} bytes`);
+    const finalMemory = await getMemoryUsage();
+    console.log(`Initial memory: ${fmtBytes(initialMemory)}`);
+    console.log(`Final memory: ${fmtBytes(finalMemory)}`);
+    console.log(`Difference: ${fmtBytes(finalMemory - initialMemory)}`);
 
     expect(finalMemory - initialMemory).toBeLessThan(errorMarginBytes);
   }
