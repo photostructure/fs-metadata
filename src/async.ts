@@ -64,23 +64,26 @@ export async function withTimeout<T>(opts: {
   );
 
   if (env["NODE_ENV"] === "test" && timeoutMs === 1) {
+    timeoutError.message += "(timeout test)";
+    opts.promise.catch(() => {}); // < avoid unhandled rejection warnings
     throw timeoutError;
   }
 
   let timeoutId: NodeJS.Timeout | undefined;
 
   opts.promise
+    .catch(() => {}) // < avoid unhandled rejection warnings
     .finally(() => {
       if (timeoutId != null) {
         clearTimeout(timeoutId);
         timeoutId = undefined;
       }
-    })
-    .catch(() => {});
+    });
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
       if (timeoutId != null) {
+        timeoutError.message += "(timeout callback)";
         reject(timeoutError);
       }
       timeoutId = undefined;
