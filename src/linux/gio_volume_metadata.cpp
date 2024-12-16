@@ -13,7 +13,8 @@ namespace FSMeta {
 namespace gio {
 
 void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
-  DEBUG_LOG("[GIO] getting mount metadata for %s", mountPoint.c_str());
+  DEBUG_LOG("[gio::addMountMetadata] getting mount metadata for %s",
+            mountPoint.c_str());
 
   MountIterator::forEachMount([&](GMount *mount, GFile *root) {
     GCharPtr path(g_file_get_path(root));
@@ -22,7 +23,8 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
     }
 
     // Found matching mount point
-    DEBUG_LOG("[GIO] found matching mount point: %s", path.get());
+    DEBUG_LOG("[gio::addMountMetadata] found matching mount point: %s",
+              path.get());
 
     // Get volume information
     GObjectPtr<GVolume> volume(g_mount_get_volume(mount));
@@ -71,7 +73,7 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
         GCharPtr unix_device(g_drive_get_identifier(
             drive.get(), G_DRIVE_IDENTIFIER_KIND_UNIX_DEVICE));
         if (unix_device) {
-          DEBUG_LOG("[GIO addMountMetadata] {mountPoint: %s, mountFrom: %s}",
+          DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, mountFrom: %s}",
                     path.get(), unix_device.get());
           metadata.mountFrom = unix_device.get();
         }

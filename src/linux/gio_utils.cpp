@@ -15,7 +15,7 @@ namespace gio {
 GVolumeMonitor *MountIterator::getMonitor() {
   GVolumeMonitor *monitor = g_volume_monitor_get();
   if (!monitor) {
-    DEBUG_LOG("[GIO] failed to get volume monitor");
+    DEBUG_LOG("[gio::getMonitor] g_volume_monitor_get() failed");
     throw std::runtime_error("Failed to get GVolumeMonitor");
   }
   return monitor;
@@ -25,7 +25,7 @@ void MountIterator::forEachMount(const MountCallback &callback) {
   GList *mounts = g_volume_monitor_get_mounts(getMonitor());
 
   if (!mounts) {
-    DEBUG_LOG("[GIO] no mounts found");
+    DEBUG_LOG("[gio::MountIterator::forEachMount] no mounts found");
     return;
   }
 
@@ -34,7 +34,7 @@ void MountIterator::forEachMount(const MountCallback &callback) {
     GMount *mount = G_MOUNT(l->data);
 
     if (!G_IS_MOUNT(mount)) {
-      DEBUG_LOG("[GIO] Skipping invalid mount");
+      DEBUG_LOG("[gio::MountIterator::forEachMount] Skipping invalid mount");
       continue;
     }
 
@@ -50,7 +50,7 @@ void MountIterator::forEachMount(const MountCallback &callback) {
         break;
       }
     } else {
-      DEBUG_LOG("[GIO] Invalid root file object");
+      DEBUG_LOG("[gio::MountIterator::forEachMount] Invalid root file object");
       g_object_unref(mount);
     }
   }

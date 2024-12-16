@@ -1,5 +1,6 @@
 // src/darwin/volume_metadata.cpp
 
+#include "../common/debug_log.h"
 #include "./fs_meta.h"
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -92,12 +93,15 @@ public:
       : MetadataWorkerBase(mountPoint, deferred), options_(options) {}
 
   void Execute() override {
+    DEBUG_LOG("[GetVolumeMetadataWorker] Executing for mount point: %s",
+              mountPoint.c_str());
     try {
       if (!GetBasicVolumeInfo()) {
         return;
       }
       GetDiskArbitrationInfo();
     } catch (const std::exception &e) {
+      DEBUG_LOG("[GetVolumeMetadataWorker] Exception: %s", e.what());
       SetError(e.what());
     }
   }
@@ -106,15 +110,21 @@ private:
   VolumeMetadataOptions options_;
 
   bool GetBasicVolumeInfo() {
+    DEBUG_LOG("[GetVolumeMetadataWorker] Getting basic volume info for: %s",
+              mountPoint.c_str());
     struct statvfs vfs;
     struct statfs fs;
 
     if (statvfs(mountPoint.c_str(), &vfs) != 0) {
+      DEBUG_LOG("[GetVolumeMetadataWorker] statvfs failed: %s (%d)",
+                strerror(errno), errno);
       SetError(CreateErrorMessage("statvfs", errno));
       return false;
     }
 
     if (statfs(mountPoint.c_str(), &fs) != 0) {
+      DEBUG_LOG("[GetVolumeMetadataWorker] statfs failed: %s (%d)",
+                strerror(errno), errno);
       SetError(CreateErrorMessage("statfs", errno));
       return false;
     }
@@ -141,12 +151,18 @@ private:
     metadata.mountName = fs.f_mntonname;
     metadata.status = "ready";
 
+    DEBUG_LOG("[GetVolumeMetadataWorker] Volume info - size: %f, available: "
+              "%f, used: %f",
+              metadata.size, metadata.available, metadata.used);
     return true;
   }
 
   void GetDiskArbitrationInfo() {
+    DEBUG_LOG("[GetVolumeMetadataWorker] Getting Disk Arbitration info for: %s",
+              mountPoint.c_str());
     CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
     if (!session.isValid()) {
+      DEBUG_LOG("[GetVolumeMetadataWorker] Failed to create DA session");
       metadata.status = "partial";
       metadata.error = "Failed to create DA session";
       return;
@@ -173,6 +189,7 @@ private:
           kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
 
       if (!disk.isValid()) {
+        DEBUG_LOG("[GetVolumeMetadataWorker] Failed to create disk reference");
         metadata.status = "partial";
         metadata.error = "Failed to create disk reference";
         return;
@@ -181,6 +198,7 @@ private:
       CFReleaser<CFDictionaryRef> description(
           DADiskCopyDescription(disk.get()));
       if (!description.isValid()) {
+        DEBUG_LOG("[GetVolumeMetadataWorker] Failed to get disk description");
         metadata.status = "partial";
         metadata.error = "Failed to get disk description";
         return;
@@ -193,13 +211,16 @@ private:
         metadata.status = "healthy";
       }
     } catch (const std::exception &e) {
+      DEBUG_LOG("[GetVolumeMetadataWorker] Exception: %s", e.what());
       metadata.status = "error";
       metadata.error = e.what();
     }
   }
 
   void ProcessDiskDescription(CFDictionaryRef description) {
+    DEBUG_LOG("[GetVolumeMetadataWorker] Processing disk description");
     if (!description) {
+      DEBUG_LOG("[GetVolumeMetadataWorker] Invalid disk description");
       metadata.status = "partial";
       metadata.error = "Invalid disk description";
       return;
@@ -225,6 +246,7 @@ private:
   }
 
   void ProcessNetworkVolume(CFDictionaryRef description) {
+    DEBUG_LOG("[GetVolumeMetadataWorker] Processing network volume");
     CFBooleanRef isNetworkVolume = (CFBooleanRef)CFDictionaryGetValue(
         description, kDADiskDescriptionVolumeNetworkKey);
 
@@ -245,6 +267,7 @@ private:
 
 Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
   auto env = info.Env();
+  DEBUG_LOG("[GetVolumeMetadata] called");
 
   VolumeMetadataOptions options;
   if (info.Length() > 0 && info[0].IsObject()) {
