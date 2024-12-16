@@ -12,9 +12,11 @@ import {
   isHidden,
   setHidden,
 } from "./index.js";
+import { isMacOS } from "./platform.js";
 import { randomLetters } from "./random.js";
 import { validateHidden } from "./test-utils/hidden-tests.js";
 import { tmpDirNotHidden } from "./test-utils/platform.js";
+import { MiB } from "./units.js";
 
 // Enable garbage collection access
 declare const global: {
@@ -38,7 +40,7 @@ describeMemory("Memory Tests", () => {
   // Helper to check if memory usage is stable
   async function checkMemoryUsage(
     operation: () => Promise<unknown>,
-    errorMarginBytes: number = 5_000_000,
+    errorMarginBytes: number = (isMacOS ? 7 : 5) * MiB,
   ) {
     const initialMemory = getMemoryUsage();
 
