@@ -23,6 +23,7 @@ struct MountPoint {
   std::string fstype;
   std::string status;
   bool isSystemVolume = false; // Default to false
+  std::string error;
 
   Napi::Object ToObject(Napi::Env env) const {
     auto obj = Napi::Object::New(env);
@@ -37,6 +38,7 @@ struct MountPoint {
       obj.Set("status", status);
     }
     obj.Set("isSystemVolume", isSystemVolume);
+    obj.Set("error", error);
     return obj;
   }
 };

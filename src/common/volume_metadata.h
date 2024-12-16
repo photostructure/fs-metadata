@@ -46,6 +46,7 @@ struct VolumeMetadata {
   std::string remoteHost;
   std::string remoteShare;
   bool isSystemVolume = false;
+  std::string error;
 
   Napi::Object ToObject(Napi::Env env) const {
     auto result = Napi::Object::New(env);

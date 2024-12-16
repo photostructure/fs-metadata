@@ -59,6 +59,12 @@ export interface MountPoint {
    * @see {@link Options.systemPathPatterns} and {@link Options.systemFsTypes}
    */
   isSystemVolume?: boolean;
+  
+  /**
+   * If there are non-critical errors while extracting metadata, those errors
+   * may be added to this field.
+   */
+  error?: string
 }
 
 export function isMountPoint(obj: unknown): obj is MountPoint {

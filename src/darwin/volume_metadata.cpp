@@ -148,41 +148,63 @@ private:
     CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
     if (!session.isValid()) {
       metadata.status = "partial";
+      metadata.error = "Failed to create DA session";
       return;
     }
 
-    // Schedule session with RunLoop
-    DASessionScheduleWithRunLoop(session.get(), CFRunLoopGetCurrent(),
-                                 kCFRunLoopDefaultMode);
+    try {
+      // RAII cleanup for RunLoop scheduling
+      struct RunLoopCleaner {
+        DASessionRef session;
+        explicit RunLoopCleaner(DASessionRef s) : session(s) {}
+        ~RunLoopCleaner() {
+          DASessionUnscheduleFromRunLoop(session, CFRunLoopGetCurrent(),
+                                         kCFRunLoopDefaultMode);
+        }
+      };
 
-    // RAII cleanup for RunLoop scheduling
-    struct RunLoopCleaner {
-      DASessionRef session;
-      explicit RunLoopCleaner(DASessionRef s) : session(s) {}
-      ~RunLoopCleaner() {
-        DASessionUnscheduleFromRunLoop(session, CFRunLoopGetCurrent(),
-                                       kCFRunLoopDefaultMode);
+      // Schedule session with RunLoop
+      DASessionScheduleWithRunLoop(session.get(), CFRunLoopGetCurrent(),
+                                   kCFRunLoopDefaultMode);
+
+      auto scopeGuard = std::make_unique<RunLoopCleaner>(session.get());
+
+      CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
+          kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
+
+      if (!disk.isValid()) {
+        metadata.status = "partial";
+        metadata.error = "Failed to create disk reference";
+        return;
       }
-    } runLoopCleaner(session.get());
 
-    CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
-        kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
+      CFReleaser<CFDictionaryRef> description(
+          DADiskCopyDescription(disk.get()));
+      if (!description.isValid()) {
+        metadata.status = "partial";
+        metadata.error = "Failed to get disk description";
+        return;
+      }
 
-    if (!disk.isValid()) {
-      metadata.status = "partial";
-      return;
+      ProcessDiskDescription(description.get());
+
+      // Only set ready if we got this far without errors
+      if (metadata.status != "partial") {
+        metadata.status = "healthy";
+      }
+    } catch (const std::exception &e) {
+      metadata.status = "error";
+      metadata.error = e.what();
     }
-
-    CFReleaser<CFDictionaryRef> description(DADiskCopyDescription(disk.get()));
-    if (!description.isValid()) {
-      metadata.status = "partial";
-      return;
-    }
-
-    ProcessDiskDescription(description.get());
   }
 
   void ProcessDiskDescription(CFDictionaryRef description) {
+    if (!description) {
+      metadata.status = "partial";
+      metadata.error = "Invalid disk description";
+      return;
+    }
+
     // Get volume name/label
     if (CFStringRef volumeName = (CFStringRef)CFDictionaryGetValue(
             description, kDADiskDescriptionVolumeNameKey)) {

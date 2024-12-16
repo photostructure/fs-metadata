@@ -34,29 +34,44 @@ public:
         MountPoint mp;
         mp.mountPoint = mntbufp[i].f_mntonname;
         mp.fstype = mntbufp[i].f_fstypename;
+        mp.error = ""; // Initialize error field
 
-        // Wrap access check in async task with timeout
-        auto future = std::async(std::launch::async, [&mp]() {
-          return access(mp.mountPoint.c_str(), R_OK) == 0;
-        });
+        try {
+          // Use shared_future to allow multiple gets
+          std::shared_future<bool> future =
+              std::async(std::launch::async, [path = mp.mountPoint]() {
+                return access(path.c_str(), R_OK) == 0;
+              }).share();
 
-        // Wait with timeout for access check
-        if (future.wait_for(std::chrono::milliseconds(timeoutMs_)) ==
-            std::future_status::timeout) {
-          mp.status = "disconnected";
-        } else {
-          try {
-            bool isAccessible = future.get();
-            mp.status = isAccessible ? "healthy" : "inaccessible";
-          } catch (...) {
-            mp.status = "inaccessible";
+          auto status = future.wait_for(std::chrono::milliseconds(timeoutMs_));
+
+          if (status == std::future_status::timeout) {
+            mp.status = "disconnected";
+            mp.error = "Access check timed out";
+          } else if (status == std::future_status::ready) {
+            try {
+              bool isAccessible = future.get();
+              mp.status = isAccessible ? "healthy" : "inaccessible";
+              if (!isAccessible) {
+                mp.error = "Path is not accessible";
+              }
+            } catch (const std::exception &e) {
+              mp.status = "error";
+              mp.error = std::string("Access check failed: ") + e.what();
+            }
+          } else {
+            mp.status = "error";
+            mp.error = "Unexpected future status";
           }
+        } catch (const std::exception &e) {
+          mp.status = "error";
+          mp.error = std::string("Mount point check failed: ") + e.what();
         }
 
         mountPoints_.push_back(std::move(mp));
       }
     } catch (const std::exception &e) {
-      SetError(e.what());
+      SetError(std::string("Failed to process mount points: ") + e.what());
     }
   }
 
@@ -75,9 +90,6 @@ public:
 Napi::Promise GetVolumeMountPoints(const Napi::CallbackInfo &info) {
   auto env = info.Env();
   auto deferred = Napi::Promise::Deferred::New(env);
-
-  // Parse options if provided
-  uint32_t timeoutMs = 5000; // Default timeout
 
   MountPointOptions options;
   if (info.Length() > 0 && info[0].IsObject()) {
