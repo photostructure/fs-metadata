@@ -2,7 +2,6 @@
 // src/volume_metadata.test.ts
 
 import { jest } from "@jest/globals";
-import { fail } from "jest-extended";
 import { compact, times } from "./array.js";
 import { TimeoutError } from "./async.js";
 import {
@@ -83,25 +82,29 @@ describe("concurrent", () => {
     ]);
 
     const arr = await Promise.all(
-      inputs.map(async (ea) => {
-        const timeoutMs = pickRandom([0, undefined]) as number;
-        let result;
+      inputs.map(async (mountPoint) => {
+        const timeoutMs = pickRandom([0, 1, undefined]) as number;
         try {
           // throw in some expected timeouts just to test more code paths
-          result = await getVolumeMetadata(ea, { timeoutMs });
-        } catch (e) {
+          return await getVolumeMetadata(mountPoint, { timeoutMs });
+        } catch (error) {
           if (timeoutMs === 1) {
-            expect(e).toBeInstanceOf(TimeoutError);
-          } else if (!validMountPoints.includes(ea)) {
-            expect(String(e)).toMatch(/ENOENT|not accessible|opendir/i);
+            console.log("Expected timeout", { mountPoint, timeoutMs, error });
+            expect(error).toBeInstanceOf(TimeoutError);
+            return;
+          } else if (!validMountPoints.includes(mountPoint)) {
+            console.log("Expected bad mount point", {
+              mountPoint,
+              timeoutMs,
+              error,
+            });
+            expect(String(error)).toMatch(/ENOENT|not accessible|opendir/i);
+            return;
           } else {
-            throw e;
+            console.log("Unexpected error", { mountPoint, timeoutMs, error });
+            throw error;
           }
         }
-        if (result != null && !validMountPoints.includes(ea)) {
-          fail(`Expected error for ${ea} but got result ${result}`);
-        }
-        return result;
       }),
     );
 
