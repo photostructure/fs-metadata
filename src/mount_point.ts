@@ -7,12 +7,7 @@ import { getLinuxMountPoints } from "./linux/mount_points.js";
 import { compactValues, isObject } from "./object.js";
 import { Options } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
-import {
-  isBlank,
-  isNotBlank,
-  sortObjectsByLocale,
-  toNotBlank,
-} from "./string.js";
+import { isNotBlank, sortObjectsByLocale, toNotBlank } from "./string.js";
 import { assignSystemVolume, SystemVolumeConfig } from "./system_volume.js";
 import { NativeBindingsFn } from "./types/native_bindings.js";
 import { directoryStatus, VolumeHealthStatus } from "./volume_health_status.js";
