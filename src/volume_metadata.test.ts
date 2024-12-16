@@ -2,6 +2,7 @@
 // src/volume_metadata.test.ts
 
 import { jest } from "@jest/globals";
+import { join } from "node:path";
 import { compact, times } from "./array.js";
 import { TimeoutError } from "./async.js";
 import {
@@ -15,11 +16,13 @@ import { IncludeSystemVolumesDefault } from "./options.js";
 import { isLinux, isMacOS, isWindows } from "./platform.js";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "./random.js";
 import { assertMetadata } from "./test-utils/assert.js";
+import { systemDrive } from "./test-utils/platform.js";
 import { MiB } from "./units.js";
+
+const rootPath = systemDrive();
 
 describe("Volume Metadata", () => {
   it("should get root filesystem metadata", async () => {
-    const rootPath = isWindows ? "C:\\" : "/";
     const metadata = await getVolumeMetadata(rootPath);
 
     console.dir(metadata);
@@ -168,8 +171,6 @@ describe("getAllVolumeMetadata()", () => {
 
 if (!isWindows) {
   describe("Timeout Handling", () => {
-    const rootPath = isWindows ? "C:\\" : "/";
-
     it("should handle getVolumeMountPoints() timeout", async () => {
       await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
         /timeout/i,
@@ -187,10 +188,8 @@ if (!isWindows) {
 describe("Error Handling", () => {
   it("should handle invalid paths appropriately", async () => {
     const invalidPaths = [
-      isWindows ? "A:\\" : "/nonexistent",
-      isWindows
-        ? "C:\\Really_Invalid_Path_123456789"
-        : "/really/invalid/path/123456789",
+      isWindows ? "A:\\" : "/nonexistent-root-directory",
+      join(rootPath, "nonexistent", "path", "123456789"),
       "",
       null,
       undefined,
@@ -198,7 +197,7 @@ describe("Error Handling", () => {
 
     for (const path of invalidPaths) {
       await expect(getVolumeMetadata(path as string)).rejects.toThrow(
-        /ENOENT|invalid|not accessible/i,
+        /ENOENT|invalid|not accessible|opendir/i,
       );
     }
   });

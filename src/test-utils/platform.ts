@@ -4,6 +4,7 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { env, platform } from "node:process";
+import { normalizePath } from "../path.js";
 import { isMacOS, isWindows } from "../platform.js";
 import { toNotBlank } from "../string.js";
 
@@ -18,7 +19,7 @@ export function describePlatform(...supported: NodeJS.Platform[]) {
 
 export function systemDrive() {
   if (isWindows) {
-    return toNotBlank(env["SystemDrive"] ?? "") ?? "C:\\";
+    return normalizePath(toNotBlank(env["SystemDrive"] ?? "") ?? "C:\\") as string;
   } else {
     return "/";
   }
