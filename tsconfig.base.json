@@ -29,6 +29,6 @@
     "**/test-utils/*",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "src/**/*.cts"
+    "**/*.cts"
   ]
 }

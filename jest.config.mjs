@@ -56,7 +56,10 @@ const config = {
   verbose: true,
   silent: false,
   randomize: true,
-  setupFilesAfterEnv: ["jest-extended/all"],
+  setupFilesAfterEnv: [
+    "jest-extended/all",
+    "<rootDir>/src/test-utils/jest-matchers.ts"
+  ],
 };
 
 export default config;
