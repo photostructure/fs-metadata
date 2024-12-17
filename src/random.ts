@@ -31,7 +31,9 @@ export function shuffle<T>(a: T[]): T[] {
   }
   return a;
 }
-
-export function pickRandom<T>(a: T[]): T | undefined {
-  return a == null || a.length === 0 ? undefined : a[randomInt(0, a.length)];
+export function pickRandom<T>(a: T[]): T {
+  if (a == null || a.length === 0) {
+    throw new Error("Cannot pick from an empty array");
+  }
+  return a[randomInt(0, a.length)] as T;
 }
