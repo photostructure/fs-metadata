@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 // src/volume_metadata.test.ts
 
 import { jest } from "@jest/globals";
@@ -81,7 +80,7 @@ describe("concurrent", () => {
           ? randomLetter().toUpperCase() + ":\\"
           : "/" + randomLetters(12),
       ),
-      ...times(samples, () => pickRandom(mountPoints)!.mountPoint),
+      ...times(samples, () => pickRandom(mountPoints).mountPoint),
     ]);
 
     const arr = await Promise.all(
@@ -120,16 +119,14 @@ describe("concurrent", () => {
         expect(omit(ea, "available", "used")).toEqual(
           omit(expected, "available", "used"),
         );
-        // REMEMBER: NEVER USE toBeCloseTo -- the api is bonkers and only applicable for fractional numbers
-        const delta = 8 * MiB;
-        expect(ea.available).toBeWithin(
-          expected.available! - delta,
-          expected.available! + delta,
+        // REMEMBER: NEVER USE toBeCloseTo -- the api is bonkers and only
+        // applicable for fractional numbers
+        const delta = 12 * MiB; // GHA runners may differ by more than 8GB!
+        expect(ea.available).toBeWithinDelta(
+          expected.available as number,
+          delta,
         );
-        expect(ea.used).toBeWithin(
-          expected.used! - delta,
-          expected.used! + delta,
-        );
+        expect(ea.used).toBeWithinDelta(expected.used as number, delta);
       }
     }
   });
