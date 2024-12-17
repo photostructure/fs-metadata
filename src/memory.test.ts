@@ -17,6 +17,9 @@ import { validateHidden } from "./test-utils/hidden-tests.js";
 import { tmpDirNotHidden } from "./test-utils/platform.js";
 import { fmtBytes, MiB } from "./units.js";
 
+// THIS IS ALL A HORRIBLE HACK. THIS "test" SHOULD BE REPLACED WITH AN ACTUAL
+// MEMORY LEAK TESTER (like with valgrind). PULL REQUESTS ARE WELCOME.
+
 // Enable garbage collection access
 declare const global: {
   gc: () => void;
@@ -32,6 +35,7 @@ describeMemory("Memory Tests", () => {
 
   // Helper to get memory usage after GC
   async function getMemoryUsage(): Promise<number> {
+    // Give things a bit to fall out of scope. delay(1) should be enough.
     await delay(100);
     global.gc();
     await delay(100);
@@ -41,7 +45,7 @@ describeMemory("Memory Tests", () => {
   // Helper to check if memory usage is stable
   async function checkMemoryUsage(
     operation: () => Promise<unknown>,
-    errorMarginBytes: number = 5 * MiB,
+    errorMarginBytes: number = 6.5 * MiB, // Alpine docker had a 5MB variance
   ) {
     // warm up memory consumption:
     await operation();
