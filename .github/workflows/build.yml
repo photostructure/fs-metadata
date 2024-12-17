@@ -113,7 +113,7 @@ jobs:
 
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [test-matrix, test-ubuntu, test-alpine]
     steps:
       - uses: actions/checkout@v4
@@ -121,14 +121,16 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies
-        run: npm ci
-
+        # We need to download the prebuilds **before** installing dependencies,
+        # or `npm ci` will recompile the native code.
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./prebuilds
-          merge-multiple: true # < because prebuilds/linux-x64/ will contain both a glibc and musl build
+          merge-multiple: true
+  
+      - name: Install dependencies
+        run: npm ci
 
       - name: List ./prebuilds/
         run: ls -laR ./prebuilds
