@@ -128,28 +128,31 @@ jobs:
         with:
           path: ./prebuilds
           merge-multiple: true
-  
+
       - name: Install dependencies
         run: npm ci
 
       - name: List ./prebuilds/
         run: ls -laR ./prebuilds
 
+      # https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
+      # https://chatgpt.com/share/6761e017-9950-800e-ba1e-94d575010f2d
+
       - name: Set up GPG
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          fingerprint: ${{ secrets.GPG_FINGERPRINT }}
           git_config_global: true
           git_user_signingkey: true
           git_commit_gpgsign: true
           git_tag_gpgsign: true
-          fingerprint: ${{ secrets.GPG_FINGERPRINT }}
-    
+
       - name: Configure git for publishing
         run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git config user.name "${secrets.GIT_USER_NAME}"
+          git config user.email "${secrets.GIT_USER_EMAIL}"
 
       - name: Configure npm for publishing
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
