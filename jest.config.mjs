@@ -58,7 +58,7 @@ const config = {
   randomize: true,
   setupFilesAfterEnv: [
     "jest-extended/all",
-    "<rootDir>/src/test-utils/jest-matchers.ts"
+    "<rootDir>/src/test-utils/jest-matchers.ts",
   ],
 };
 

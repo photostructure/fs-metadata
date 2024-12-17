@@ -49,7 +49,9 @@ describe("random", () => {
 
     it("should return undefined for an empty array", () => {
       const array: number[] = [];
-      expect(() => pickRandom(array)).toThrow("Cannot pick from an empty array");
+      expect(() => pickRandom(array)).toThrow(
+        "Cannot pick from an empty array",
+      );
     });
   });
 });
