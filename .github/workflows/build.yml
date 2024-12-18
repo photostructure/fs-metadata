@@ -18,47 +18,46 @@ on:
         default: "minor"
 
 jobs:
-  test-matrix:
+  prebuild-macos:
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, macos-14]
-        node-version: [18, 20, 22, 23]
-
-    runs-on: ${{ matrix.os }}
-
+    runs-on: macos-14
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 18
           cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Compile native code
-        run: npm run prebuild
-
-      - name: Run tests
-        run: npm run tests
-
-      - name: Upload prebuilds
-        if: ${{ matrix.node-version == 18 && github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@v4
+      - run: npm ci
+      - run: npm run prebuild
+      - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ matrix.os }}
           path: prebuilds/
 
-  test-ubuntu:
+  prebuild-windows:
+    strategy:
+      fail-fast: false
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+      - run: npm ci
+      - run: npm run prebuild
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-${{ matrix.os }}
+          path: prebuilds/
+
+  prebuild-ubuntu:
     strategy:
       fail-fast: false
       matrix:
+        # my eyes can't discern arm64 from amd64
         arch: [x64, arm64]
-        node-version: [18, 20, 22, 23]
     runs-on: ubuntu-22.04 # < build on older Ubuntu
     steps:
       - name: Setup QEMU
@@ -70,19 +69,16 @@ jobs:
       - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 18
       - uses: actions/checkout@v4
       - run: npm ci
       - run: npm run prebuild
-      - run: npm run tests
-      - name: Upload prebuilds
-        if: ${{ matrix.node-version == 18 && github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-linux-${{ matrix.arch }}-glibc
           path: prebuilds/
 
-  test-alpine:
+  prebuild-alpine:
     strategy:
       fail-fast: false
       matrix:
@@ -101,39 +97,122 @@ jobs:
           apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
           cd /tmp/project && \
           npm ci && \
-          npm run prebuild && \
-          npm run tests"
+          npm run prebuild"
 
-      - name: Upload prebuilds
-        if: ${{ matrix.node-version == 18 && github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-linux-${{ matrix.arch }}-musl
           path: prebuilds/
 
-  publish:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-22.04
-    needs: [test-matrix, test-ubuntu, test-alpine]
+  test-macos:
+    needs: [prebuild-macos]
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22, 23]
+    runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
-
-        # We need to download the prebuilds **before** installing dependencies,
-        # or `npm ci` will recompile the native code.
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           path: ./prebuilds
           merge-multiple: true
+      - run: npm ci
+      - run: npm run tests
 
-      - name: Install dependencies
-        run: npm ci
+  test-windows:
+    needs: [prebuild-windows]
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22, 23]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./prebuilds
+          merge-multiple: true
+      - run: npm ci
+      - run: npm run tests
 
-      - name: List ./prebuilds/
-        run: ls -laR ./prebuilds
+  test-ubuntu:
+    needs: [prebuild-ubuntu]
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+        node-version: [18, 20, 22, 23]
+    runs-on: ubuntu-22.04 # < build on older Ubuntu
+    steps:
+      - name: Setup QEMU
+        if: ${{ matrix.arch == 'arm64' }}
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./prebuilds
+          merge-multiple: true
+      - run: npm ci
+      - run: npm run tests
+
+  test-alpine:
+    needs: [prebuild-alpine]
+    strategy:
+      fail-fast: false
+      matrix:
+        # my eyes can't discern arm64 from amd64
+        arch: [x64, arm64]
+        node-version: [18, 20, 22, 23]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./prebuilds
+          merge-multiple: true
+      - uses: docker/setup-qemu-action@v3
+        if: ${{ matrix.arch == 'arm64' }}
+        with:
+          platforms: linux/arm64
+      - run: |
+          docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:${{ matrix.node-version }}-alpine -c "\
+          apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
+          cd /tmp/project && \
+          npm ci && \
+          npm run prebuild && \
+          npm run tests"
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-22.04
+    needs: [test-macos, test-windows, test-ubuntu, test-alpine]
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./prebuilds
+          merge-multiple: true
+      - run: ls -laR ./prebuilds
+      - run: npm ci
 
       # https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
       # https://chatgpt.com/share/6761e017-9950-800e-ba1e-94d575010f2d
