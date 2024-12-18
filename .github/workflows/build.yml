@@ -160,7 +160,6 @@ jobs:
           apk add util-linux-dev --update-cache && \
           cd /tmp/project && \
           npm ci && \
-          npm run prebuild && \
           npm run tests"
 
   publish:
