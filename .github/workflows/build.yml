@@ -157,7 +157,7 @@ jobs:
           platforms: linux/arm64
       - run: |
           docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:${{ matrix.node-version }}-alpine -c "\
-          apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
+          apk add util-linux-dev --update-cache && \
           cd /tmp/project && \
           npm ci && \
           npm run prebuild && \
