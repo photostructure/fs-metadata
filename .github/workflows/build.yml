@@ -155,7 +155,7 @@ jobs:
           git config user.email "${{ secrets.GIT_USER_EMAIL }}"
 
       - name: Configure npm for publishing
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+        run: npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm
         run: npm run release -- --ci ${{ github.event.inputs.version }}
@@ -166,10 +166,10 @@ jobs:
       - name: Cleanup GPG keys
         if: always()
         run: |
-          gpg --batch --yes --delete-secret-keys ${{ secrets.GPG_KEY_ID }}
-          gpg --batch --yes --delete-keys ${{ secrets.GPG_KEY_ID }}
+          gpg --batch --yes --delete-secret-keys ${{ secrets.GPG_FINGERPRINT }}
+          gpg --batch --yes --delete-keys ${{ secrets.GPG_FINGERPRINT }}
           rm -rf ~/.gnupg/
 
       - name: Remove npm token
         if: always()
-        run: rm -f ~/.npmrc
+        run: npm config delete //registry.npmjs.org/:_authToken
