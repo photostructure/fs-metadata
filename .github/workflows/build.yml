@@ -68,7 +68,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x64, arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -143,7 +143,7 @@ jobs:
       matrix:
         # my eyes can't discern arm64 from amd64
         arch: [x64, arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -164,7 +164,7 @@ jobs:
 
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [test-mac-win, test-ubuntu, test-alpine]
     steps:
       - uses: actions/checkout@v4
