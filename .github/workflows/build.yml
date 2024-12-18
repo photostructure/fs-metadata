@@ -151,8 +151,8 @@ jobs:
 
       - name: Configure git for publishing
         run: |
-          git config user.name "${secrets.GIT_USER_NAME}"
-          git config user.email "${secrets.GIT_USER_EMAIL}"
+          git config user.name "${{ secrets.GIT_USER_NAME }}"
+          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
 
       - name: Configure npm for publishing
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
