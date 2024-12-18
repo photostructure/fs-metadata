@@ -84,7 +84,6 @@ jobs:
       matrix:
         # my eyes can't discern arm64 from amd64
         arch: [x64, arm64]
-        node-version: [18, 20, 22, 23]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,7 +92,7 @@ jobs:
         with:
           platforms: linux/arm64
       - run: |
-          docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:${{ matrix.node-version }}-alpine -c "\
+          docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:18-alpine -c "\
           apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
           cd /tmp/project && \
           npm ci && \
