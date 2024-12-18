@@ -18,27 +18,12 @@ on:
         default: "minor"
 
 jobs:
-  prebuild-macos:
+  prebuild-mac-win:
     strategy:
       fail-fast: false
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: "npm"
-      - run: npm ci
-      - run: npm run prebuild
-      - uses: actions/upload-artifact@v4
-        with:
-          name: prebuilds-${{ matrix.os }}
-          path: prebuilds/
-
-  prebuild-windows:
-    strategy:
-      fail-fast: false
-    runs-on: windows-latest
+      matrix:
+        os: [macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,9 +41,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # my eyes can't discern arm64 from amd64
         arch: [x64, arm64]
-    runs-on: ubuntu-22.04 # < build on older Ubuntu
+    runs-on: ubuntu-20.04 # < compile with ancient Ubuntu
     steps:
       - name: Setup QEMU
         if: ${{ matrix.arch == 'arm64' }}
@@ -67,10 +51,11 @@ jobs:
           platforms: linux/arm64
       - run: sudo apt-get update
       - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-      - uses: actions/checkout@v4
+          cache: "npm"
       - run: npm ci
       - run: npm run prebuild
       - uses: actions/upload-artifact@v4
@@ -82,7 +67,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # my eyes can't discern arm64 from amd64
         arch: [x64, arm64]
     runs-on: ubuntu-latest
     steps:
@@ -103,43 +87,24 @@ jobs:
           name: prebuilds-linux-${{ matrix.arch }}-musl
           path: prebuilds/
 
-  test-macos:
-    needs: [prebuild-macos]
+  test-mac-win:
+    needs: [prebuild-mac-win]
     strategy:
       fail-fast: false
       matrix:
+        os: [macos-14, windows-latest]
         node-version: [18, 20, 22, 23]
-    runs-on: macos-14
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: ./prebuilds
           merge-multiple: true
-      - run: npm ci
-      - run: npm run tests
-
-  test-windows:
-    needs: [prebuild-windows]
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [18, 20, 22, 23]
-    runs-on: windows-latest
-    steps:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: ./prebuilds
-          merge-multiple: true
       - run: npm ci
       - run: npm run tests
 
@@ -148,9 +113,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
         arch: [x64, arm64]
         node-version: [18, 20, 22, 23]
-    runs-on: ubuntu-22.04 # < build on older Ubuntu
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Setup QEMU
         if: ${{ matrix.arch == 'arm64' }}
@@ -158,7 +124,7 @@ jobs:
         with:
           platforms: linux/arm64
       - run: sudo apt-get update
-      - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
+      - run: sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -177,7 +143,6 @@ jobs:
       matrix:
         # my eyes can't discern arm64 from amd64
         arch: [x64, arm64]
-        node-version: [18, 20, 22, 23]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -199,21 +164,22 @@ jobs:
 
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-22.04
-    needs: [test-macos, test-windows, test-ubuntu, test-alpine]
+    runs-on: ubuntu-latest
+    needs: [test-mac-win, test-ubuntu, test-alpine]
     steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: ./prebuilds
           merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: "npm"
       - run: ls -laR ./prebuilds
       - run: npm ci
 
-      # https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
+      # readme: https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
       # https://chatgpt.com/share/6761e017-9950-800e-ba1e-94d575010f2d
 
       - name: Set up GPG
