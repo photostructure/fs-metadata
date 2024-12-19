@@ -4,18 +4,16 @@
   "description": "Cross-platform native filesystem metadata retrieval for Node.js",
   "homepage": "https://photostructure.github.io/fs-metadata/",
   "type": "module",
-  "main": "dist/cjs/index.cjs",
-  "module": "dist/esm/index.mjs",
   "// exports": "https://nodejs.org/api/packages.html#conditional-exports",
   "exports": {
     ".": {
       "require": {
-        "default": "./lib/cjs/index.cjs",
-        "types": "./lib/cjs/index.d.ts"
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.cjs"
       },
       "import": {
-        "default": "./lib/esm/index.js",
-        "types": "./lib/esm/index.d.ts"
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
       }
     }
   },
@@ -40,6 +38,7 @@
     "tsc": "run-p tsc:*",
     "tsc:esm": "tsc -p tsconfig.esm.json",
     "tsc:cjs": "tsc -p tsconfig.cjs.json",
+    "posttsc:cjs": "echo '{ \"type\": \"commonjs\" }' > dist/cjs/package.json",
     "tsc:tests": "tsc -p tsconfig.json",
     "watch": "tsc --watch --project tsconfig.watch.json",
     "docs": "typedoc --out docs src/index.ts",
