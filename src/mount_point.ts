@@ -9,7 +9,7 @@ import { Options } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
 import { isNotBlank, sortObjectsByLocale, toNotBlank } from "./string.js";
 import { assignSystemVolume, SystemVolumeConfig } from "./system_volume.js";
-import { NativeBindingsFn } from "./types/native_bindings.js";
+import type { NativeBindingsFn } from "./types/native_bindings.js";
 import { directoryStatus, VolumeHealthStatus } from "./volume_health_status.js";
 
 /**
@@ -79,7 +79,7 @@ export type GetVolumeMountPointOptions = Partial<
 >;
 
 /**
- * Helper function for {@link ExportsImpl.getVolumeMountPoints}.
+ * Helper function for {@link getVolumeMountPoints}.
  */
 export async function getVolumeMountPoints(
   opts: Required<GetVolumeMountPointOptions>,
