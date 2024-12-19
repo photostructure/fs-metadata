@@ -178,6 +178,7 @@ jobs:
           cache: "npm"
       - run: ls -laR ./prebuilds
       - run: npm ci
+      - run: npm run tsc
 
       # readme: https://github.com/actions/checkout?tab=readme-ov-file#push-a-commit-using-the-built-in-token
       # https://chatgpt.com/share/6761e017-9950-800e-ba1e-94d575010f2d
