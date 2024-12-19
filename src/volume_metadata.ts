@@ -25,7 +25,7 @@ import {
 } from "./remote_info.js";
 import { isBlank, isNotBlank } from "./string.js";
 import { assignSystemVolume } from "./system_volume.js";
-import {
+import type {
   GetVolumeMetadataOptions,
   NativeBindingsFn,
 } from "./types/native_bindings.js";
