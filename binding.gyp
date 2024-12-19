@@ -72,8 +72,21 @@
             ],
             "msvs_settings": {
               "VCCLCompilerTool": {
+                "AdditionalOptions": [
+                  "/Qspectre",
+                  "/guard:cf",
+                  "/ZH:SHA_256",
+                  "/sdl"
+                ],
                 "ExceptionHandling": 1,
                 "RuntimeTypeInfo": "true"
+              },
+              "VCLinkerTool": {
+                "AdditionalOptions": [
+                  "/guard:cf",
+                  "/DYNAMICBASE",
+                  "/CETCOMPAT"
+                ]
               }
             }
           }
