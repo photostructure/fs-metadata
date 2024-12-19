@@ -6,7 +6,7 @@ import { WrappedError } from "./error.js";
 import { canStatAsync, statAsync } from "./fs.js";
 import { isRootDirectory, normalizePath } from "./path.js";
 import { isWindows } from "./platform.js";
-import { NativeBindingsFn } from "./types/native_bindings.js";
+import type { NativeBindingsFn } from "./types/native_bindings.js";
 
 /**
  * Represents the detailed state of a file or directory's hidden attribute
@@ -185,15 +185,20 @@ export async function getHiddenMetadata(
 
 export type HideMethod = "dotPrefix" | "systemFlag" | "all" | "auto";
 
+export type SetHiddenResult = {
+  pathname: string;
+  actions: {
+    dotPrefix: boolean;
+    systemFlag: boolean;
+  };
+};
+
 export async function setHidden(
   pathname: string,
   hide: boolean,
   method: HideMethod,
   nativeFn: NativeBindingsFn,
-): Promise<{
-  pathname: string;
-  actions: { dotPrefix: boolean; systemFlag: boolean };
-}> {
+): Promise<SetHiddenResult> {
   let norm = normalizePath(pathname);
   if (norm == null) {
     throw new Error("Invalid pathname: " + JSON.stringify(pathname));
