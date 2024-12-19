@@ -8,7 +8,6 @@
     "inlineSourceMap": false,
     "esModuleInterop": true
   },
-  "include": ["src/**/*"],
-  "files": ["node_modules/jest-extended/types/index.d.ts"],
-  "exclude": ["src/**/*.cts", "node_modules"]
+  "exclude": ["node_modules"],
+  "files": ["node_modules/jest-extended/types/index.d.ts"]
 }
