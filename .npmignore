@@ -25,7 +25,7 @@ config.gypi
 !scripts/
 !scripts/*js
 
-# include dist js
+# include dist .cjs, .mjs, .js, and types
 !dist/**/*js
 !dist/**/*js.map
 !dist/**/*.d.ts

@@ -5,16 +5,15 @@
   "homepage": "https://photostructure.github.io/fs-metadata/",
   "type": "module",
   "// exports": "https://nodejs.org/api/packages.html#conditional-exports",
+  "types": "./dist/types/index.d.ts",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.js",
   "exports": {
     ".": {
-      "require": {
-        "types": "./dist/cjs/index.d.ts",
-        "default": "./dist/cjs/index.cjs"
-      },
-      "import": {
-        "types": "./dist/esm/index.d.ts",
-        "default": "./dist/esm/index.js"
-      }
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/cjs/index.cjs",
+      "import": "./dist/esm/index.js",
+      "default": "./dist/esm/index.js"
     }
   },
   "repository": {
@@ -37,8 +36,9 @@
     "prep": "run-s clean prebuild tsc",
     "tsc": "run-p tsc:*",
     "tsc:esm": "tsc -p tsconfig.esm.json",
+    "tsc:types": "tsc -p tsconfig.types.json",
     "tsc:cjs": "tsc -p tsconfig.cjs.json",
-    "posttsc:cjs": "echo '{ \"type\": \"commonjs\" }' > dist/cjs/package.json",
+    "posttsc:cjs": "node scripts/fix-cjs.mjs",
     "tsc:tests": "tsc -p tsconfig.json",
     "watch": "tsc --watch --project tsconfig.watch.json",
     "docs": "typedoc --out docs src/index.ts",
