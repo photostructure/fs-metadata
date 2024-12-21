@@ -7,8 +7,9 @@ const otherPlatforms = ["linux", "darwin", "windows"]
   .map((ea) => `/${ea}/`);
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
+
 const config = {
-  displayName: "@photostructure/fs-metadata",
+  displayName: "@photostructure/fs-metadata (ESM)",
   testEnvironment: "jest-environment-node",
   roots: ["<rootDir>/src"],
   coverageProvider: "v8",
@@ -16,15 +17,15 @@ const config = {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   transform: {
-    "^.+\\.tsx?$": [
+    "^.+\\.(m)?ts$": [
       "ts-jest",
       {
         useESM: true,
-        tsconfig: "tsconfig.json",
+        tsconfig: "tsconfig.jest-esm.json",
       },
     ],
   },
-  extensionsToTreatAsEsm: [".ts"],
+  extensionsToTreatAsEsm: [".ts", ".mts"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   collectCoverage:
     argv.includes("--coverage") && !argv.includes("--no-coverage"),
@@ -33,7 +34,6 @@ const config = {
   collectCoverageFrom: ["src/**/*.ts"],
   coveragePathIgnorePatterns: [
     "debuglog",
-    "\\.test\\.ts$",
     "/test-utils/",
     "/types/",
     ...otherPlatforms,

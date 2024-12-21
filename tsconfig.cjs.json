@@ -2,9 +2,8 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
-    "outDir": "./dist/cjs",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "outDir": "./dist/cjs"
   },
-  "files": ["src/index.cts"],
-  "exclude": ["src/index.ts", "node_modules", "**/test-utils/*", "**/*.test.ts"]
+  "files": ["src/index.cts"]
 }

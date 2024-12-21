@@ -1,9 +1,9 @@
 // src/mount_point.test.ts
 
 import { jest } from "@jest/globals";
+import { getVolumeMountPoints } from "..";
 import { times, uniq } from "./array.js";
 import { TimeoutError } from "./async.js";
-import { getVolumeMountPoints } from "./index.js";
 import { MountPoint } from "./mount_point.js";
 import { isLinux, isWindows } from "./platform.js";
 import { sortByLocale } from "./string.js";

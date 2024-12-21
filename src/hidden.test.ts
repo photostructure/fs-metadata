@@ -4,14 +4,9 @@ import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path, { join } from "node:path";
+import { getHiddenMetadata, isHidden, isHiddenRecursive, setHidden } from "..";
 import { statAsync } from "./fs.js";
 import { createHiddenPosixPath, LocalSupport } from "./hidden.js";
-import {
-  getHiddenMetadata,
-  isHidden,
-  isHiddenRecursive,
-  setHidden,
-} from "./index.js";
 import { isLinux, isMacOS, isWindows } from "./platform.js";
 import { validateHidden } from "./test-utils/hidden-tests.js";
 import { systemDrive, tmpDirNotHidden } from "./test-utils/platform.js";

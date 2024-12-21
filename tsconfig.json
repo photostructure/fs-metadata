@@ -1,13 +1,8 @@
 {
-  "extends": "./tsconfig.esm.json",
+  "#": "used by `npm run watch` and vscode",
+  "extends": "./tsconfig.jest-esm.json",
   "compilerOptions": {
-    "types": ["node", "jest"],
-    "noEmit": true,
-    "sourceMap": true,
-    "inlineSources": true,
-    "inlineSourceMap": false,
-    "esModuleInterop": true
-  },
-  "exclude": ["node_modules"],
-  "files": ["node_modules/jest-extended/types/index.d.ts"]
+    "noEmit": false,
+    "sourceMap": true
+  }
 }

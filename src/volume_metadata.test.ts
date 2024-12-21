@@ -2,14 +2,13 @@
 
 import { jest } from "@jest/globals";
 import { join } from "node:path";
-import { compact, times } from "./array.js";
-import { TimeoutError } from "./async.js";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
   VolumeHealthStatuses,
-} from "./index.js";
+} from "..";
+import { compact, times } from "./array.js";
 import { omit } from "./object.js";
 import { IncludeSystemVolumesDefault } from "./options.js";
 import { isLinux, isMacOS, isWindows } from "./platform.js";
@@ -92,7 +91,7 @@ describe("concurrent", () => {
         } catch (error) {
           if (timeoutMs === 1) {
             console.log("Expected timeout", { mountPoint, timeoutMs, error });
-            expect(error).toBeInstanceOf(TimeoutError);
+            expect(String(error)).toMatch(/TimeoutError/); // < we can't check for instanceOf TimeoutError because it's imported from the tsup bundle
             return;
           } else if (!validMountPoints.includes(mountPoint)) {
             console.log("Expected bad mount point", {

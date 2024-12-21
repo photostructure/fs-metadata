@@ -2,8 +2,8 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "module": "node16",
-    "outDir": "./dist/esm",
-    "moduleResolution": "node16"
+    "moduleResolution": "node16",
+    "outDir": "./dist/esm"
   },
-  "files": ["src/index.ts"]
+  "files": ["src/index.mts"]
 }

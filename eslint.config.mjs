@@ -5,14 +5,14 @@ import ts_eslint from "typescript-eslint";
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    files: ["src/**/*.ts", "scripts/*.js", "*.js"],
+    files: ["src/**/*.ts", "scripts/*.js"],
     languageOptions: {
       globals: {
         ...globals.node,
       },
     },
   },
-  { ignores: [".tsup", "build", "coverage", "dist*", "docs"] },
+  { ignores: ["build", "coverage", "dist", "docs", "*.cts", "*.cjs"] },
   pluginJs.configs.recommended,
   ...ts_eslint.configs.recommended,
   ...ts_eslint.configs.strict,
