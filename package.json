@@ -3,7 +3,6 @@
   "version": "0.1.4",
   "description": "Cross-platform native filesystem metadata retrieval for Node.js",
   "homepage": "https://photostructure.github.io/fs-metadata/",
-  "type": "module",
   "// exports": "https://nodejs.org/api/packages.html#conditional-exports",
   "types": "./dist/index.d.ts",
   "main": "./dist/index.cjs",
