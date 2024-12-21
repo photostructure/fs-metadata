@@ -5,15 +5,15 @@
   "homepage": "https://photostructure.github.io/fs-metadata/",
   "type": "module",
   "// exports": "https://nodejs.org/api/packages.html#conditional-exports",
-  "types": "./dist/types/index.d.ts",
-  "main": "./dist/cjs/index.cjs",
-  "module": "./dist/esm/index.js",
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
-      "require": "./dist/cjs/index.cjs",
-      "import": "./dist/esm/index.js",
-      "default": "./dist/esm/index.js"
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "repository": {
@@ -33,12 +33,15 @@
     "prebuildify": "prebuildify --napi --tag-libc --strip",
     "// prebuild": "is called by .github/workflows/build.yml",
     "prebuild": "run-s configure prebuildify",
-    "prep": "run-s clean prebuild tsc",
+    "prep": "run-s clean prebuild tsup",
     "tsc": "run-p tsc:*",
     "tsc:esm": "tsc -p tsconfig.esm.json",
     "tsc:types": "tsc -p tsconfig.types.json",
     "tsc:cjs": "tsc -p tsconfig.cjs.json",
     "posttsc:cjs": "node scripts/fix-cjs.mjs",
+    "tsup": "run-p tsup:*",
+    "tsup:cjs": "tsup src/index.cts --format cjs --out-dir ./dist",
+    "tsup:esm": "tsup src/index.ts --format esm --experimental-dts --out-dir ./dist",
     "tsc:tests": "tsc -p tsconfig.json",
     "watch": "tsc --watch --project tsconfig.watch.json",
     "docs": "typedoc --out docs src/index.ts",
@@ -46,7 +49,7 @@
     "jest:watch": "npm t -- --watch",
     "jest:clear": "jest --clearCache",
     "// tests": "is called by .github/workflows/test.yml",
-    "tests": "run-s lint test test:memory",
+    "tests": "run-s tsc lint test test:memory",
     "test": "node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --coverage",
     "// test:memory:todo": "set up valgrind or similar",
     "test:memory": "cross-env TEST_MEMORY=1 node --expose-gc --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --no-coverage src/memory.test.ts",
@@ -61,8 +64,8 @@
     "fmt:ts": "prettier --write \"src/**/*.ts\"",
     "// precommit": "is called manually before committing",
     "precommit": "run-s fmt prep tests",
-    "// release": "is called by .github/workflows/release.yml and should only be run via GitHub Actions",
-    "prerelease": "tsc",
+    "// prepare-release and release": "are called by .github/workflows/build.yml and should only be run via GitHub Actions",
+    "prepare-release": "npm run tsup",
     "release": "release-it"
   },
   "gypfile": true,
@@ -97,6 +100,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@microsoft/api-extractor": "^7.48.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
@@ -116,6 +120,7 @@
     "release-it": "^17.10.0",
     "terser": "^5.37.0",
     "ts-jest": "^29.2.5",
+    "tsup": "^8.3.5",
     "typedoc": "^0.27.5",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1"
