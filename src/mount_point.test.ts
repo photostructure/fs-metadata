@@ -3,7 +3,6 @@
 import { jest } from "@jest/globals";
 import { getVolumeMountPoints } from "..";
 import { times, uniq } from "./array.js";
-import { TimeoutError } from "./async.js";
 import { MountPoint } from "./mount_point.js";
 import { isLinux, isWindows } from "./platform.js";
 import { sortByLocale } from "./string.js";
@@ -33,7 +32,7 @@ describe("Filesystem Metadata", () => {
       // < timeouts on windows are handled by the native bindings, and don't know about the magick "timeoutMs = 1" test option.
       it("should timeout mount points if timeoutMs = 1", async () => {
         await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
-          TimeoutError,
+          /TimeoutError/, // < we can't check for instanceOf TimeoutError because it's imported from the tsup bundle
         );
       });
     }
