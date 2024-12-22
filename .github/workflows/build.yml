@@ -16,7 +16,7 @@ on:
           - minor
           - major
         default: "minor"
-run-name: ${{ (github.event_name == 'workflow_dispatch' && 'Release - ' + github.event.inputs.version) || 'Build' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || 'Build' }}
 jobs:
   prebuild-mac-win:
     strategy:
