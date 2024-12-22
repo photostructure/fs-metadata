@@ -1,8 +1,4 @@
 {
-  "#": "used by `npm run watch` and vscode",
-  "extends": "./tsconfig.jest-esm.json",
-  "compilerOptions": {
-    "noEmit": false,
-    "sourceMap": true
-  }
+  "#": "used by `npm run watch` and vscode. Note that this doesn't emit anything into ./dist/",
+  "extends": "./tsconfig.jest-esm.json"
 }
