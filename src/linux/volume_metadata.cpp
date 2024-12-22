@@ -29,12 +29,29 @@ public:
         throw FSException(CreateErrorMessage("statvfs", errno));
       }
 
-      uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
+      const uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
+      const uint64_t totalBlocks = static_cast<uint64_t>(vfs.f_blocks);
+      const uint64_t availBlocks = static_cast<uint64_t>(vfs.f_bavail);
+      const uint64_t freeBlocks = static_cast<uint64_t>(vfs.f_bfree);
+
+      // Check for overflow before multiplication
+      if (blockSize > 0) {
+        if (totalBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
+          throw FSException("Total volume size calculation would overflow");
+        }
+        if (availBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
+          throw FSException("Available space calculation would overflow");
+        }
+        if (freeBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
+          throw FSException("Free space calculation would overflow");
+        }
+      }
+
       metadata.remote = false;
-      metadata.size = static_cast<double>(blockSize) * vfs.f_blocks;
-      metadata.available = static_cast<double>(blockSize) * vfs.f_bavail;
+      metadata.size = static_cast<double>(blockSize * totalBlocks);
+      metadata.available = static_cast<double>(blockSize * availBlocks);
       metadata.used =
-          metadata.size - (static_cast<double>(blockSize) * vfs.f_bfree);
+          static_cast<double>(blockSize * (totalBlocks - freeBlocks));
 
       DEBUG_LOG("[LinuxMetadataWorker] %s {size: %.3f GB, available: %.3f GB}",
                 mountPoint.c_str(), metadata.size / 1e9,

@@ -165,7 +165,8 @@ private:
     metadata.mountName = fs.f_mntonname;
     metadata.status = "ready";
 
-    DEBUG_LOG("[GetVolumeMetadataWorker] Volume info - size: %.0f, available: %.0f, used: %.0f",
+    DEBUG_LOG("[GetVolumeMetadataWorker] Volume info - size: %.0f, available: "
+              "%.0f, used: %.0f",
               metadata.size, metadata.available, metadata.used);
     return true;
   }
