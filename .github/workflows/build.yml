@@ -1,4 +1,4 @@
-name: Build
+name: Build & Release
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
           - minor
           - major
         default: "minor"
-
+run-name: ${{ (github.event_name == 'workflow_dispatch' && 'Release - ' + github.event.inputs.version) || 'Build' }}
 jobs:
   prebuild-mac-win:
     strategy:
