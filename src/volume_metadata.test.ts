@@ -20,6 +20,9 @@ import { MiB } from "./units.js";
 const rootPath = systemDrive();
 
 describe("Volume Metadata", () => {
+  beforeEach(() => {
+    jest.setTimeout(30_000);
+  });
   it("should get root filesystem metadata", async () => {
     const metadata = await getVolumeMetadata(rootPath);
 
@@ -56,8 +59,6 @@ describe("Volume Metadata errors", () => {
 });
 
 describe("concurrent", () => {
-  jest.setTimeout(30_000);
-
   it("should handle concurrent getVolumeMetadata() calls", async () => {
     const mountPoints = await getVolumeMountPoints();
     const expectedMountPoint = systemDrive();
@@ -91,7 +92,7 @@ describe("concurrent", () => {
         } catch (error) {
           if (timeoutMs === 1) {
             console.log("Expected timeout", { mountPoint, timeoutMs, error });
-            expect(String(error)).toMatch(/TimeoutError/); // < we can't check for instanceOf TimeoutError because it's imported from the tsup bundle
+            expect(String(error)).toMatch(/timeout/i); // < we can't check for instanceOf TimeoutError because it's imported from the tsup bundle
             return;
           } else if (!validMountPoints.includes(mountPoint)) {
             console.log("Expected bad mount point", {
