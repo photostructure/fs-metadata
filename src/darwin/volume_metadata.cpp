@@ -131,28 +131,41 @@ private:
 
     // Calculate sizes using uint64_t to prevent overflow
     const uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
-    const uint64_t totalBlocks = vfs.f_blocks;
-    const uint64_t availBlocks = vfs.f_bavail;
-    const uint64_t freeBlocks = vfs.f_bfree;
+    const uint64_t totalBlocks = static_cast<uint64_t>(vfs.f_blocks);
+    const uint64_t availBlocks = static_cast<uint64_t>(vfs.f_bavail);
+    const uint64_t freeBlocks = static_cast<uint64_t>(vfs.f_bfree);
 
     // Check for overflow before multiplication
-    if (blockSize > 0 &&
-        totalBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
-      SetError("Volume size calculation would overflow");
-      return false;
+    if (blockSize > 0) {
+      if (totalBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
+        SetError("Total volume size calculation would overflow");
+        return false;
+      }
+      if (availBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
+        SetError("Available space calculation would overflow");
+        return false;
+      }
+      if (freeBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
+        SetError("Free space calculation would overflow");
+        return false;
+      }
     }
 
-    metadata.size = static_cast<double>(blockSize * totalBlocks);
-    metadata.available = static_cast<double>(blockSize * availBlocks);
-    metadata.used = static_cast<double>(blockSize * (totalBlocks - freeBlocks));
+    const uint64_t totalSize = blockSize * totalBlocks;
+    const uint64_t availableSize = blockSize * availBlocks;
+    const uint64_t usedSize = blockSize * (totalBlocks - freeBlocks);
+
+    // Convert to double for JavaScript compatibility
+    metadata.size = static_cast<double>(totalSize);
+    metadata.available = static_cast<double>(availableSize);
+    metadata.used = static_cast<double>(usedSize);
 
     metadata.fstype = fs.f_fstypename;
     metadata.mountFrom = fs.f_mntfromname;
     metadata.mountName = fs.f_mntonname;
     metadata.status = "ready";
 
-    DEBUG_LOG("[GetVolumeMetadataWorker] Volume info - size: %f, available: "
-              "%f, used: %f",
+    DEBUG_LOG("[GetVolumeMetadataWorker] Volume info - size: %.0f, available: %.0f, used: %.0f",
               metadata.size, metadata.available, metadata.used);
     return true;
   }
