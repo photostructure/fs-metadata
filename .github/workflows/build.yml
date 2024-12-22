@@ -9,14 +9,14 @@ on:
     inputs:
       version:
         description: "Version bump type"
-        required: true
+        required: false
         type: choice
         options:
           - patch
           - minor
           - major
         default: "minor"
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || 'Build' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || format('Build - {0}', github.event.head_commit.message || github.event.pull_request.title) }}
 jobs:
   prebuild-mac-win:
     strategy:
