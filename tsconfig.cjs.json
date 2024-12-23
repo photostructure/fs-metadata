@@ -5,5 +5,5 @@
     "moduleResolution": "node",
     "outDir": "./dist/cjs"
   },
-  "files": ["src/index.cts"]
+  "files": ["./src/index.cts"]
 }

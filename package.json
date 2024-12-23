@@ -30,7 +30,7 @@
     "bundle": "run-p bundle:* compile:types",
     "bundle:cjs": "tsup src/index.cts --format cjs --tsconfig tsconfig.cjs.json",
     "bundle:esm": "tsup src/index.mts --format esm --tsconfig tsconfig.esm.json",
-    "docs": "typedoc --out docs src/index.ts",
+    "docs": "typedoc --tsconfig tsconfig.esm.json --out docs src/index.mts",
     "jest:coverage": "jest --coverage",
     "jest:watch": "npm t -- --watch",
     "jest:clear": "jest --clearCache",

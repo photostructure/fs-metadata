@@ -5,5 +5,5 @@
     "moduleResolution": "node16",
     "outDir": "./dist/esm"
   },
-  "files": ["src/index.mts"]
+  "files": ["./src/index.mts"]
 }
