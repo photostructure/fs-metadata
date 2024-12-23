@@ -8,7 +8,7 @@ Built and supported by [PhotoStructure](https://photostructure.com).
 [![Build](https://github.com/photostructure/fs-metadata/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/photostructure/fs-metadata/actions/workflows/build.yml)
 [![GitHub issues](https://img.shields.io/github/issues/photostructure/fs-metadata.svg)](https://github.com/photostructure/fs-metadata/issues)
 [![Known Vulnerabilities](https://snyk.io/test/github/photostructure/fs-metadata/badge.svg?targetFile=package.json)](https://snyk.io/test/github/photostructure/fs-metadata?targetFile=package.json)
-[![Node-API v9 Badge](https://github.com/nodejs/abi-stable-node/blob/doc/assets/Node-API%20v9%20Badge.svg)](https://nodejs.org/dist/latest/docs/api/n-api.html#node-api-version-matrix)
+[![Node-API v9 Badge](https://raw.githubusercontent.com/nodejs/abi-stable-node/refs/heads/doc/assets/Node-API%20v9%20Badge.svg)](https://nodejs.org/dist/latest/docs/api/n-api.html#node-api-version-matrix)
 [![View on GitHub](https://img.shields.io/badge/View%20on-GitHub-blue)](https://github.com/photostructure/fs-metadata)
 
 ## Features
@@ -105,75 +105,14 @@ This library uses heuristics to identify system volumes. See [Options](https://p
 
 Note: [`getAllVolumeMetadata()`](https://photostructure.github.io/fs-metadata/functions/getAllVolumeMetadata.html) returns all volumes on Windows but only non-system volumes elsewhere by default.
 
-## Platform-Specific Behaviors
-
-This module's results are inherently platform-specific. Here are some things to
-keep in mind:
-
-### Mount Points
-
-#### Windows
-
-- Mount points are drive letters with trailing backslash (e.g., `C:\`, `D:\`)
-- Network shares appear as mounted drives with UNC paths
-- Volume GUIDs are available through Windows API
-- Hidden and system volumes may be included
-
-#### macOS
-
-- Uses forward slashes for paths (e.g., `/`, `/Users`)
-- Volume UUIDs may be available through the DiskArbitration framework
-- Time Machine volumes should be detected and handled appropriately
-
-#### Linux
-
-- Uses forward slashes for paths (e.g., `/`, `/home`)
-- Network mounts (NFS/CIFS) handled through mount table
-- If `GIO` support is installed, it will be queried for additional mountpoints and volume metadata
-- Depending on your distribution, you may want to use `{ linuxMountTablePath: "/etc/mtab" }` instead of the default, `/proc/mounts`.
-- UUID detection is via `libblkid`, which must be installed.
-
-### Volume Metadata
-
-#### Windows
-
-- Volume status from `GetDriveType`
-- Size information from `GetDiskFreeSpaceEx`
-- Volume information (label, filesystem) from `GetVolumeInformation`
-- `fstype` will be `NTFS` for remote filesystems, as that's how Windows presents
-  the local volume. Fixing this to be more accurate requires additional
-  heuristics that have diminshing returns.
-- The
-  [UUID](https://photostructure.github.io/fs-metadata/interfaces/VolumeMetadata.html#uuid)
-  is attempted to be extracted from the partition UUID, but if this is a remote
-  volume, or system permissions do not provide access to this, we will fall back
-  to returning the volume serial number that the operating system assigns. You
-  can tell that it's a serial number UUID in that it only contains 8 characters
-  (32 bits of entropy).
-
-#### macOS
-
-- Size calculations via `statvfs`
-- Volume details through DiskArbitration framework
-- Network share detection via volume characteristics
-
-#### Linux
-
-- Size information from `statvfs`
-- Filesystem type from mount table and from `gio`
-- Block device metadata via `libblkid`
-- Network filesystem detection from mount options
-- Optional GIO integration for additional metadata
-- Backfills with `lsblk` metadata if native code fails
-
 ## License
 
-[MIT](https://github.com/photostructure/fs-metadata/blob/main/LICENSE.txt)
+This project is licensed under the [MIT License](https://github.com/photostructure/fs-metadata/blob/main/LICENSE.txt).
 
 ## Contributing
 
-See [CONTRIBUTING.md](https://github.com/photostructure/fs-metadata/blob/main/CONTRIBUTING.md) on GitHub.
+We welcome contributions! Please see our [Contributing Guide](https://github.com/photostructure/fs-metadata/blob/main/CONTRIBUTING.md) for more details.
 
 ## Security
 
-See [SECURITY.md](https://github.com/photostructure/fs-metadata/blob/main/SECURITY.md) on GitHub.
+For security-related issues, please refer to our [Security Policy](https://github.com/photostructure/fs-metadata/blob/main/SECURITY.md).
