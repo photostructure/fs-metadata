@@ -106,7 +106,7 @@
     "terser": "^5.37.0",
     "ts-jest": "^29.2.5",
     "tsup": "^8.3.5",
-    "typedoc": "^0.27.5",
+    "typedoc": "^0.27.6",
     "typescript-eslint": "^8.18.1",
     "typescript": "^5.7.2"
   }
