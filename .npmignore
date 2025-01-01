@@ -1,22 +1,21 @@
 # no hidden files
 .*
 
-# no configs, docs, logs, or typescript
+# no configs, docs, logs, or test typescript
 *.config.js
 *.config.mjs
 *.json
 *.log
-*.md
-*.ts
-*.cts
-*.mts
 *.txt
 *.yml
 yarn.lock
 package-lock.json
+docs/
+*.test.ts
+**/test*
 
-# ignore all directories by default
-*/
+# build/ contains the ingredients for prebuilds/ -- we don't need it.
+build/
 
 # This is rebuilt by scripts/configure.js:
 config.gypi
