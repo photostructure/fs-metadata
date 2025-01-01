@@ -15,7 +15,7 @@
     "install": "node-gyp-build",
     "clean": "run-p clean:*",
     "clean:dist": "del-cli coverage dist docs \"*.tsbuildinfo\"",
-    "clean:gyp-cache": "del-cli build %USERPROFILE%/.node-gyp ~/.node-gyp",
+    "clean:gyp-cache": "del-cli --force build %USERPROFILE%/.node-gyp ~/.node-gyp",
     "clean:gyp": "node-gyp clean",
     "node-gyp-rebuild": "node-gyp rebuild",
     "configure": "node scripts/configure.mjs",
