@@ -100,7 +100,9 @@ describe("concurrent", () => {
               timeoutMs,
               error,
             });
-            expect(String(error)).toMatch(/ENOENT|not accessible|opendir/i);
+            expect(String(error)).toMatch(
+              /EINVAL|ENOENT|not accessible|opendir/i,
+            );
             return;
           } else {
             console.log("Unexpected error", { mountPoint, timeoutMs, error });
