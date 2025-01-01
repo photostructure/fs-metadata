@@ -19,6 +19,7 @@ describe("isSystemVolume", () => {
     },
     { mountPoint: "/sys/fs/cgroup", fstype: "cgroup2", expected: true },
     { mountPoint: "/sys/fs/bpf", fstype: "bpf", expected: true },
+    { mountPoint: "/mnt/remote/nas/#snapshot", fstype: "cifs", expected: true },
   ]) {
     it(`should return ${expected} for ${mountPoint} (${fstype})`, () => {
       expect(isSystemVolume(mountPoint, fstype)).toBe(expected);
