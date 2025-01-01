@@ -14,6 +14,12 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities. 
 -->
 
+## [0.2.0] - 2025-01-01
+
+- `Changed`: Add `**/#snapshot` to the list of "system" volumes
+
+- `Changed`: Add sourcemaps and source typescript to the npm pack
+
 ## [0.1.0] - 2024-12-17
 
 First release! Everything is a new feature!
