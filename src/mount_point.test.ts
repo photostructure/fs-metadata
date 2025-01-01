@@ -4,7 +4,7 @@ import { jest } from "@jest/globals";
 import { getVolumeMountPoints } from "..";
 import { times, uniq } from "./array.js";
 import { MountPoint } from "./mount_point.js";
-import { isLinux, isWindows } from "./platform.js";
+import { isWindows } from "./platform.js";
 import { sortByLocale } from "./string.js";
 
 describe("Filesystem Metadata", () => {
@@ -48,15 +48,45 @@ describe("Filesystem Metadata", () => {
     });
 
     if (!isWindows) {
-      it("should exclude pseudo filesystems", async () => {
-        const mountPoints = await getVolumeMountPoints();
-        const pseudoFS = isLinux
-          ? ["/proc", "/sys", "/dev/pts"]
-          : ["/dev", "/dev/fd"];
-
-        pseudoFS.forEach((fs) => {
-          expect(mountPoints).not.toContain(fs);
+      it("should mark filesystems properly as a system volume", async () => {
+        const allMountPoints = await getVolumeMountPoints({
+          includeSystemVolumes: true,
         });
+        const nonSystemMountPoints = await getVolumeMountPoints();
+        console.log({ allMountPoints, nonSystemMountPoints });
+        const foundSystemVolumes = [];
+        const mismarkedSystemVolumes = [];
+        const systemVolumesInDefaultList = nonSystemMountPoints.filter(
+          (ea) => ea.isSystemVolume,
+        );
+        // this is a non-exhaustive list of filesystems to validate that at
+        // least one of these both exists and is marked as a system volume:
+        for (const mountPoint of [
+          "/boot",
+          "/proc",
+          "/sys",
+          "/dev/shm",
+          "/snap",
+          "/run/lock",
+          "/System/Volumes/VM",
+        ]) {
+          const fs = allMountPoints.find((ea) => ea.mountPoint === mountPoint);
+          if (fs != null) {
+            if (fs.isSystemVolume) {
+              foundSystemVolumes.push(fs);
+            } else {
+              mismarkedSystemVolumes.push(fs);
+            }
+          }
+          systemVolumesInDefaultList.push(
+            ...systemVolumesInDefaultList.filter(
+              (ea) => ea.mountPoint === mountPoint,
+            ),
+          );
+        }
+        expect(foundSystemVolumes).not.toEqual([]);
+        expect(mismarkedSystemVolumes).toEqual([]);
+        expect(systemVolumesInDefaultList).toEqual([]);
       });
     }
 
