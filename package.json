@@ -21,6 +21,7 @@
     "configure": "node scripts/configure.mjs",
     "prebuildify": "prebuildify --napi --tag-libc --strip",
     "prebuild": "run-s configure prebuildify",
+    "clang-tidy": "node-gyp configure -- -f compile_commands_json && clang-tidy -p build/Release src/**/*.cpp",
     "compile": "run-p compile:*",
     "compile:esm": "tsc -p tsconfig.esm.json --noEmit",
     "compile:cjs": "tsc -p tsconfig.cjs.json --noEmit",
