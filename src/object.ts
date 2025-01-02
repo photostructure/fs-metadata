@@ -39,19 +39,7 @@ export function omit<T extends object, K extends keyof T>(
 
   return result;
 }
-/**
- * Pick the specified fields from an object
- */
-export function pick<T extends object, K extends keyof T>(
-  obj: T,
-  ...keys: K[]
-): Pick<T, K> {
-  const copy = {} as Pick<T, K>;
-  for (const key of keys) {
-    copy[key] = obj[key];
-  }
-  return copy;
-}
+
 export function compactValues<T extends object>(
   obj: T | undefined,
 ): Partial<T> {

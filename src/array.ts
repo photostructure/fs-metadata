@@ -1,18 +1,6 @@
 // src/array.ts
 
 /**
- * @return a new array whose elements return true based on the given `predicate`
- * function.
- */
-export async function asyncFilter<T>(
-  arr: T[],
-  predicate: (item: T) => boolean | Promise<boolean>,
-): Promise<T[]> {
-  const results = await Promise.all(arr.map(async (ea) => predicate(ea)));
-  return arr.filter((_item, index) => results[index]);
-}
-
-/**
  * Remove duplicate elements from an array.
  *
  * - Primitive values are compared using strict equality.

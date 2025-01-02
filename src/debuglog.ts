@@ -28,8 +28,3 @@ export function debug(msg: string, ...args: unknown[]) {
 
   process.stderr.write(timestamp + format(msg, ...args) + "\n");
 }
-
-export function resetDebugLog() {
-  debugLogContext.reset();
-  isDebugEnabled.reset();
-}
