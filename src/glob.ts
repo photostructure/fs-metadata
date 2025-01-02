@@ -123,5 +123,7 @@ function _compileGlob(patterns: string[] | readonly string[]): RegExp {
     : new RegExp(`^(?:${final.join("|")})$`, "i");
 }
 
+// eslint-disable-next-line regexp/no-empty-group
 export const AlwaysMatchRE = /(?:)/;
+// eslint-disable-next-line regexp/no-empty-lookarounds-assertion
 export const NeverMatchRE = /(?!)/;

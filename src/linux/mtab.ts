@@ -92,7 +92,7 @@ export function parseMtab(content: string): MountEntry[] {
 
     const fields = line
       .trim()
-      .match(/(?:[^\s\\]+|\\.)+/g)
+      .match(/(?:[^\s\\]|\\.)+/g)
       ?.map(decodeEscapeSequences);
 
     if (!fields || fields.length < 3) {

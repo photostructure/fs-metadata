@@ -53,7 +53,7 @@ export function decodeEscapeSequences(input: string): string {
   });
 }
 
-const AlphaNumericRE = /[a-z0-9.-_]/i;
+const AlphaNumericRE = /[/\w.-]/;
 
 export function encodeEscapeSequences(input: string): string {
   return input
