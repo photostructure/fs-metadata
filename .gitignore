@@ -25,10 +25,11 @@ stage/
 *.node
 config.gypi
 
-# IDE files
+# temporary files from tools
 .idea/
 *.swp
 *.swo
+.dccache
 
 # OS generated files
 .DS_Store
