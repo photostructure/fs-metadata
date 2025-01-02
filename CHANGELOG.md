@@ -14,6 +14,12 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## [0.3.0] - 2025-01-01
+
+- `Changed`: For consistency,
+  [Options.systemFsTypes](https://photostructure.github.io/fs-metadata/interfaces/Options.html#systemfstypes)
+  is now a `string[]` (it was a `Set<string>`)
+
 ## [0.2.0] - 2025-01-01
 
 - `Changed`: Add `**/#snapshot` to the list of "system" volumes

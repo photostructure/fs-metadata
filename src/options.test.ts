@@ -16,7 +16,7 @@ describe("options()", () => {
   });
 
   it("should override excludedFileSystemTypes when provided", () => {
-    const override = { systemFsTypes: new Set(["customfs"]) };
+    const override = { systemFsTypes: ["custom-fs"] };
     const result = optionsWithDefaults(override);
     expect(result.systemFsTypes).toEqual(override.systemFsTypes);
     expect(result.timeoutMs).toBe(OptionsDefault.timeoutMs);

@@ -41,7 +41,7 @@ export interface Options {
    *
    * @see {@link SystemFsTypesDefault} for the default value
    */
-  systemFsTypes: Set<string>;
+  systemFsTypes: string[];
 
   /**
    * On Linux, use the first mount point table in this array that is readable.
@@ -105,7 +105,7 @@ export const SystemPathPatternsDefault = [
 /**
  * Filesystem types that indicate system volumes
  */
-export const SystemFsTypesDefault = new Set([
+export const SystemFsTypesDefault = [
   "autofs",
   "binfmt_misc",
   "cgroup",
@@ -128,13 +128,13 @@ export const SystemFsTypesDefault = new Set([
   "squashfs",
   "sysfs",
   "tmpfs",
-]);
+] as const;
 
 export const LinuxMountTablePathsDefault = [
   "/proc/self/mounts",
   "/proc/mounts",
   "/etc/mtab",
-];
+] as const;
 
 /**
  * Should {@link getAllVolumeMetadata} include system volumes by
@@ -151,8 +151,8 @@ export const OptionsDefault: Options = {
   timeoutMs: TimeoutMsDefault,
   maxConcurrency: availableParallelism(),
   systemPathPatterns: [...SystemPathPatternsDefault],
-  systemFsTypes: new Set(SystemFsTypesDefault),
-  linuxMountTablePaths: LinuxMountTablePathsDefault,
+  systemFsTypes: [...SystemFsTypesDefault],
+  linuxMountTablePaths: [...LinuxMountTablePathsDefault],
   includeSystemVolumes: IncludeSystemVolumesDefault,
 } as const;
 

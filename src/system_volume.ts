@@ -31,7 +31,6 @@ export function isSystemVolume(
   fstype: string | undefined,
   config: Partial<SystemVolumeConfig> = {},
 ): boolean {
-  debug("[isSystemVolume] checking %s (fstype: %s)", mountPoint, fstype);
   if (isWindows) {
     const systemDrive = normalizePath(process.env["SystemDrive"]);
     if (systemDrive != null && mountPoint === systemDrive) {
@@ -39,13 +38,22 @@ export function isSystemVolume(
       return true;
     }
   }
-  const result =
-    (isNotBlank(fstype) &&
-      (config.systemFsTypes ?? SystemFsTypesDefault).has(fstype)) ||
-    compileGlob(config.systemPathPatterns ?? SystemPathPatternsDefault).test(
-      mountPoint,
+  const isSystemFsType =
+    isNotBlank(fstype) &&
+    ((config.systemFsTypes ?? SystemFsTypesDefault) as string[]).includes(
+      fstype,
     );
-  debug("[isSystemVolume] %s -> %s", mountPoint, result);
+  const hasSystemPath = compileGlob(
+    config.systemPathPatterns ?? SystemPathPatternsDefault,
+  ).test(mountPoint);
+  const result = isSystemFsType || hasSystemPath;
+  debug("[isSystemVolume]", {
+    mountPoint,
+    fstype,
+    result,
+    isSystemFsType,
+    hasSystemPath,
+  });
   return result;
 }
 
