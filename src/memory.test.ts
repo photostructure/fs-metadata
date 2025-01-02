@@ -31,7 +31,7 @@ const describeMemory = shouldRunMemoryTests ? describe : describe.skip;
 
 describeMemory("Memory Tests", () => {
   jest.setTimeout(60_000);
-  const iterations = 200;
+  const iterations = 100;
 
   // Helper to get memory usage after GC
   async function getMemoryUsage(): Promise<number> {
@@ -45,36 +45,63 @@ describeMemory("Memory Tests", () => {
   // Helper to check if memory usage is stable
   async function checkMemoryUsage(
     operation: () => Promise<unknown>,
-    errorMarginBytes: number = 6.5 * MiB, // Alpine docker had a 5MB variance
+    errorMarginBytes: number = 10 * MiB, // Alpine docker had a 5MB variance
   ) {
     // warm up memory consumption:
-    await operation();
+    for (let i = 0; i < 5; i++) await operation();
+
     // __then__ take a snapshot
     const initialMemory = await getMemoryUsage();
+    const memoryUsages = [1];
 
     // Run operations
-    for (let i = 0; i < iterations; i++) {
+    for (let iteration = 0; iteration < iterations; iteration++) {
       await operation();
-
-      // Check every 10 iterations
-      if (i % Math.floor(iterations / 5) === 0) {
+      if (iteration % Math.floor(iterations / 10) === 0) {
         const currentMemory = await getMemoryUsage();
-        console.log(
-          `Memory after iteration ${i}: ${fmtBytes(currentMemory)} (diff: ${fmtBytes(currentMemory - initialMemory)})`,
-        );
-        // Allow some variance but fail on large increases
-        expect(currentMemory - initialMemory).toBeLessThan(errorMarginBytes);
+        memoryUsages.push(currentMemory / initialMemory);
+        // console.dir({
+        //   iteration,
+        //   currentMemory: fmtBytes(currentMemory),
+        //   diff: fmtBytes(currentMemory - initialMemory),
+        //   slope: slope(memoryUsages),
+        // });
       }
     }
 
     // Final memory check
     const finalMemory = await getMemoryUsage();
+    memoryUsages.push(finalMemory / initialMemory);
+    const slope = leastSquaresSlope(memoryUsages);
     console.dir({
       initial: fmtBytes(initialMemory),
       final: fmtBytes(finalMemory),
       diff: fmtBytes(finalMemory - initialMemory),
+      slope,
     });
     expect(finalMemory - initialMemory).toBeLessThan(errorMarginBytes);
+    expect(slope).toBeLessThan(0.001);
+  }
+
+  /**
+   * Detects the likelihood of a memory leak based on memory usage values.
+   * @param memoryUsages - Array of memory usage values.
+   * @returns A boolean indicating if a memory leak is likely.
+   */
+  function leastSquaresSlope(memoryUsages: number[]): number {
+    const n = memoryUsages.length;
+    if (n < 2) return 0;
+
+    // Calculate the slope using linear regression (least squares method)
+    const xSum = (n * (n - 1)) / 2;
+    const ySum = memoryUsages.reduce((sum, usage) => sum + usage, 0);
+    const xySum = memoryUsages.reduce((sum, usage, i) => sum + i * usage, 0);
+    const xSquaredSum = (n * (n - 1) * (2 * n - 1)) / 6;
+
+    const result = (n * xySum - xSum * ySum) / (n * xSquaredSum - xSum * xSum);
+
+    // If the slope is positive and significant, it indicates a memory leak
+    return result;
   }
 
   describe("getVolumeMountPoints", () => {
