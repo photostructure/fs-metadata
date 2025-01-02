@@ -46,6 +46,7 @@ describeMemory("Memory Tests", () => {
   async function checkMemoryUsage(
     operation: () => Promise<unknown>,
     errorMarginBytes: number = 10 * MiB, // Alpine docker had a 5MB variance
+    maxAllowedSlope: number = 0.01,
   ) {
     // warm up memory consumption:
     for (let i = 0; i < 5; i++) await operation();
@@ -80,7 +81,7 @@ describeMemory("Memory Tests", () => {
       slope,
     });
     expect(finalMemory - initialMemory).toBeLessThan(errorMarginBytes);
-    expect(slope).toBeLessThan(0.001);
+    expect(slope).toBeLessThan(maxAllowedSlope);
   }
 
   /**
