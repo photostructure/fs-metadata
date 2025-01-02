@@ -1,5 +1,7 @@
+// src/exports.ts
+
 import type { HiddenMetadata, HideMethod, SetHiddenResult } from "./hidden.js";
-import type { GetVolumeMountPointOptions, MountPoint } from "./mount_point.js";
+import type { MountPoint } from "./mount_point.js";
 import type { Options } from "./options.js";
 import {
   IncludeSystemVolumesDefault,
@@ -19,6 +21,7 @@ import type { SystemVolumeConfig } from "./system_volume.js";
 import type { VolumeHealthStatus } from "./volume_health_status.js";
 import { VolumeHealthStatuses } from "./volume_health_status.js";
 import type { VolumeMetadata } from "./volume_metadata.js";
+import type { GetVolumeMountPointOptions } from "./volume_mount_points.js";
 
 export type {
   GetVolumeMountPointOptions,

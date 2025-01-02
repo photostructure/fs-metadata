@@ -48,6 +48,7 @@ export function isSystemVolume(
   debug("[isSystemVolume] %s -> %s", mountPoint, result);
   return result;
 }
+
 export function assignSystemVolume(
   mp: MountPoint,
   config: Partial<SystemVolumeConfig>,

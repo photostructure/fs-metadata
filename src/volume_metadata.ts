@@ -6,20 +6,20 @@ import { WrappedError } from "./error.js";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
 import { getLinuxMtabMetadata } from "./linux/mount_points.js";
 import {
-  MtabVolumeMetadata,
+  type MtabVolumeMetadata,
   mountEntryToPartialVolumeMetadata,
 } from "./linux/mtab.js";
-import { MountPoint, getVolumeMountPoints } from "./mount_point.js";
+import type { MountPoint } from "./mount_point.js";
 import { compactValues } from "./object.js";
 import {
   IncludeSystemVolumesDefault,
-  Options,
+  type Options,
   optionsWithDefaults,
 } from "./options.js";
 import { normalizePath } from "./path.js";
 import { isLinux, isWindows } from "./platform.js";
 import {
-  RemoteInfo,
+  type RemoteInfo,
   extractRemoteInfo,
   isRemoteFsType,
 } from "./remote_info.js";
@@ -35,6 +35,7 @@ import {
   VolumeHealthStatuses,
   directoryStatus,
 } from "./volume_health_status.js";
+import { getVolumeMountPoints } from "./volume_mount_points.js";
 
 /**
  * Metadata associated to a volume.

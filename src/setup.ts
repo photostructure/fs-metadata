@@ -12,13 +12,13 @@ import {
   isHiddenRecursive,
   setHidden,
 } from "./hidden.js";
-import {
-  getVolumeMountPoints,
-  type GetVolumeMountPointOptions,
-} from "./mount_point.js";
 import { optionsWithDefaults } from "./options.js";
 import type { NativeBindings } from "./types/native_bindings.js";
 import { getAllVolumeMetadata, getVolumeMetadata } from "./volume_metadata.js";
+import {
+  getVolumeMountPoints,
+  type GetVolumeMountPointOptions,
+} from "./volume_mount_points.js";
 
 export function setup(dirname: string): ExportedFunctions {
   const nativeFn = defer<Promise<NativeBindings>>(async () => {

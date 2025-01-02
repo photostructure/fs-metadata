@@ -5,7 +5,6 @@ import { toError, WrappedError } from "../error.js";
 import { isMountPoint, type MountPoint } from "../mount_point.js";
 import { compactValues } from "../object.js";
 import { optionsWithDefaults, type Options } from "../options.js";
-import { assignSystemVolume } from "../system_volume.js";
 import type { NativeBindingsFn } from "../types/native_bindings.js";
 import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab.js";
 
@@ -47,7 +46,6 @@ export async function getLinuxMountPoints(
     const prior = byMountPoint.get(ea.mountPoint);
     const merged = { ...compactValues(prior), ...compactValues(ea) };
     if (isMountPoint(merged)) {
-      assignSystemVolume(merged, o);
       byMountPoint.set(merged.mountPoint, merged);
     }
   }
@@ -60,10 +58,11 @@ export async function getLinuxMountPoints(
   }
 
   const results = [...byMountPoint.values()];
-  debug("[getLinuxMountPoints] found %d mount points", results.length);
-  return o.includeSystemVolumes
-    ? results
-    : results.filter((ea) => !ea.isSystemVolume);
+  debug("[getLinuxMountPoints] %o", {
+    results: results.map((ea) => ea.mountPoint),
+  });
+
+  return results;
 }
 
 export async function getLinuxMtabMetadata(
