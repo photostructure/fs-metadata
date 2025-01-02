@@ -151,7 +151,7 @@ jobs:
         with:
           path: ./prebuilds
           merge-multiple: true
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@8b562ef
         if: ${{ matrix.arch == 'arm64' }}
         with:
           platforms: linux/arm64
