@@ -1,4 +1,5 @@
 import pluginJs from "@eslint/js";
+import regexp_plugin from "eslint-plugin-regexp";
 import globals from "globals";
 import ts_eslint from "typescript-eslint";
 
@@ -16,6 +17,7 @@ export default [
   pluginJs.configs.recommended,
   ...ts_eslint.configs.recommended,
   ...ts_eslint.configs.strict,
+  regexp_plugin.configs["flat/recommended"],
   {
     rules: {
       "@typescript-eslint/no-shadow": "error",
