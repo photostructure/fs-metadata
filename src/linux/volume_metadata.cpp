@@ -116,8 +116,10 @@ Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
   }
 
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new LinuxMetadataWorker(options.mountPoint, options, deferred);
-  worker->Queue();
+  auto worker = std::make_unique<LinuxMetadataWorker>(options.mountPoint,
+                                                      options, deferred);
+  auto raw_worker = worker.release(); // Release ownership to Node-API
+  raw_worker->Queue();
   return deferred.Promise();
 }
 

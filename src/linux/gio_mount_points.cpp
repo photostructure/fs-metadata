@@ -70,8 +70,9 @@ void GioMountPointsWorker::OnError(const Napi::Error &error) {
 
 Napi::Value GetMountPoints(Napi::Env env) {
   auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker = new GioMountPointsWorker(deferred);
-  worker->Queue();
+  auto worker = std::make_unique<GioMountPointsWorker>(deferred);
+  auto raw_worker = worker.release(); // Release ownership to Node-API
+  raw_worker->Queue();
   return deferred.Promise();
 }
 
