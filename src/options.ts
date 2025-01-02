@@ -137,7 +137,7 @@ export const LinuxMountTablePathsDefault = [
 ];
 
 /**
- * Should {@link getAllVolumeMetadata()} include system volumes by
+ * Should {@link getAllVolumeMetadata} include system volumes by
  * default?
  */
 export const IncludeSystemVolumesDefault = isWindows;
