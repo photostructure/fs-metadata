@@ -17,6 +17,14 @@ export function describePlatform(...supported: NodeJS.Platform[]) {
   return supported.includes(platform) ? describe : describe.skip;
 }
 
+export function skipItIf(skipped: NodeJS.Platform[]): jest.It {
+  return skipped.includes(platform) ? it.skip : it;
+}
+
+export function runItIf(included: NodeJS.Platform[]): jest.It {
+  return included.includes(platform) ? it : it.skip;
+}
+
 export function systemDrive() {
   if (isWindows) {
     return normalizePath(

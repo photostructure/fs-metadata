@@ -9,7 +9,12 @@ import { statAsync } from "./fs.js";
 import { createHiddenPosixPath, LocalSupport } from "./hidden.js";
 import { isLinux, isMacOS, isWindows } from "./platform.js";
 import { validateHidden } from "./test-utils/hidden-tests.js";
-import { systemDrive, tmpDirNotHidden } from "./test-utils/platform.js";
+import {
+  runItIf,
+  skipItIf,
+  systemDrive,
+  tmpDirNotHidden,
+} from "./test-utils/platform.js";
 
 describe("hidden file tests", () => {
   let tempDir: string;
@@ -58,37 +63,47 @@ describe("hidden file tests", () => {
     });
 
     describe("platform-specific behavior", () => {
-      if (isWindows) {
-        it("should detect hidden files using system flag", async () => {
+      runItIf(["win32"])(
+        "should detect hidden files using system flag",
+        async () => {
           const testFile = path.join(tempDir, "hidden.txt");
           await fs.writeFile(testFile, "test");
           execSync(`attrib +h "${testFile}"`);
           expect(await isHidden(testFile)).toBe(true);
-        });
+        },
+      );
 
-        it("should detect hidden directories", async () => {
-          const testDir = path.join(tempDir, "hiddenDir");
-          await fs.mkdir(testDir);
-          execSync(`attrib +h "${testDir}"`);
-          expect(await isHidden(testDir)).toBe(true);
-        });
+      runItIf(["win32"])("should detect hidden directories", async () => {
+        const testDir = path.join(tempDir, "hiddenDir");
+        await fs.mkdir(testDir);
+        execSync(`attrib +h "${testDir}"`);
+        expect(await isHidden(testDir)).toBe(true);
+      });
 
-        it("should not treat dot-prefixed files as hidden", async () => {
+      runItIf(["win32"])(
+        "should not treat dot-prefixed files as hidden",
+        async () => {
           const testFile = path.join(tempDir, ".gitignore");
           await fs.writeFile(testFile, "test");
           expect(await isHidden(testFile)).toBe(false);
-        });
-      } else {
-        it("should detect hidden files by dot prefix", async () => {
-          expect(await isHidden(path.join(tempDir, ".hidden.txt"))).toBe(true);
-        });
+        },
+      );
 
-        it("should detect hidden directories by dot prefix", async () => {
+      skipItIf(["win32"])(
+        "should detect hidden files by dot prefix",
+        async () => {
+          expect(await isHidden(path.join(tempDir, ".hidden.txt"))).toBe(true);
+        },
+      );
+
+      skipItIf(["win32"])(
+        "should detect hidden directories by dot prefix",
+        async () => {
           const testDir = path.join(tempDir, ".hidden");
           await fs.mkdir(testDir, { recursive: true });
           expect(await isHidden(testDir)).toBe(true);
-        });
-      }
+        },
+      );
     });
 
     describe("special characters handling", () => {

@@ -10,6 +10,7 @@ import {
   findAncestorDir,
   isDirectory,
 } from "./fs.js";
+import { skipItIf } from "./test-utils/platform.js";
 
 describe("fs", () => {
   let tempDir: string;
@@ -153,7 +154,7 @@ describe("fs", () => {
       await expect(canReaddir(dirPath, 1000)).resolves.toBe(true);
     });
 
-    it("should reject for unreadable directory", async () => {
+    skipItIf(["win32"])("should reject for unreadable directory", async () => {
       const dirPath = join(tempDir, "unreadableDir");
       await mkdir(dirPath, { mode: 0o000 });
       expect(canReaddir(dirPath, 1000)).rejects.toThrow(/EACCES/);
