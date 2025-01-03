@@ -1,12 +1,6 @@
 // src/fs.ts
 
-import {
-  type Dir,
-  type PathLike,
-  type StatOptions,
-  Stats,
-  statSync,
-} from "node:fs";
+import { type PathLike, type StatOptions, Stats, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { withTimeout } from "./async.js";
@@ -78,12 +72,6 @@ export async function canReaddir(
 }
 
 async function _canReaddir(dir: string): Promise<true> {
-  let d: Dir | undefined = undefined;
-  try {
-    d = await opendir(dir);
-    await d.read();
-    return true;
-  } finally {
-    if (d != null) void d.close();
-  }
+  await (await opendir(dir)).close();
+  return true;
 }

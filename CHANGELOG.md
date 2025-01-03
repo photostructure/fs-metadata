@@ -14,6 +14,10 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## [0.3.2] - 2025-01-03
+
+- `Fixed`: prior `canReaddir()` (and subsequent `status` of volume metadata) would incorrectly fail if the first directory element wasn't readable.
+
 ## [0.3.1] - 2025-01-03
 
 No public codepath updates.

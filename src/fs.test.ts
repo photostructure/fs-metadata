@@ -1,6 +1,6 @@
 // src/fs.test.ts
 
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -26,34 +26,22 @@ describe("fs", () => {
     it("should return true for existing file", async () => {
       const filePath = join(tempDir, "test.txt");
       await writeFile(filePath, "test content");
-
-      const result = await canStatAsync(filePath);
-      expect(result).toBe(true);
+      expect(await canStatAsync(filePath)).toBe(true);
     });
 
     it("should return true for existing directory", async () => {
-      const dirPath = join(tempDir, "testDir");
-      await mkdir(dirPath);
-
-      const result = await canStatAsync(dirPath);
-      expect(result).toBe(true);
+      expect(await canStatAsync(tempDir)).toBe(true);
     });
 
     it("should return false for non-existent path", async () => {
       const nonExistentPath = join(tempDir, "does-not-exist");
-
-      const result = await canStatAsync(nonExistentPath);
-      expect(result).toBe(false);
+      expect(await canStatAsync(nonExistentPath)).toBe(false);
     });
   });
 
   describe("isDirectory", () => {
     it("should return true for directory", async () => {
-      const dirPath = join(tempDir, "testDir");
-      await mkdir(dirPath);
-
-      const result = await isDirectory(dirPath);
-      expect(result).toBe(true);
+      expect(await isDirectory(tempDir)).toBe(true);
     });
 
     it("should return false for file", async () => {
@@ -66,9 +54,15 @@ describe("fs", () => {
 
     it("should return false for non-existent path", async () => {
       const nonExistentPath = join(tempDir, "does-not-exist");
+      expect(await isDirectory(nonExistentPath)).toBe(false);
+    });
 
-      const result = await isDirectory(nonExistentPath);
-      expect(result).toBe(false);
+    it("should return true for unreadable dir", async () => {
+      const unreadable = join(tempDir, "unreadable");
+      await mkdir(unreadable, { mode: 0o000 });
+      const child = join(unreadable, "child");
+      expect(await isDirectory(unreadable)).toBe(true);
+      expect(await isDirectory(child)).toBe(false);
     });
   });
 
@@ -136,18 +130,38 @@ describe("fs", () => {
   });
 
   describe("canReaddir", () => {
-    it("should resolve for readable directory", async () => {
+    it("should resolve for readable empty directory", async () => {
+      const dirPath = join(tempDir, "emptyDir");
+      await mkdir(dirPath);
+      await expect(canReaddir(dirPath, 1000)).resolves.toBe(true);
+    });
+
+    it("should resolve for readable directory with readable content", async () => {
       const dirPath = join(tempDir, "readableDir");
       await mkdir(dirPath);
       await writeFile(join(dirPath, "test.txt"), "test");
-
       await expect(canReaddir(dirPath, 1000)).resolves.toBe(true);
+    });
+
+    it("should resolve for readable directory with unreadable content", async () => {
+      const dirPath = join(tempDir, "readableDirWith000");
+      await mkdir(dirPath);
+      const txtPath = join(dirPath, "test.txt");
+      // make txtPath unreadable
+      await writeFile(txtPath, "test");
+      await chmod(txtPath, 0o000);
+      await expect(canReaddir(dirPath, 1000)).resolves.toBe(true);
+    });
+
+    it("should reject for unreadable directory", async () => {
+      const dirPath = join(tempDir, "unreadableDir");
+      await mkdir(dirPath, { mode: 0o000 });
+      expect(canReaddir(dirPath, 1000)).rejects.toThrow(/EACCES/);
     });
 
     it("should reject for non-existent directory", async () => {
       const nonExistentPath = join(tempDir, "does-not-exist");
-
-      await expect(canReaddir(nonExistentPath, 1000)).rejects.toThrow();
+      await expect(canReaddir(nonExistentPath, 1000)).rejects.toThrow(/ENOENT/);
     });
 
     it("should reject for file path", async () => {
