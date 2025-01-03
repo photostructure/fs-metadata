@@ -167,8 +167,7 @@ describe("fs", () => {
     it("should reject for file path", async () => {
       const filePath = join(tempDir, "test.txt");
       await writeFile(filePath, "test");
-
-      await expect(canReaddir(filePath, 1000)).rejects.toThrow();
+      await expect(canReaddir(filePath, 1000)).rejects.toThrow(/ENOTDIR/);
     });
 
     it("should reject on timeout", async () => {
