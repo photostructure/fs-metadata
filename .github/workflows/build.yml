@@ -46,7 +46,7 @@ jobs:
     steps:
       - name: Setup QEMU
         if: ${{ matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@8b562efa09ec1557a9e26f25a7c6292838acea94
         with:
           platforms: linux/arm64
       - run: sudo apt-get update
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@8b562efa09ec1557a9e26f25a7c6292838acea94
         if: ${{ matrix.arch == 'arm64' }}
         with:
           platforms: linux/arm64
@@ -120,7 +120,7 @@ jobs:
     steps:
       - name: Setup QEMU
         if: ${{ matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@8b562efa09ec1557a9e26f25a7c6292838acea94
         with:
           platforms: linux/arm64
       - run: sudo apt-get update
@@ -151,7 +151,7 @@ jobs:
         with:
           path: ./prebuilds
           merge-multiple: true
-      - uses: docker/setup-qemu-action@8b562ef
+      - uses: docker/setup-qemu-action@8b562efa09ec1557a9e26f25a7c6292838acea94
         if: ${{ matrix.arch == 'arm64' }}
         with:
           platforms: linux/arm64
@@ -187,7 +187,7 @@ jobs:
       # https://chatgpt.com/share/6761e017-9950-800e-ba1e-94d575010f2d
 
       - name: Set up GPG
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
