@@ -14,6 +14,18 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## [0.3.1] - 2025-01-03
+
+No public codepath updates.
+
+- `Fixed`: updated regex patterns for improved matching and linting compliance
+
+- `Fixed`: flaky CI test on macOS
+
+- `Added`: GitHub Action CodeQL and addressed linting nits
+
+- `Added`: scripts for **manually** running `clang-tidy` and `snyk code test` (as they both emit spurious warnings that don't seem to be safely silenced)
+
 ## [0.3.0] - 2025-01-01
 
 - `Changed`: For consistency,
