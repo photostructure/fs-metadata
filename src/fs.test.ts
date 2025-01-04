@@ -1,7 +1,7 @@
 // src/fs.test.ts
 
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import {
   canReaddir,
@@ -10,7 +10,6 @@ import {
   findAncestorDir,
   isDirectory,
 } from "./fs.js";
-import { skipItIf } from "./test-utils/platform.js";
 
 describe("fs", () => {
   let tempDir: string;
@@ -154,11 +153,14 @@ describe("fs", () => {
       await expect(canReaddir(dirPath, 1000)).resolves.toBe(true);
     });
 
-    skipItIf(["win32"])("should reject for unreadable directory", async () => {
-      const dirPath = join(tempDir, "unreadableDir");
-      await mkdir(dirPath, { mode: 0o000 });
-      expect(canReaddir(dirPath, 1000)).rejects.toThrow(/EACCES/);
-    });
+    (process.platform === "win32" || userInfo()?.uid === 0 ? it.skip : it)(
+      "should reject for unreadable directory",
+      async () => {
+        const dirPath = join(tempDir, "unreadableDir");
+        await mkdir(dirPath, { mode: 0o000 });
+        expect(canReaddir(dirPath, 1000)).rejects.toThrow(/EACCES/);
+      },
+    );
 
     it("should reject for non-existent directory", async () => {
       const nonExistentPath = join(tempDir, "does-not-exist");
