@@ -1,8 +1,8 @@
 // src/types/native_bindings.ts
 
-import { MountPoint } from "../mount_point.js";
-import type { Options } from "../options.js";
-import type { VolumeMetadata } from "../volume_metadata.js";
+import type { MountPoint } from "./mount_point.js";
+import type { Options } from "./options.js";
+import type { VolumeMetadata } from "./volume_metadata.js";
 
 export interface NativeBindings {
   /**

@@ -3,9 +3,10 @@ import { readFile } from "node:fs/promises";
 import { debug } from "../debuglog.js";
 import { toError, WrappedError } from "../error.js";
 import { compactValues } from "../object.js";
-import { optionsWithDefaults, type Options } from "../options.js";
+import { optionsWithDefaults } from "../options.js";
 import { isMountPoint, type MountPoint } from "../types/mount_point.js";
 import type { NativeBindingsFn } from "../types/native_bindings.js";
+import type { Options } from "../types/options.js";
 import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab.js";
 
 export async function getLinuxMountPoints(

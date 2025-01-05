@@ -5,7 +5,6 @@ import { mapConcurrent, withTimeout } from "./async.js";
 import { debug } from "./debuglog.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
 import { compactValues } from "./object.js";
-import { Options } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
 import {
   isBlank,
@@ -16,6 +15,7 @@ import {
 import { assignSystemVolume, SystemVolumeConfig } from "./system_volume.js";
 import type { MountPoint } from "./types/mount_point.js";
 import type { NativeBindingsFn } from "./types/native_bindings.js";
+import type { Options } from "./types/options.js";
 import { directoryStatus } from "./volume_health_status.js";
 
 export type GetVolumeMountPointOptions = Partial<
