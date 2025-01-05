@@ -82,6 +82,8 @@ export const SystemPathPatternsDefault = [
   "/run/user/*/gvfs",
   "/snap/**",
   "/sys/**",
+  "/tmp",
+  "/tmp/**",
   "**/#snapshot", // Synology and Kubernetes volume snapshots
 
   // windows for linux:

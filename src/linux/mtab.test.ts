@@ -17,6 +17,9 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
 192.168.0.216:/mnt/HDD1 /media/freenas/ nfs rw,bg,soft,intr,nosuid 0 0
 //cifs-server/share /mnt/cifs cifs rw,credentials=/path/to/credentials 0 0
 //guest@SERVER._smb._tcp.local/share /mnt/cifs2 smb rw,credentials=/path/to/guest/credentials 0 0
+u3145678@u3141519.example.com:/var/hdd2 /mnt/example.com fuse.sshfs rw,nosuid 0 0
+sshfs#USER@HOST:REMOTE_PATH LOCAL_PATH fuse defaults,_netdev,allow_other 0 0
+https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_netdev 0 0
 `;
 
       const entries = parseMtab(mtabContent);
@@ -85,6 +88,30 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
           fs_passno: 0,
           fs_spec: "//guest@SERVER._smb._tcp.local/share",
           fs_vfstype: "smb",
+        },
+        {
+          fs_file: "/mnt/example.com",
+          fs_freq: 0,
+          fs_mntops: "rw,nosuid",
+          fs_passno: 0,
+          fs_spec: "u3145678@u3141519.example.com:/var/hdd2",
+          fs_vfstype: "fuse.sshfs",
+        },
+        {
+          fs_file: "LOCAL_PATH",
+          fs_freq: 0,
+          fs_mntops: "defaults,_netdev,allow_other",
+          fs_passno: 0,
+          fs_spec: "sshfs#USER@HOST:REMOTE_PATH",
+          fs_vfstype: "fuse",
+        },
+        {
+          fs_file: "/mnt/webdav",
+          fs_freq: 0,
+          fs_mntops: "rw,user,noauto,_netdev",
+          fs_passno: 0,
+          fs_spec: "https://webdav.example.com/remote.php/webdav/",
+          fs_vfstype: "davfs",
         },
       ]);
 
@@ -161,6 +188,35 @@ nfs-server:/export /mnt/nfs nfs rw,vers=4.1 0 0
           remoteShare: "share",
           remoteUser: "guest",
           isSystemVolume: false,
+        },
+        {
+          fstype: "fuse.sshfs",
+          isSystemVolume: false,
+          mountFrom: "u3145678@u3141519.example.com:/var/hdd2",
+          mountPoint: "/mnt/example.com",
+          remote: true,
+          remoteUser: "u3145678",
+          remoteHost: "u3141519.example.com",
+          remoteShare: "/var/hdd2",
+        },
+        {
+          fstype: "fuse",
+          isSystemVolume: false,
+          mountFrom: "sshfs#USER@HOST:REMOTE_PATH",
+          mountPoint: "LOCAL_PATH",
+          protocol: "sshfs",
+          remote: true,
+          remoteHost: "HOST",
+          remoteShare: "REMOTE_PATH",
+          remoteUser: "USER",
+        },
+        {
+          fstype: "davfs",
+          isSystemVolume: false,
+          mountFrom: "https://webdav.example.com/remote.php/webdav/",
+          mountPoint: "/mnt/webdav",
+          remote: false,
+          uri: "https://webdav.example.com/remote.php/webdav/",
         },
       ]);
     });

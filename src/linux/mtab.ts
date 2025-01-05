@@ -70,7 +70,7 @@ export function mountEntryToPartialVolumeMetadata(
     fstype: entry.fs_vfstype,
     mountFrom: entry.fs_spec,
     isSystemVolume: isSystemVolume(entry.fs_file, entry.fs_vfstype, options),
-    remote: false, // < default to false
+    remote: false, // < default to false, but it may be overridden by extractRemoteInfo
     ...extractRemoteInfo(entry.fs_spec),
   };
 }

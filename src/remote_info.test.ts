@@ -3,17 +3,18 @@
 import {
   extractRemoteInfo,
   isRemoteFsType,
-  normalizeProtocol,
+  normalizeFsType,
   parseURL,
 } from "./remote_info.js";
 
 describe("remote_info tests", () => {
-  describe("normalizeProtocol", () => {
+  describe("normalizeFsType", () => {
     it("should normalize protocol by converting to lowercase and removing trailing colon", () => {
-      expect(normalizeProtocol("HTTP:")).toBe("http");
-      expect(normalizeProtocol("ftp:")).toBe("ftp");
-      expect(normalizeProtocol("")).toBe("");
-      expect(normalizeProtocol(null as unknown as string)).toBe("");
+      expect(normalizeFsType("HTTP:")).toBe("http");
+      expect(normalizeFsType("ftp:")).toBe("ftp");
+      expect(normalizeFsType("fuse.sshfs")).toBe("sshfs");
+      expect(normalizeFsType("")).toBe("");
+      expect(normalizeFsType(null as unknown as string)).toBe("");
     });
   });
 
@@ -73,6 +74,17 @@ describe("remote_info tests", () => {
         remoteUser: "user",
         remoteHost: "host",
         remoteShare: "share",
+      });
+    });
+
+    it("should return remote info for sshfs pattern", () => {
+      const result = extractRemoteInfo("sshfs#USER@HOST:REMOTE/PATH");
+      expect(result).toEqual({
+        remote: true,
+        remoteUser: "USER",
+        remoteHost: "HOST",
+        remoteShare: "REMOTE/PATH",
+        protocol: "sshfs",
       });
     });
 
