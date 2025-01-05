@@ -2,9 +2,9 @@
 import { readFile } from "node:fs/promises";
 import { debug } from "../debuglog.js";
 import { toError, WrappedError } from "../error.js";
-import { isMountPoint, type MountPoint } from "../mount_point.js";
 import { compactValues } from "../object.js";
 import { optionsWithDefaults, type Options } from "../options.js";
+import { isMountPoint, type MountPoint } from "../types/mount_point.js";
 import type { NativeBindingsFn } from "../types/native_bindings.js";
 import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab.js";
 

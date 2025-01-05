@@ -4,7 +4,6 @@ import { uniqBy } from "./array.js";
 import { mapConcurrent, withTimeout } from "./async.js";
 import { debug } from "./debuglog.js";
 import { getLinuxMountPoints } from "./linux/mount_points.js";
-import { MountPoint } from "./mount_point.js";
 import { compactValues } from "./object.js";
 import { Options } from "./options.js";
 import { isMacOS, isWindows } from "./platform.js";
@@ -15,6 +14,7 @@ import {
   toNotBlank,
 } from "./string.js";
 import { assignSystemVolume, SystemVolumeConfig } from "./system_volume.js";
+import type { MountPoint } from "./types/mount_point.js";
 import type { NativeBindingsFn } from "./types/native_bindings.js";
 import { directoryStatus } from "./volume_health_status.js";
 

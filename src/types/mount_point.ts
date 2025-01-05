@@ -1,6 +1,8 @@
-import { isObject } from "./object";
-import { isNotBlank } from "./string";
-import { VolumeHealthStatus } from "./volume_health_status";
+// src/types/mount_point.ts
+
+import { isObject } from "../object";
+import { isNotBlank } from "../string";
+import type { VolumeHealthStatus } from "../volume_health_status";
 
 /**
  * A mount point is a location in the file system where a volume is mounted.
@@ -53,6 +55,5 @@ export interface MountPoint {
 }
 
 export function isMountPoint(obj: unknown): obj is MountPoint {
-  if (!isObject(obj)) return false;
-  return "mountPoint" in obj && isNotBlank(obj.mountPoint);
+  return isObject(obj) && "mountPoint" in obj && isNotBlank(obj.mountPoint);
 }

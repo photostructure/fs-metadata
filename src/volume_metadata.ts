@@ -9,7 +9,6 @@ import {
   type MtabVolumeMetadata,
   mountEntryToPartialVolumeMetadata,
 } from "./linux/mtab.js";
-import type { MountPoint } from "./mount_point.js";
 import { compactValues } from "./object.js";
 import {
   IncludeSystemVolumesDefault,
@@ -18,17 +17,14 @@ import {
 } from "./options.js";
 import { normalizePath } from "./path.js";
 import { isLinux, isWindows } from "./platform.js";
-import {
-  type RemoteInfo,
-  extractRemoteInfo,
-  isRemoteFsType,
-} from "./remote_info.js";
+import { extractRemoteInfo, isRemoteFsType } from "./remote_info.js";
 import { isBlank, isNotBlank } from "./string.js";
 import { assignSystemVolume } from "./system_volume.js";
 import type {
   GetVolumeMetadataOptions,
   NativeBindingsFn,
 } from "./types/native_bindings.js";
+import type { VolumeMetadata } from "./types/volume_metadata.js";
 import { parseUNCPath } from "./unc.js";
 import { extractUUID } from "./uuid.js";
 import {
@@ -36,54 +32,6 @@ import {
   directoryStatus,
 } from "./volume_health_status.js";
 import { getVolumeMountPoints } from "./volume_mount_points.js";
-
-/**
- * Metadata associated to a volume.
- *
- * @see https://en.wikipedia.org/wiki/Volume_(computing)
- */
-export interface VolumeMetadata extends RemoteInfo, MountPoint {
-  /**
-   * The name of the partition
-   */
-  label?: string;
-  /**
-   * Total size in bytes
-   */
-  size?: number;
-  /**
-   * Used size in bytes
-   */
-  used?: number;
-  /**
-   * Available size in bytes
-   */
-  available?: number;
-
-  /**
-   * Path to the device or service that the mountpoint is from.
-   *
-   * Examples include `/dev/sda1`, `nfs-server:/export`,
-   * `//username@remoteHost/remoteShare`, or `//cifs-server/share`.
-   *
-   * May be undefined for remote volumes.
-   */
-  mountFrom?: string;
-
-  /**
-   * The name of the mount. This may match the resolved mountPoint.
-   */
-  mountName?: string;
-
-  /**
-   * UUID for the volume, like "c9b08f6e-b392-11ef-bf19-4b13bb7db4b4".
-   *
-   * On windows, this _may_ be the 128-bit volume UUID, but if that is not
-   * available, like in the case of remote volumes, we fallback to the 32-bit
-   * volume serial number, rendered in lowercase hexadecimal.
-   */
-  uuid?: string;
-}
 
 export async function getVolumeMetadata(
   o: GetVolumeMetadataOptions & Options,
@@ -290,5 +238,3 @@ export async function getAllVolumeMetadata(
         }) as VolumeMetadata,
   );
 }
-
-export const _ = undefined;

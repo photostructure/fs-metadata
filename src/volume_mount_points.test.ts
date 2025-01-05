@@ -3,9 +3,9 @@
 import { jest } from "@jest/globals";
 import { getVolumeMountPoints } from "..";
 import { times, uniq } from "./array.js";
-import { MountPoint } from "./mount_point.js";
 import { isWindows } from "./platform.js";
 import { sortByLocale } from "./string.js";
+import type { MountPoint } from "./types/mount_point.js";
 
 describe("Filesystem Metadata", () => {
   jest.setTimeout(15_000);

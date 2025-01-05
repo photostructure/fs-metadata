@@ -2,7 +2,6 @@
 
 import { debug } from "./debuglog.js";
 import { compileGlob } from "./glob.js";
-import { MountPoint } from "./mount_point.js";
 import {
   Options,
   SystemFsTypesDefault,
@@ -11,6 +10,7 @@ import {
 import { normalizePath } from "./path.js";
 import { isWindows } from "./platform.js";
 import { isNotBlank } from "./string.js";
+import type { MountPoint } from "./types/mount_point.js";
 
 /**
  * Configuration for system volume detection
