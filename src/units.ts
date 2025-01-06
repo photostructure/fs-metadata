@@ -1,6 +1,26 @@
 // src/units.ts
 
 /**
+ * Milliseconds in a second
+ */
+export const SecondMs = 1000;
+
+/**
+ * Milliseconds in a minute
+ */
+export const MinuteMs = 60 * SecondMs;
+
+/**
+ * Milliseconds in an hour
+ */
+export const HourMs = 60 * MinuteMs;
+
+/**
+ * Milliseconds in a day
+ */
+export const DayMs = 24 * HourMs;
+
+/**
  * Kibibyte (KiB) = 1024 bytes
  * @see https://en.wikipedia.org/wiki/Kibibyte
  */

@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { times } from "./array.js";
 import { delay, mapConcurrent, TimeoutError, withTimeout } from "./async.js";
+import { DayMs, HourMs } from "./units.js";
 
 describe("async", () => {
   describe("withTimeout", () => {
@@ -62,11 +63,6 @@ describe("async", () => {
         await expect(withTimeout({ promise, timeoutMs: 100.1 })).resolves.toBe(
           "test",
         );
-
-        // Very large timeout
-        await expect(
-          withTimeout({ promise, timeoutMs: Number.MAX_SAFE_INTEGER }),
-        ).resolves.toBe("test");
       });
     });
 
@@ -101,6 +97,7 @@ describe("async", () => {
           ).resolves.toBe(value);
         }
       });
+
       it("should handle immediate rejection", async () => {
         await expect(
           withTimeout({
@@ -292,8 +289,11 @@ describe("async", () => {
       it("should handle very large timeout values", async () => {
         const promise = Promise.resolve("test");
         await expect(
-          withTimeout({ promise, timeoutMs: Number.MAX_SAFE_INTEGER }),
-        ).resolves.toBe("test");
+          withTimeout({ promise, timeoutMs: HourMs }),
+        ).resolves.toEqual("test");
+        await expect(
+          withTimeout({ promise, timeoutMs: 2 * DayMs }),
+        ).rejects.toThrow(/too large/);
       });
 
       it("should handle promises that never settle", async () => {

@@ -2,6 +2,7 @@ import { availableParallelism } from "node:os";
 import { env } from "node:process";
 import { gt0, isNumber } from "./number.js";
 import { isBlank } from "./string.js";
+import { DayMs } from "./units.js";
 
 /**
  * An error that is thrown when a promise does not resolve within the specified
@@ -50,6 +51,14 @@ export async function withTimeout<T>(opts: {
   if (timeoutMs < 0) {
     throw new TypeError(
       desc + ": Expected timeoutMs to be > 0, but got " + timeoutMs,
+    );
+  }
+
+  if (timeoutMs > DayMs) {
+    throw new TypeError(
+      desc +
+        ": Invalid timeoutMs is too large: must be less than one day, but got " +
+        timeoutMs,
     );
   }
 
