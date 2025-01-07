@@ -1,6 +1,6 @@
 // src/defer.ts
 
-type Defer<T> = (() => T) & {
+export type Defer<T> = (() => T) & {
   reset: () => void;
 };
 
