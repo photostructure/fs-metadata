@@ -1,7 +1,5 @@
 // src/types/mount_point.ts
 
-import { isObject } from "../object";
-import { isNotBlank } from "../string";
 import type { VolumeHealthStatus } from "../volume_health_status";
 
 /**
@@ -52,8 +50,4 @@ export interface MountPoint {
    * may be added to this field.
    */
   error?: Error | string;
-}
-
-export function isMountPoint(obj: unknown): obj is MountPoint {
-  return isObject(obj) && "mountPoint" in obj && isNotBlank(obj.mountPoint);
 }
