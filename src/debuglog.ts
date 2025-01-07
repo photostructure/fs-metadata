@@ -1,7 +1,11 @@
 import { debuglog, format } from "node:util";
-import { defer } from "./defer.js";
 
-// allow tests to reset the debug log context
+// inlined as a hack to get around relative imports broken in ts-node (used by
+// the debuglog tests):
+function defer<T>(thunk: () => T) {
+  let t: T;
+  return () => t ??= thunk();
+}
 
 export const debugLogContext = defer(() => {
   for (const ea of ["fs-metadata", "fs-meta"]) {
