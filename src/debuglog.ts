@@ -4,7 +4,7 @@ import { debuglog, format } from "node:util";
 // the debuglog tests):
 function defer<T>(thunk: () => T) {
   let t: T;
-  return () => t ??= thunk();
+  return () => (t ??= thunk());
 }
 
 export const debugLogContext = defer(() => {
