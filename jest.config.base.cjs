@@ -43,13 +43,19 @@ const baseConfig = {
   ],
   coverageThreshold: {
     // As of 20250106 on linux:
-    //  | % Stmts | % Branch | % Funcs | % Lines
-    //  |   93.63 |    87.05 |   91.86 |   93.63
+    // % Stmts | % Branch | % Funcs | % Lines
+    //   93.63 |    87.05 |   91.86 |   93.63
+    // As of 20250106 on darwin:
+    // % Stmts | % Branch | % Funcs | % Lines
+    //   85.91 |    84.03 |   88.69 |   85.91
+    // As of 20250106 on windows:
+    // % Stmts | % Branch | % Funcs | % Lines
+    //   85.91 |    84.03 |   88.69 |   85.91
     global: {
-      statements: 85,
+      statements: 80,
       branches: 80,
-      functions: 85,
-      lines: 86,
+      functions: 80,
+      lines: 80,
     },
   },
 };

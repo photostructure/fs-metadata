@@ -14,9 +14,9 @@ Built and supported by [PhotoStructure](https://photostructure.com).
 ## Features
 
 - Cross-platform support:
-  - Windows 10+ (x64, arm64)
-  - macOS 14+ (x64, arm64)
-  - Ubuntu 22+ (x64, arm64) (with Gnome GIO/`GVfs` mount support when available)
+  - Windows 10+ (x64)
+  - macOS 14+
+  - Ubuntu 22+ (x64, arm64) (with Gnome GIO/`GVfs` mount support where available)
 
 - [List all mounted volumes/drives](https://photostructure.github.io/fs-metadata/functions/getVolumeMountPoints.html)
 
