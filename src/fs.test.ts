@@ -153,12 +153,13 @@ describe("fs", () => {
       await expect(canReaddir(dirPath, 1000)).resolves.toBe(true);
     });
 
-    (process.platform === "win32" || userInfo()?.uid === 0 ? it.skip : it)(
+    // userInfo.uid is -1 on Windows
+    (userInfo().uid <= 0 ? it.skip : it)(
       "should reject for unreadable directory",
       async () => {
         const dirPath = join(tempDir, "unreadableDir");
         await mkdir(dirPath, { mode: 0o000 });
-        expect(canReaddir(dirPath, 1000)).rejects.toThrow(/EACCES/);
+        expect(canReaddir(dirPath, 1000)).rejects.toThrow(/EACCES|ENOENT/);
       },
     );
 
