@@ -1,6 +1,17 @@
-// src/exports.ts
+// src/index.ts
 
+import NodeGypBuild from "node-gyp-build";
+import { debug, debugLogContext, isDebugEnabled } from "./debuglog.js";
+import { defer } from "./defer.js";
+import { _dirname } from "./dirname.js";
+import { findAncestorDir } from "./fs.js";
 import type { HideMethod, SetHiddenResult } from "./hidden.js";
+import {
+  getHiddenMetadataImpl,
+  isHiddenImpl,
+  isHiddenRecursiveImpl,
+  setHiddenImpl,
+} from "./hidden.js";
 import {
   IncludeSystemVolumesDefault,
   LinuxMountTablePathsDefault,
@@ -18,11 +29,17 @@ import type {
 import type { SystemVolumeConfig } from "./system_volume.js";
 import type { HiddenMetadata } from "./types/hidden_metadata.js";
 import type { MountPoint } from "./types/mount_point.js";
+import { NativeBindings } from "./types/native_bindings.js";
 import type { Options } from "./types/options.js";
 import type { VolumeMetadata } from "./types/volume_metadata.js";
 import type { VolumeHealthStatus } from "./volume_health_status.js";
 import { VolumeHealthStatuses } from "./volume_health_status.js";
+import {
+  getAllVolumeMetadataImpl,
+  getVolumeMetadataImpl,
+} from "./volume_metadata.js";
 import type { GetVolumeMountPointOptions } from "./volume_mount_points.js";
+import { getVolumeMountPointsImpl } from "./volume_mount_points.js";
 
 export type {
   GetVolumeMountPointOptions,
@@ -39,6 +56,28 @@ export type {
   VolumeMetadata,
 };
 
+const nativeFn = defer<Promise<NativeBindings>>(async () => {
+  const start = Date.now();
+  try {
+    const dirname = _dirname();
+    const dir = await findAncestorDir(dirname, "binding.gyp");
+    if (dir == null) {
+      throw new Error(
+        "Could not find bindings.gyp in any ancestor directory of " + dirname,
+      );
+    }
+    const bindings = NodeGypBuild(dir) as NativeBindings;
+    bindings.setDebugLogging(isDebugEnabled());
+    bindings.setDebugPrefix(debugLogContext() + ":native");
+    return bindings;
+  } catch (error) {
+    debug("Loading native bindings failed: %s", error);
+    throw error;
+  } finally {
+    debug(`Native bindings took %d ms to load`, Date.now() - start);
+  }
+});
+
 /**
  * List all active local and remote mount points on the system.
  *
@@ -49,9 +88,11 @@ export type {
  *
  * @param opts Optional filesystem operation settings to override default values
  */
-export declare function getVolumeMountPoints(
+export function getVolumeMountPoints(
   opts?: Partial<GetVolumeMountPointOptions>,
-): Promise<MountPoint[]>;
+): Promise<MountPoint[]> {
+  return getVolumeMountPointsImpl(optionsWithDefaults(opts), nativeFn);
+}
 
 /**
  * Get metadata for the volume at the given mount point.
@@ -59,10 +100,15 @@ export declare function getVolumeMountPoints(
  * @param mountPoint Must be a non-blank string
  * @param opts Optional filesystem operation settings
  */
-export declare function getVolumeMetadata(
+export function getVolumeMetadata(
   mountPoint: string,
   opts?: Partial<Pick<Options, "timeoutMs">>,
-): Promise<VolumeMetadata>;
+): Promise<VolumeMetadata> {
+  return getVolumeMetadataImpl(
+    { ...optionsWithDefaults(opts), mountPoint },
+    nativeFn,
+  );
+}
 
 /**
  * Retrieves metadata for all mounted volumes with optional filtering and
@@ -75,15 +121,17 @@ export declare function getVolumeMetadata(
  * Defaults to the system's available parallelism: see
  * {@link https://nodejs.org/api/os.html#osavailableparallelism | os.availableParallelism()}
  * @param opts.timeoutMs - Maximum time to wait for
- * {@link getVolumeMountPoints}, as well as **each** {@link getVolumeMetadata}
+ * {@link getVolumeMountPointsImpl}, as well as **each** {@link getVolumeMetadataImpl}
  * to complete. Defaults to {@link TimeoutMsDefault}
  * @returns Promise that resolves to an array of either VolumeMetadata objects
  * or error objects containing the mount point and error
  * @throws Never - errors are caught and returned as part of the result array
  */
-export declare function getAllVolumeMetadata(
+export function getAllVolumeMetadata(
   opts?: Partial<Options> & { includeSystemVolumes?: boolean },
-): Promise<VolumeMetadata[]>;
+): Promise<VolumeMetadata[]> {
+  return getAllVolumeMetadataImpl(optionsWithDefaults(opts), nativeFn);
+}
 
 /**
  * Check if a file or directory is hidden.
@@ -94,7 +142,9 @@ export declare function getAllVolumeMetadata(
  * @param pathname Path to file or directory
  * @returns Promise resolving to boolean indicating hidden state
  */
-export declare function isHidden(pathname: string): Promise<boolean>;
+export function isHidden(pathname: string): Promise<boolean> {
+  return isHiddenImpl(pathname, nativeFn);
+}
 
 /**
  * Check if a file or directory is hidden, or if any of its ancestor
@@ -103,7 +153,9 @@ export declare function isHidden(pathname: string): Promise<boolean>;
  * @param pathname Path to file or directory
  * @returns Promise resolving to boolean indicating hidden state
  */
-export declare function isHiddenRecursive(pathname: string): Promise<boolean>;
+export function isHiddenRecursive(pathname: string): Promise<boolean> {
+  return isHiddenRecursiveImpl(pathname, nativeFn);
+}
 
 /**
  * Get detailed metadata about the hidden state of a file or directory.
@@ -111,9 +163,9 @@ export declare function isHiddenRecursive(pathname: string): Promise<boolean>;
  * @param pathname Path to file or directory
  * @returns Promise resolving to metadata about the hidden state
  */
-export declare function getHiddenMetadata(
-  pathname: string,
-): Promise<HiddenMetadata>;
+export function getHiddenMetadata(pathname: string): Promise<HiddenMetadata> {
+  return getHiddenMetadataImpl(pathname, nativeFn);
+}
 
 /**
  * Set the hidden state of a file or directory
@@ -129,21 +181,13 @@ export declare function getHiddenMetadata(
  * @throws {Error} If the file doesn't exist, permissions are insufficient, or
  * the requested method is unsupported
  */
-export declare function setHidden(
+export function setHidden(
   pathname: string,
   hidden: boolean,
-  method?: HideMethod,
-): Promise<SetHiddenResult>;
-
-export type ExportedFunctions = {
-  getVolumeMountPoints: typeof getVolumeMountPoints;
-  getVolumeMetadata: typeof getVolumeMetadata;
-  getAllVolumeMetadata: typeof getAllVolumeMetadata;
-  isHidden: typeof isHidden;
-  isHiddenRecursive: typeof isHiddenRecursive;
-  getHiddenMetadata: typeof getHiddenMetadata;
-  setHidden: typeof setHidden;
-};
+  method: HideMethod = "auto",
+): Promise<SetHiddenResult> {
+  return setHiddenImpl(pathname, hidden, method, nativeFn);
+}
 
 export {
   IncludeSystemVolumesDefault,

@@ -28,9 +28,9 @@ import {
   VolumeHealthStatuses,
   directoryStatus,
 } from "./volume_health_status.js";
-import { getVolumeMountPoints } from "./volume_mount_points.js";
+import { getVolumeMountPointsImpl } from "./volume_mount_points.js";
 
-export async function getVolumeMetadata(
+export async function getVolumeMetadataImpl(
   o: GetVolumeMetadataOptions & Options,
   nativeFn: NativeBindingsFn,
 ): Promise<VolumeMetadata> {
@@ -156,7 +156,7 @@ async function _getVolumeMetadata(
   return compactValues(result) as VolumeMetadata;
 }
 
-export async function getAllVolumeMetadata(
+export async function getAllVolumeMetadataImpl(
   opts: Required<Options> & {
     includeSystemVolumes?: boolean;
     maxConcurrency?: number;
@@ -166,7 +166,7 @@ export async function getAllVolumeMetadata(
   const o = optionsWithDefaults(opts);
   debug("[getAllVolumeMetadata] starting with options: %o", o);
 
-  const arr = await getVolumeMountPoints(o, nativeFn);
+  const arr = await getVolumeMountPointsImpl(o, nativeFn);
   debug("[getAllVolumeMetadata] found %d mount points", arr.length);
 
   const unhealthyMountPoints = arr
@@ -214,7 +214,7 @@ export async function getAllVolumeMetadata(
         ? healthy
         : healthy.filter((ea) => !ea.isSystemVolume),
     fn: async (mp) =>
-      getVolumeMetadata({ ...mp, ...o }, nativeFn).catch((error) => ({
+      getVolumeMetadataImpl({ ...mp, ...o }, nativeFn).catch((error) => ({
         mountPoint: mp.mountPoint,
         error,
       })),

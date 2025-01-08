@@ -14,6 +14,21 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## [0.3.3] - 2025-01-07
+
+- `Packaging`: Improved ESM/CJS support with common `__dirname` implementation thanks to `tsup` [shims](https://tsup.egoist.dev/#inject-cjs-and-esm-shims).
+
+  This change simplifies the implementation and improves inline jsdocs as the exported code and docs have been inlined.
+  
+- `Packaging`: Re-enabled test coverage assertions (after finding the magicks to get istanbul to see what the tests were exercising)
+
+- `Packaging`: Added debuglog tests
+
+- `Packaging`: Fixed `npm run watch`
+
+- `Packaging`: Fixed `npm run watch`
+
+
 ## [0.3.2] - 2025-01-03
 
 - `Fixed`: prior `canReaddir()` (and subsequent `status` of volume metadata) would incorrectly fail if the first directory element wasn't readable.

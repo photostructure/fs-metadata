@@ -29,10 +29,7 @@ export type GetVolumeMountPointOptions = Partial<
     SystemVolumeConfig
 >;
 
-/**
- * Helper function for {@link getVolumeMountPoints}.
- */
-export async function getVolumeMountPoints(
+export async function getVolumeMountPointsImpl(
   opts: Required<GetVolumeMountPointOptions>,
   nativeFn: NativeBindingsFn,
 ): Promise<MountPoint[]> {

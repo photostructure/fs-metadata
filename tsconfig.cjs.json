@@ -4,6 +4,5 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "outDir": "./dist/cjs"
-  },
-  "files": ["./src/index.cts"]
+  }
 }

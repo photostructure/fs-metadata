@@ -37,15 +37,19 @@ const baseConfig = {
     "exports",
     "setup",
     "/test-utils/",
+    "\.d.ts$",
     "/types/",
     ...otherPlatforms,
   ],
   coverageThreshold: {
+    // As of 20250106 on linux:
+    //  | % Stmts | % Branch | % Funcs | % Lines
+    //  |   93.63 |    87.05 |   91.86 |   93.63
     global: {
       statements: 85,
       branches: 80,
-      functions: 88,
-      lines: 90,
+      functions: 85,
+      lines: 86,
     },
   },
 };

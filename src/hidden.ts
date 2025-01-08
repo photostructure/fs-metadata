@@ -43,7 +43,7 @@ export const LocalSupport = HiddenSupportByPlatform[process.platform]
  * @returns A boolean indicating if the item is hidden
  * @throws {Error} If the file doesn't exist or permissions are insufficient
  */
-export async function isHidden(
+export async function isHiddenImpl(
   pathname: string,
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
@@ -57,7 +57,7 @@ export async function isHidden(
   );
 }
 
-export async function isHiddenRecursive(
+export async function isHiddenRecursiveImpl(
   path: string,
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
@@ -66,7 +66,7 @@ export async function isHiddenRecursive(
     throw new Error("Invalid path: " + JSON.stringify(path));
   }
   while (!isRootDirectory(norm)) {
-    if (await isHidden(norm, nativeFn)) {
+    if (await isHiddenImpl(norm, nativeFn)) {
       return true;
     }
     norm = dirname(norm);
@@ -129,7 +129,7 @@ async function isSystemHidden(
  * @returns An object containing detailed hidden state information
  * @throws {Error} If the file doesn't exist or permissions are insufficient
  */
-export async function getHiddenMetadata(
+export async function getHiddenMetadataImpl(
   pathname: string,
   nativeFn: NativeBindingsFn,
 ): Promise<HiddenMetadata> {
@@ -157,7 +157,7 @@ export type SetHiddenResult = {
   };
 };
 
-export async function setHidden(
+export async function setHiddenImpl(
   pathname: string,
   hide: boolean,
   method: HideMethod,

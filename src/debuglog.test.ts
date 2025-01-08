@@ -1,11 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { env } from "node:process";
-import { isESM } from "./platform";
+import { _dirname } from "./dirname";
 
-(isESM() ? describe.skip : describe)("debuglog integration tests", () => {
-  const childTestPath = join(__dirname, "test-utils", "debuglog-child.ts");
-
+describe("debuglog integration tests", () => {
   function runChildTest(nodeDebug?: string) {
     const childEnv: Record<string, string | undefined> = {
       ...env,
@@ -13,10 +11,9 @@ import { isESM } from "./platform";
     if (nodeDebug != null) {
       childEnv["NODE_DEBUG"] = nodeDebug;
     }
-
     const result = spawnSync(
-      "node",
-      ["-r", "ts-node/register", childTestPath],
+      "npx",
+      ["tsx", join(_dirname(), "test-utils", "debuglog-child.ts")],
       {
         env: childEnv,
         encoding: "utf8",
