@@ -24,11 +24,18 @@ export function normalizePath(
 export function normalizePosixPath(
   mountPoint: string | undefined,
 ): string | undefined {
-  return isBlank(mountPoint)
-    ? undefined
-    : mountPoint === "/"
-      ? mountPoint
-      : mountPoint.replace(/\/+$/, "");
+  if (isBlank(mountPoint)) return undefined;
+  if (mountPoint === "/") return mountPoint;
+  
+  // Fast path: check last char only if no trailing slash
+  if (mountPoint[mountPoint.length - 1] !== "/") return mountPoint;
+  
+  // Slower path: trim trailing slashes
+  let end = mountPoint.length - 1;
+  while (end > 0 && mountPoint[end] === "/") {
+    end--;
+  }
+  return mountPoint.slice(0, end + 1);
 }
 
 /**

@@ -19,6 +19,7 @@ describe("mount_point", () => {
     });
 
     it("handles multiple trailing slashes", () => {
+      expect(normalizePosixPath("//")).toBe("/");
       expect(normalizePosixPath("/home//")).toBe("/home");
       expect(normalizePosixPath("/usr////")).toBe("/usr");
     });
