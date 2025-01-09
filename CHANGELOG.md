@@ -14,7 +14,7 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## [0.3.3] - 2025-01-07
+## [0.3.3] - 2025-01-08
 
 - `Packaging`: Improved ESM/CJS support with common `__dirname` implementation thanks to `tsup` [shims](https://tsup.egoist.dev/#inject-cjs-and-esm-shims).
 
@@ -25,9 +25,6 @@ Security in case of vulnerabilities.
 - `Packaging`: Added debuglog tests
 
 - `Packaging`: Fixed `npm run watch`
-
-- `Packaging`: Fixed `npm run watch`
-
 
 ## [0.3.2] - 2025-01-03
 
