@@ -31,7 +31,8 @@ export const SystemPathPatternsDefault = [
   "/snap/**",
   "/sys/**",
   "/tmp",
-  "/tmp/**",
+  "/var/tmp",
+  // we aren't including /tmp/**, as some people temporarily mount volumes there, like /tmp/project.
   "**/#snapshot", // Synology and Kubernetes volume snapshots
 
   // windows for linux:
