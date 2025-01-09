@@ -1,9 +1,9 @@
 // src/platform.ts
 
-import { platform } from "node:os";
+import { arch, platform } from "node:process";
 
-const p = platform();
+export const isLinux = platform === "linux";
+export const isWindows = platform === "win32";
+export const isMacOS = platform === "darwin";
 
-export const isLinux = p === "linux";
-export const isWindows = p === "win32";
-export const isMacOS = p === "darwin";
+export const isArm = isLinux && arch.startsWith("arm");

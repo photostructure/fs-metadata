@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { times } from "./array.js";
 import { delay, mapConcurrent, TimeoutError, withTimeout } from "./async.js";
+import { isArm } from "./platform.js";
 import { DayMs, HourMs } from "./units.js";
 
 describe("async", () => {
@@ -395,7 +396,8 @@ describe("async", () => {
           maxConcurrency,
         });
         expect(results).toEqual(times(10, (i) => i * 2));
-        expect(Date.now() - start).toBeLessThan(200); // Should complete concurrently
+        // This should complete in ~100ms, but GHA runners are slow -- the alpine ARM runner took 243ms (!!)
+        expect(Date.now() - start).toBeLessThan(isArm ? 250 : 200);
       });
 
       it("should maintain proper order even with varying execution times", async () => {
