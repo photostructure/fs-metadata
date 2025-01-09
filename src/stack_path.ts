@@ -35,6 +35,8 @@ const patterns = isWindows
       /\bat\s(.+[^/]\s)?(?<path>\/.+?):\d+:\d+$/,
     ];
 
+const MaybeUrlRE = /^[a-z]{2,5}:\/\//i;
+
 // only exposed for tests:
 export function extractCallerPath(stack: string): string {
   const frames = stack.split("\n").filter(Boolean);
@@ -48,15 +50,20 @@ export function extractCallerPath(stack: string): string {
   }
   for (let i = callerFrame + 1; i < frames.length; i++) {
     const frame = frames[i];
-    for (const re of patterns) {
-      const g = toS(frame).trim().match(re)?.groups;
+    for (const pattern of patterns) {
+      const g = toS(frame).trim().match(pattern)?.groups;
       if (g != null && isNotBlank(g["path"])) {
         const path = g["path"];
-        try {
-          return new URL(path).pathname;
-        } catch {
-          return path;
+        // Windows requires us to check if it's a reasonable URL, as URL accepts
+        // "C:\\path\\file.txt" as valid (!!)
+        if (MaybeUrlRE.test(path)) {
+          try {
+            return new URL(path).pathname;
+          } catch {
+            // ignore
+          }
         }
+        return path;
       }
     }
   }
