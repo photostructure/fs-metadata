@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { env } from "node:process";
 import { _dirname } from "./dirname";
@@ -11,21 +11,15 @@ describe("debuglog integration tests", () => {
     if (nodeDebug != null) {
       childEnv["NODE_DEBUG"] = nodeDebug;
     }
-    const result = spawnSync(
-      "npx",
-      ["tsx", join(_dirname(), "test-utils", "debuglog-child.ts")],
-      {
-        env: childEnv,
-        encoding: "utf8",
-      },
-    );
 
-    if (result.error) throw result.error;
-    if (result.status !== 0) {
-      throw new Error(`Child process failed: ${result.stderr}`);
-    }
+    const script = join(_dirname(), "test-utils", "debuglog-child.ts");
 
-    return JSON.parse(result.stdout);
+    const result = execFileSync(process.execPath, ["--import=tsx", script], {
+      env: childEnv,
+      encoding: "utf8",
+    });
+
+    return JSON.parse(result);
   }
 
   test("uses fs-metadata when NODE_DEBUG=fs-metadata", () => {
