@@ -1,7 +1,8 @@
 // src/darwin/volume_mount_points.cpp
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
-#include "fs_meta.h"
+#include "./fs_meta.h"
+#include "./raii_utils.h"
 #include <chrono>
 #include <future>
 #include <sys/mount.h>
@@ -24,9 +25,8 @@ public:
   void Execute() override {
     DEBUG_LOG("[GetVolumeMountPointsWorker] Executing");
     try {
-      // Get mount list - this is fast
-      struct statfs *mntbufp;
-      int count = getmntinfo(&mntbufp, MNT_WAIT);
+      MountBufferRAII mntbuf; // RAII wrapper will handle cleanup
+      int count = getmntinfo_r_np(mntbuf.ptr(), MNT_WAIT);
 
       if (count <= 0) {
         throw std::runtime_error("Failed to get mount information");
@@ -34,36 +34,39 @@ public:
 
       for (int i = 0; i < count; i++) {
         MountPoint mp;
-        mp.mountPoint = mntbufp[i].f_mntonname;
-        mp.fstype = mntbufp[i].f_fstypename;
+        mp.mountPoint = mntbuf.get()[i].f_mntonname;
+        mp.fstype = mntbuf.get()[i].f_fstypename;
         mp.error = ""; // Initialize error field
 
         DEBUG_LOG("[GetVolumeMountPointsWorker] Checking mount point: %s",
                   mp.mountPoint.c_str());
 
         try {
-          // Use shared_future to allow multiple gets
-          std::shared_future<bool> future =
+          // Use RAII to manage future
+          auto future = std::make_shared<std::future<bool>>(
               std::async(std::launch::async, [path = mp.mountPoint]() {
-                return access(path.c_str(), R_OK) == 0;
-              }).share();
+                // Use faccessat for better security
+                return faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
+              }));
 
-          auto status = future.wait_for(std::chrono::milliseconds(timeoutMs_));
+          auto status = future->wait_for(std::chrono::milliseconds(timeoutMs_));
 
-          if (status == std::future_status::timeout) {
+          switch (status) {
+          case std::future_status::timeout:
             mp.status = "disconnected";
             mp.error = "Access check timed out";
-            DEBUG_LOG(
-                "[GetVolumeMountPointsWorker] Access check timed out for: %s",
-                mp.mountPoint.c_str());
-          } else if (status == std::future_status::ready) {
+            DEBUG_LOG("[GetVolumeMountPointsWorker] Access check timed out: %s",
+                      mp.mountPoint.c_str());
+            break;
+
+          case std::future_status::ready:
             try {
-              bool isAccessible = future.get();
+              bool isAccessible = future->get();
               mp.status = isAccessible ? "healthy" : "inaccessible";
               if (!isAccessible) {
                 mp.error = "Path is not accessible";
               }
-              DEBUG_LOG("[GetVolumeMountPointsWorker] Access check %s for: %s",
+              DEBUG_LOG("[GetVolumeMountPointsWorker] Access check %s: %s",
                         isAccessible ? "succeeded" : "failed",
                         mp.mountPoint.c_str());
             } catch (const std::exception &e) {
@@ -71,12 +74,14 @@ public:
               mp.error = std::string("Access check failed: ") + e.what();
               DEBUG_LOG("[GetVolumeMountPointsWorker] Exception: %s", e.what());
             }
-          } else {
+            break;
+
+          default:
             mp.status = "error";
             mp.error = "Unexpected future status";
-            DEBUG_LOG(
-                "[GetVolumeMountPointsWorker] Unexpected future status for: %s",
-                mp.mountPoint.c_str());
+            DEBUG_LOG("[GetVolumeMountPointsWorker] Unexpected status: %s",
+                      mp.mountPoint.c_str());
+            break;
           }
         } catch (const std::exception &e) {
           mp.status = "error";

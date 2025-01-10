@@ -2,6 +2,7 @@
 
 #include "../common/debug_log.h"
 #include "./fs_meta.h"
+#include "./raii_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
@@ -35,55 +36,6 @@ static std::string CFStringToString(CFStringRef cfString) {
   result.resize(strlen(result.c_str()));
   return result;
 }
-
-// Improved CFReleaser with proper Core Foundation support
-template <typename T> class CFReleaser {
-private:
-  T ref_;
-
-public:
-  explicit CFReleaser(T ref = nullptr) noexcept : ref_(ref) {}
-
-  // Delete copy operations
-  CFReleaser(const CFReleaser &) = delete;
-  CFReleaser &operator=(const CFReleaser &) = delete;
-
-  // Move operations
-  CFReleaser(CFReleaser &&other) noexcept : ref_(other.ref_) {
-    other.ref_ = nullptr;
-  }
-
-  CFReleaser &operator=(CFReleaser &&other) noexcept {
-    if (this != &other) {
-      reset();
-      ref_ = other.ref_;
-      other.ref_ = nullptr;
-    }
-    return *this;
-  }
-
-  ~CFReleaser() { reset(); }
-
-  void reset(T ref = nullptr) {
-    if (ref_) {
-      CFRelease(ref_);
-    }
-    ref_ = ref;
-  }
-
-  // Implicit conversion operator for Core Foundation APIs
-  operator T() const noexcept { return ref_; }
-
-  T get() const noexcept { return ref_; }
-  bool isValid() const noexcept { return ref_ != nullptr; }
-
-  // Release ownership
-  T release() noexcept {
-    T temp = ref_;
-    ref_ = nullptr;
-    return temp;
-  }
-};
 
 class GetVolumeMetadataWorker : public MetadataWorkerBase {
 public:
@@ -178,12 +130,12 @@ private:
     // Check if this is a network filesystem
     if (metadata.fstype == "smbfs" || metadata.fstype == "nfs" ||
         metadata.fstype == "afpfs" || metadata.fstype == "webdav") {
-      // For network filesystems, we consider them healthy even without DA info
       metadata.remote = true;
       metadata.status = "healthy";
       return;
     }
 
+    // Create session on current thread
     CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
     if (!session.isValid()) {
       DEBUG_LOG("[GetVolumeMetadataWorker] Failed to create DA session");
@@ -193,21 +145,39 @@ private:
     }
 
     try {
-      // RAII cleanup for RunLoop scheduling
-      struct RunLoopCleaner {
-        DASessionRef session;
-        explicit RunLoopCleaner(DASessionRef s) : session(s) {}
-        ~RunLoopCleaner() {
-          DASessionUnscheduleFromRunLoop(session, CFRunLoopGetCurrent(),
-                                         kCFRunLoopDefaultMode);
+      // Get thread-local runloop or create new one if needed
+      CFRunLoopRef runLoop = CFRunLoopGetCurrent();
+      if (!runLoop) {
+        // If no runloop exists, create a new one for this thread
+        CFRunLoopRun();
+        runLoop = CFRunLoopGetCurrent();
+        if (!runLoop) {
+          throw std::runtime_error("Failed to create thread-local runloop");
         }
-      };
+      }
 
-      // Schedule session with RunLoop
-      DASessionScheduleWithRunLoop(session.get(), CFRunLoopGetCurrent(),
+      // Schedule session with our runloop
+      DASessionScheduleWithRunLoop(session.get(), runLoop,
                                    kCFRunLoopDefaultMode);
 
-      auto scopeGuard = std::make_unique<RunLoopCleaner>(session.get());
+      // Use RAII to ensure cleanup
+      struct RunLoopCleaner {
+        DASessionRef session;
+        CFRunLoopRef runLoop;
+        bool shouldStop;
+        RunLoopCleaner(DASessionRef s, CFRunLoopRef l, bool stop = false)
+            : session(s), runLoop(l), shouldStop(stop) {}
+        ~RunLoopCleaner() {
+          DASessionUnscheduleFromRunLoop(session, runLoop,
+                                         kCFRunLoopDefaultMode);
+          if (shouldStop) {
+            CFRunLoopStop(runLoop);
+          }
+        }
+      } scopeGuard(session.get(), runLoop, !CFRunLoopGetCurrent());
+
+      // Run the run loop briefly to ensure DA is ready
+      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
 
       CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
           kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
@@ -228,12 +198,17 @@ private:
         return;
       }
 
+      // Ensure we have a complete description before continuing
+      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, false);
+
+      // Process description synchronously since we're already on the right
+      // thread
       ProcessDiskDescription(description.get());
 
-      // Only set ready if we got this far without errors
       if (metadata.status != "partial") {
         metadata.status = "healthy";
       }
+
     } catch (const std::exception &e) {
       DEBUG_LOG("[GetVolumeMetadataWorker] Exception: %s", e.what());
       metadata.status = "error";

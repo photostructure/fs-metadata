@@ -15,6 +15,13 @@ GetHiddenWorker::GetHiddenWorker(std::string path,
 
 void GetHiddenWorker::Execute() {
   DEBUG_LOG("[GetHiddenWorker] checking hidden status for: %s", path_.c_str());
+
+  // Add path validation to prevent directory traversal
+  if (path_.find("..") != std::string::npos) {
+    SetError("Invalid path containing '..'");
+    return;
+  }
+
   struct stat statbuf;
   if (stat(path_.c_str(), &statbuf) != 0) {
     int error = errno;
@@ -73,6 +80,13 @@ SetHiddenWorker::SetHiddenWorker(std::string path, bool hidden,
 void SetHiddenWorker::Execute() {
   DEBUG_LOG("[SetHiddenWorker] setting hidden=%d for: %s", hidden_,
             path_.c_str());
+
+  // Add path validation to prevent directory traversal
+  if (path_.find("..") != std::string::npos) {
+    SetError("Invalid path containing '..'");
+    return;
+  }
+
   struct stat statbuf;
   if (stat(path_.c_str(), &statbuf) != 0) {
     int error = errno;
