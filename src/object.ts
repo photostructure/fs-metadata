@@ -3,7 +3,7 @@
 import { isNotBlank, isString } from "./string.js";
 
 /**
- * Check if a value is an object
+ * @return true iff value is an object and not an array
  */
 export function isObject(value: unknown): value is object {
   // typeof null is 'object', so we need to check for that case YAY JAVASCRIPT
@@ -11,7 +11,8 @@ export function isObject(value: unknown): value is object {
 }
 
 /**
- * Map a value to another value, or undefined if the value is undefined
+ * @return undefined if `obj` is nullish, or the return value of `fn` applied
+ * against `obj` if `obj` is defined
  */
 export function map<T, U>(
   obj: T | undefined,
@@ -21,7 +22,7 @@ export function map<T, U>(
 }
 
 /**
- * Omit the specified fields from an object
+ * @return a shallow copy of `obj` that omits the specified `keys`
  */
 export function omit<T extends object, K extends keyof T>(
   obj: T,
@@ -40,6 +41,10 @@ export function omit<T extends object, K extends keyof T>(
   return result;
 }
 
+/**
+ * @return a shallow copy of `obj` that only includes fields that are defined
+ * and not nullish or blank.
+ */
 export function compactValues<T extends object>(
   obj: T | undefined,
 ): Partial<T> {
