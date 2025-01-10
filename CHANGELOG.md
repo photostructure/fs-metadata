@@ -14,6 +14,10 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## [0.4.0] - 2025-01-09
+
+- `Fixed`: Switch to thread-safe `getmntinfo_r_np()` for macOS. Improved darwin resource management.
+
 ## [0.3.3] - 2025-01-08
 
 - `Packaging`: Improved ESM/CJS support with common `__dirname` implementation thanks to `tsup` [shims](https://tsup.egoist.dev/#inject-cjs-and-esm-shims).
