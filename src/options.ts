@@ -51,7 +51,7 @@ export const SystemPathPatternsDefault = [
   "/System/Volumes/Update",
   "/System/Volumes/VM",
   "/System/Volumes/xarts",
-];
+] as const;
 
 /**
  * Filesystem types that indicate system volumes
