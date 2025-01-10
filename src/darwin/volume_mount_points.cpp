@@ -25,8 +25,12 @@ public:
   void Execute() override {
     DEBUG_LOG("[GetVolumeMountPointsWorker] Executing");
     try {
-      MountBufferRAII mntbuf; // RAII wrapper will handle cleanup
-      int count = getmntinfo_r_np(mntbuf.ptr(), MNT_WAIT);
+      MountBufferRAII mntbuf;
+      // Use MNT_NOWAIT for better performance - we'll verify accessibility
+      // separately and our error handling already covers mount state changes
+      // See https://github.com/swiftlang/swift-corelibs-foundation/issues/4649
+
+      int count = getmntinfo_r_np(mntbuf.ptr(), MNT_NOWAIT);
 
       if (count <= 0) {
         throw std::runtime_error("Failed to get mount information");
