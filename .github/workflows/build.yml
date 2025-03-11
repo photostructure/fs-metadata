@@ -44,14 +44,12 @@ jobs:
         arch: [x64, arm64]
     runs-on: ubuntu-22.04 # < compile with oldest supported Ubuntu
     steps:
-      - name: Setup QEMU
-        if: ${{ matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@f30d974279f970cd3ed4ee3bcf1ff7795e271f00
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-qemu
         with:
-          platforms: linux/arm64
+          arch: ${{ matrix.arch }}
       - run: sudo apt-get update
       - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -71,17 +69,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@f30d974279f970cd3ed4ee3bcf1ff7795e271f00
-        if: ${{ matrix.arch == 'arm64' }}
+      - uses: ./.github/actions/setup-qemu
         with:
-          platforms: linux/arm64
+          arch: ${{ matrix.arch }}
       - run: |
           docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:18-alpine -c "\
           apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
           cd /tmp/project && \
           npm ci && \
           npm run prebuild"
-
       - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-linux-${{ matrix.arch }}-musl
@@ -118,17 +114,15 @@ jobs:
         node-version: [18, 20, 22, 23]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Setup QEMU
-        if: ${{ matrix.arch == 'arm64' }}
-        uses: docker/setup-qemu-action@f30d974279f970cd3ed4ee3bcf1ff7795e271f00
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-qemu
         with:
-          platforms: linux/arm64
+          arch: ${{ matrix.arch }}
       - run: sudo apt-get update
       - run: sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: ./prebuilds
@@ -141,20 +135,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # my eyes can't discern arm64 from amd64
         arch: [x64, arm64]
         node-version: [18, 20, 22, 23]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-qemu
+        with:
+          arch: ${{ matrix.arch }}
       - uses: actions/download-artifact@v4
         with:
           path: ./prebuilds
           merge-multiple: true
-      - uses: docker/setup-qemu-action@f30d974279f970cd3ed4ee3bcf1ff7795e271f00
-        if: ${{ matrix.arch == 'arm64' }}
-        with:
-          platforms: linux/arm64
       - run: |
           docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:${{ matrix.node-version }}-alpine -c "\
           apk add util-linux-dev --update-cache && \
