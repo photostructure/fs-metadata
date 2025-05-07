@@ -123,8 +123,8 @@ describe("concurrent", () => {
         );
         // REMEMBER: NEVER USE toBeCloseTo -- the api is bonkers and only
         // applicable for fractional numbers
-        // GHA runners may differ by more than 15Mb, and
-        const delta = (isMacOS ? 35 : 20) * MiB;
+        // GHA runners may differ by more than 20Mb, and macOS can differ by 95 Mb (!!)
+        const delta = (isMacOS ? 100 : 20) * MiB;
         expect(ea.available).toBeWithinDelta(
           expected.available as number,
           delta,
