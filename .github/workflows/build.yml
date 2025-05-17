@@ -179,7 +179,7 @@ jobs:
       # https://chatgpt.com/share/6761e017-9950-800e-ba1e-94d575010f2d
 
       - name: Set up GPG
-        uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
