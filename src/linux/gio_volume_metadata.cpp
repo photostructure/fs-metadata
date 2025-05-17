@@ -28,10 +28,10 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
 
     // Get volume information
     GObjectPtr<GVolume> volume(g_mount_get_volume(mount));
-    if (volume) {
+    if (volume && volume.get()) {
       GCharPtr label(g_volume_get_name(volume.get()));
-      if (label) {
-        DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, label: %s",
+      if (label && label.get()) {
+        DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, label: %s}",
                   path.get(), label.get());
         metadata.label = label.get();
       }
@@ -43,9 +43,9 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
     }
 
     GObjectPtr<GFile> location(g_mount_get_default_location(mount));
-    if (location) {
+    if (location && location.get()) {
       GCharPtr uri(g_file_get_uri(location.get()));
-      if (uri) {
+      if (uri && uri.get()) {
         DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, uri: %s}",
                   path.get(), uri.get());
         metadata.uri = uri.get();
