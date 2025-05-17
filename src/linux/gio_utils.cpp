@@ -41,17 +41,28 @@ void MountIterator::forEachMount(const MountCallback &callback) {
     // Take an extra reference on the mount while we work with it
     g_object_ref(mount);
 
-    GioResource<GFile> root(g_mount_get_root(mount));
-    if (G_IS_FILE(root.get())) {
-      bool continue_iteration = callback(mount, root.get());
-      g_object_unref(mount);
+    try {
+      GioResource<GFile> root(g_mount_get_root(mount));
 
-      if (!continue_iteration) {
-        break;
+      // Check both for null and valid GFile
+      if (root.get() && G_IS_FILE(root.get())) {
+        bool continue_iteration = callback(mount, root.get());
+        g_object_unref(mount);
+
+        if (!continue_iteration) {
+          break;
+        }
+      } else {
+        DEBUG_LOG(
+            "[gio::MountIterator::forEachMount] Invalid root file object");
+        g_object_unref(mount);
       }
-    } else {
-      DEBUG_LOG("[gio::MountIterator::forEachMount] Invalid root file object");
+    } catch (const std::exception &e) {
+      DEBUG_LOG("[gio::MountIterator::forEachMount] Exception during mount "
+                "processing: %s",
+                e.what());
       g_object_unref(mount);
+      throw; // Re-throw to maintain current behavior
     }
   }
 
