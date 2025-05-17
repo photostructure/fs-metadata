@@ -18,7 +18,12 @@ public:
   LinuxMetadataWorker(const std::string &mountPoint,
                       const VolumeMetadataOptions &options,
                       const Napi::Promise::Deferred &deferred)
-      : MetadataWorkerBase(mountPoint, deferred), options_(options) {}
+      : MetadataWorkerBase(mountPoint, deferred), options_(options) {
+    // Validate mount point is not empty
+    if (mountPoint.empty()) {
+      throw std::invalid_argument("Mount point cannot be empty");
+    }
+  }
 
   void Execute() override {
     try {
