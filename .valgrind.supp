@@ -1,0 +1,68 @@
+# Valgrind suppressions for @photostructure/fs-metadata
+# 
+# These suppressions filter out known issues in Node.js/V8 internals
+# so we can focus on actual memory leaks in our native module.
+
+{
+   V8-GC-Uninit
+   Memcheck:Cond
+   ...
+   fun:*v8*internal*GCTracer*
+   ...
+}
+
+{
+   V8-Compiler-Uninit
+   Memcheck:Cond
+   ...
+   fun:*v8*internal*compiler*
+   ...
+}
+
+{
+   V8-ICU-Reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*icu*
+   ...
+}
+
+{
+   Node-Platform-Reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:*node*
+   ...
+}
+
+{
+   GLib-Thread-PossiblyLost
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:*pthread_create*
+   fun:*g_thread_*
+   ...
+}
+
+{
+   GIO-DBus-PossiblyLost
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:*g_bus_get_sync*
+   ...
+}
+
+{
+   Node-Inspector-PossiblyLost
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   fun:pthread_create*
+   fun:*node*inspector*
+   ...
+}
