@@ -2,7 +2,5 @@
   "reject": [
     "rimraf",
     "rimraf-why: https://github.com/isaacs/rimraf/issues/313 💩",
-    "release-it",
-    "release-it-why: they dropped Node v18 support 6 months before it EOLs 🤦‍♂️"
   ]
 }
