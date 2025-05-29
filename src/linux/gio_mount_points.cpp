@@ -21,16 +21,16 @@ void GioMountPointsWorker::Execute() {
   try {
     DEBUG_LOG("[GioMountPoints] processing mounts");
 
-    MountIterator::forEachMount([this](GMount *mount, GFile *root) {
-      GCharPtr path(g_file_get_path(root));
+    MountIterator::forEachMount([this](GMount * /*mount*/, GFile *root) {
+      const GCharPtr path(g_file_get_path(root));
       if (path) {
-        GFileInfoPtr info(g_file_query_filesystem_info(
+        const GFileInfoPtr info(g_file_query_filesystem_info(
             root, G_FILE_ATTRIBUTE_FILESYSTEM_TYPE, nullptr, nullptr));
         if (info) {
           const char *fs_type_str = g_file_info_get_attribute_string(
               info.get(), G_FILE_ATTRIBUTE_FILESYSTEM_TYPE);
           if (fs_type_str) {
-            GCharPtr fs_type(g_strdup(fs_type_str));
+            const GCharPtr fs_type(g_strdup(fs_type_str));
             DEBUG_LOG("[GioMountPoints] found {mountPoint: %s, fsType: %s}",
                       path.get(), fs_type.get());
             MountPoint point{};
@@ -51,11 +51,11 @@ void GioMountPointsWorker::Execute() {
 }
 
 void GioMountPointsWorker::OnOK() {
-  Napi::HandleScope scope(Env());
-  Napi::Array result = Napi::Array::New(Env());
+  const Napi::HandleScope scope(Env());
+  const Napi::Array result = Napi::Array::New(Env());
 
   for (size_t i = 0; i < mountPoints.size(); i++) {
-    Napi::Object point = Napi::Object::New(Env());
+    const Napi::Object point = Napi::Object::New(Env());
     point.Set("mountPoint", mountPoints[i].mountPoint);
     point.Set("fstype", mountPoints[i].fstype);
     result.Set(i, point);

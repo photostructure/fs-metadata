@@ -11,7 +11,7 @@ std::mutex BlkidCache::mutex_;
 
 // Constructor: Initializes the blkid cache with proper error handling
 BlkidCache::BlkidCache() : cache_(nullptr) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  const std::lock_guard<std::mutex> lock(mutex_);
   DEBUG_LOG("[BlkidCache] initializing cache");
   if (blkid_get_cache(&cache_, nullptr) != 0) {
     DEBUG_LOG("[BlkidCache] failed to initialize cache");
@@ -23,7 +23,7 @@ BlkidCache::BlkidCache() : cache_(nullptr) {
 // Destructor: Safely releases the blkid cache resource
 BlkidCache::~BlkidCache() {
   if (cache_) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    const std::lock_guard<std::mutex> lock(mutex_);
     if (cache_) { // Double-check after acquiring lock
       DEBUG_LOG("[BlkidCache] releasing cache");
       try {

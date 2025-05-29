@@ -42,11 +42,11 @@ void MountIterator::forEachMount(const MountCallback &callback) {
     g_object_ref(mount);
 
     try {
-      GioResource<GFile> root(g_mount_get_root(mount));
+      const GioResource<GFile> root(g_mount_get_root(mount));
 
       // Check both for null and valid GFile
       if (root.get() && G_IS_FILE(root.get())) {
-        bool continue_iteration = callback(mount, root.get());
+        const bool continue_iteration = callback(mount, root.get());
         g_object_unref(mount);
 
         if (!continue_iteration) {

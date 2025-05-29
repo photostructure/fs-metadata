@@ -20,7 +20,7 @@
 namespace {
 
 Napi::Value SetDebugLogging(const Napi::CallbackInfo &info) {
-  Napi::Env env = info.Env();
+  const Napi::Env env = info.Env();
 
   if (info.Length() < 1 || !info[0].IsBoolean()) {
     throw Napi::TypeError::New(env, "Boolean argument expected");
@@ -31,7 +31,7 @@ Napi::Value SetDebugLogging(const Napi::CallbackInfo &info) {
 }
 
 Napi::Value SetDebugPrefix(const Napi::CallbackInfo &info) {
-  Napi::Env env = info.Env();
+  const Napi::Env env = info.Env();
 
   if (info.Length() < 1 || !info[0].IsString()) {
     throw Napi::TypeError::New(env, "String argument expected");
@@ -44,7 +44,7 @@ Napi::Value SetDebugPrefix(const Napi::CallbackInfo &info) {
 
 #ifdef ENABLE_GIO
 Napi::Value GetGioMountPoints(const Napi::CallbackInfo &info) {
-  Napi::Env env = info.Env();
+  const Napi::Env env = info.Env();
   return FSMeta::gio::GetMountPoints(env);
 }
 #endif

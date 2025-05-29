@@ -17,7 +17,7 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
             mountPoint.c_str());
 
   MountIterator::forEachMount([&](GMount *mount, GFile *root) {
-    GCharPtr path(g_file_get_path(root));
+    const GCharPtr path(g_file_get_path(root));
     if (!path || mountPoint != path.get()) {
       return true; // Continue iteration
     }
@@ -27,9 +27,9 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
               path.get());
 
     // Get volume information
-    GObjectPtr<GVolume> volume(g_mount_get_volume(mount));
+    const GObjectPtr<GVolume> volume(g_mount_get_volume(mount));
     if (volume && volume.get()) {
-      GCharPtr label(g_volume_get_name(volume.get()));
+      const GCharPtr label(g_volume_get_name(volume.get()));
       if (label && label.get()) {
         DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, label: %s}",
                   path.get(), label.get());
@@ -37,14 +37,14 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
       }
     }
 
-    GCharPtr mount_name(g_mount_get_name(mount));
+    const GCharPtr mount_name(g_mount_get_name(mount));
     if (mount_name) {
       metadata.mountName = mount_name.get();
     }
 
-    GObjectPtr<GFile> location(g_mount_get_default_location(mount));
+    const GObjectPtr<GFile> location(g_mount_get_default_location(mount));
     if (location && location.get()) {
-      GCharPtr uri(g_file_get_uri(location.get()));
+      const GCharPtr uri(g_file_get_uri(location.get()));
       if (uri && uri.get()) {
         DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, uri: %s}",
                   path.get(), uri.get());
@@ -53,13 +53,13 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
     }
 
     if (metadata.fstype.empty()) {
-      GFileInfoPtr info(g_file_query_filesystem_info(
+      const GFileInfoPtr info(g_file_query_filesystem_info(
           root, G_FILE_ATTRIBUTE_FILESYSTEM_TYPE, nullptr, nullptr));
       if (info) {
         const char *fs_type_str = g_file_info_get_attribute_string(
             info.get(), G_FILE_ATTRIBUTE_FILESYSTEM_TYPE);
         if (fs_type_str) {
-          GCharPtr fs_type(g_strdup(fs_type_str));
+          const GCharPtr fs_type(g_strdup(fs_type_str));
           DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, fsType: %s}",
                     path.get(), fs_type.get());
           metadata.fstype = fs_type.get();
@@ -68,9 +68,9 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
     }
 
     if (metadata.mountFrom.empty()) {
-      GObjectPtr<GDrive> drive(g_mount_get_drive(mount));
+      const GObjectPtr<GDrive> drive(g_mount_get_drive(mount));
       if (drive) {
-        GCharPtr unix_device(g_drive_get_identifier(
+        const GCharPtr unix_device(g_drive_get_identifier(
             drive.get(), G_DRIVE_IDENTIFIER_KIND_UNIX_DEVICE));
         if (unix_device) {
           DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, mountFrom: %s}",
