@@ -220,7 +220,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
    - Created comprehensive memory testing documentation (`docs/MEMORY_TESTING.md`)
    - Improved ASan configuration with proper suppressions
    - Created standalone test runner (`scripts/run-asan.sh`)
-   - Updated `scripts/check-memory.js` with better ASan support
+   - Updated `scripts/check-memory.mjs` with better ASan support
    - All memory tests integrated into CI/CD
 
 ## Documentation Updates Needed

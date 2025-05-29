@@ -9,7 +9,9 @@
       "Bash(grep:*)",
       "Bash(nm:*)",
       "Bash(find:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(mv:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   },

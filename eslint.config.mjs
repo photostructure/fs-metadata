@@ -6,7 +6,7 @@ import ts_eslint from "typescript-eslint";
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    files: ["src/**/*.ts", "scripts/*.js"],
+    files: ["src/**/*.ts", "scripts/*.js", "scripts/*.mjs"],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -21,6 +21,20 @@ export default [
   {
     rules: {
       "@typescript-eslint/no-shadow": "error",
+    },
+  },
+  {
+    files: ["scripts/*.mjs"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
+      ],
+      "@typescript-eslint/no-require-imports": "off",
+      "no-console": "off",
     },
   },
 ];

@@ -27,7 +27,7 @@ fi
 echo -e "${GREEN}Running valgrind memory leak detection...${NC}"
 
 # Path to the dedicated valgrind test script
-VALGRIND_TEST="$SCRIPT_DIR/valgrind-test.js"
+VALGRIND_TEST="$SCRIPT_DIR/valgrind-test.mjs"
 
 # Ensure the test script exists
 if [ ! -f "$VALGRIND_TEST" ]; then

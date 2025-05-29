@@ -133,9 +133,9 @@ npm run docs
 - Valgrind integration: `npm run test:valgrind` - runs on Linux only, checks for memory leaks
 - AddressSanitizer: `npm run asan` - runs on Linux only, detects memory errors and leaks (~2x faster than Valgrind)
 - Comprehensive memory tests: `npm run tests:memory` - runs all memory tests appropriate for the platform
-- Automated test runners: `scripts/valgrind-test.js` and `scripts/run-asan.sh`
+- Automated test runners: `scripts/valgrind-test.mjs` and `scripts/run-asan.sh`
 - CI/CD includes both valgrind and ASAN tests via `.github/workflows/memory-tests.yml`
-- Cross-platform memory check script: `scripts/check-memory.js` handles platform differences
+- Cross-platform memory check script: `scripts/check-memory.mjs` handles platform differences
 - Suppression files: `.valgrind.supp` (Valgrind), `.lsan-suppressions.txt` (LeakSanitizer)
 - Memory tests are integrated into `npm run tests` pipeline on Linux
 - See `docs/MEMORY_TESTING.md` for detailed memory testing guide
