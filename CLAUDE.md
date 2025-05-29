@@ -43,7 +43,7 @@ npm run bundle
 
 ### Testing
 ```bash
-# Run all tests with coverage
+# Run all tests with coverage (includes memory tests on Linux)
 npm run tests
 
 # Run CommonJS tests
@@ -52,8 +52,17 @@ npm test cjs
 # Run ESM tests
 npm test esm
 
-# Test memory leaks
+# Test memory leaks (JavaScript)
 npm run test:memory
+
+# Run valgrind memory analysis (Linux only)
+npm run test:valgrind
+
+# Run comprehensive memory tests (JavaScript + valgrind on Linux)
+npm run tests:memory
+
+# Run AddressSanitizer tests (Linux only)
+npm run asan
 
 # Run a specific test file (no coverage)
 npm test volume_metadata
@@ -118,6 +127,18 @@ npm run docs
 - Platform-specific test expectations handled via `isWindows`, `isMacOS`, `isLinux` helpers
 - Memory leak testing with garbage collection monitoring
 - Coverage thresholds: 80% for all metrics
+
+### Memory Testing
+- JavaScript memory tests: `npm run test:memory` - uses GC and heap monitoring
+- Valgrind integration: `npm run test:valgrind` - runs on Linux only, checks for memory leaks
+- AddressSanitizer: `npm run asan` - runs on Linux only, detects memory errors and leaks (~2x faster than Valgrind)
+- Comprehensive memory tests: `npm run tests:memory` - runs all memory tests appropriate for the platform
+- Automated test runners: `scripts/valgrind-test.js` and `scripts/run-asan.sh`
+- CI/CD includes both valgrind and ASAN tests via `.github/workflows/memory-tests.yml`
+- Cross-platform memory check script: `scripts/check-memory.js` handles platform differences
+- Suppression files: `.valgrind.supp` (Valgrind), `.lsan-suppressions.txt` (LeakSanitizer)
+- Memory tests are integrated into `npm run tests` pipeline on Linux
+- See `docs/MEMORY_TESTING.md` for detailed memory testing guide
 
 ### Timeout Handling
 - Default timeout for volume operations to handle unresponsive network mounts
