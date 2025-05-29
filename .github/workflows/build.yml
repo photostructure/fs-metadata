@@ -154,10 +154,33 @@ jobs:
           npm ci && \
           npm run tests"
 
+  clang-tidy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y clang-tidy build-essential libglib2.0-dev libblkid-dev uuid-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+      - run: npm ci
+      - run: npm run configure
+      - name: Generate compile database
+        run: |
+          # Install bear to generate compile_commands.json
+          sudo apt-get install -y bear
+          # Generate compile_commands.json
+          bear -- npm run node-gyp-rebuild
+      - name: Run clang-tidy
+        run: |
+          # Run clang-tidy on Linux C++ source files only
+          find src -name "*.cpp" -o -name "*.h" | grep -E '\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy
+
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
-    needs: [test-mac-win, test-ubuntu, test-alpine]
+    needs: [test-mac-win, test-ubuntu, test-alpine, clang-tidy]
     permissions:
       contents: write
       packages: write
