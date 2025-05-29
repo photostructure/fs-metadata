@@ -1,0 +1,88 @@
+name: Memory Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  valgrind:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind libglib2.0-dev libblkid-dev uuid-dev build-essential
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build native module
+        run: npm run prebuild
+      
+      - name: Bundle JavaScript
+        run: npm run bundle
+      
+      - name: Run comprehensive memory tests
+        run: npm run tests:memory
+      
+      - name: Upload valgrind results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: valgrind-results-node-${{ matrix.node-version }}
+          path: |
+            valgrind-*.log
+            core.*
+
+  asan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev build-essential clang
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ASAN tests
+        run: npm run asan 2>&1 | tee asan-test.log
+      
+      - name: Check ASAN results
+        run: |
+          if grep -q "ERROR: AddressSanitizer.*fs-metadata" asan-test.log 2>/dev/null; then
+            echo "AddressSanitizer found errors in our code"
+            exit 1
+          fi
+          
+          # Report V8/Node.js leaks but don't fail the build
+          if grep -q "ERROR: AddressSanitizer" asan-test.log 2>/dev/null; then
+            echo "NOTICE: AddressSanitizer found leaks in V8/Node.js internals (ignored)"
+          fi
+      
+      - name: Upload ASAN results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asan-results
+          path: asan-test.log

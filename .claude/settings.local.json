@@ -1,6 +1,17 @@
 {
   "permissions": {
-    "allow": ["Bash(npm run compile:*)", "Bash(npm run:*)", "Bash(npm test:*)"],
+    "allow": [
+      "Bash(npm run compile:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(chmod:*)",
+      "Bash(valgrind:*)",
+      "Bash(grep:*)",
+      "Bash(nm:*)",
+      "Bash(find:*)",
+      "Bash(sed:*)"
+    ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": false
 }
