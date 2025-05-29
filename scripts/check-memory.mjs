@@ -10,6 +10,10 @@ import { execSync } from "child_process";
 import { writeFileSync } from "fs";
 import os from "os";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Colors for output
 const colors = {
@@ -45,7 +49,8 @@ if (os.platform() === "linux") {
     execSync("which valgrind", { stdio: "ignore" });
     console.log(color(colors.YELLOW, "\nRunning valgrind memory analysis..."));
     try {
-      execSync("npm run test:valgrind", { stdio: "inherit" });
+      const valgrindScript = path.join(__dirname, "valgrind.sh");
+      execSync(valgrindScript, { stdio: "inherit" });
       console.log(color(colors.GREEN, "✓ Valgrind tests passed"));
     } catch {
       console.log(color(colors.RED, "✗ Valgrind tests failed"));

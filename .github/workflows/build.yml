@@ -149,7 +149,7 @@ jobs:
           merge-multiple: true
       - run: |
           docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:${{ matrix.node-version }}-alpine -c "\
-          apk add util-linux-dev --update-cache && \
+          apk add util-linux-dev bash valgrind --update-cache && \
           cd /tmp/project && \
           npm ci && \
           npm run tests"
