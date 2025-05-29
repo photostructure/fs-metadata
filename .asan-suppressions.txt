@@ -1,0 +1,13 @@
+# AddressSanitizer suppressions for @photostructure/fs-metadata
+# Format: interceptor_name:function_name_pattern
+# Note: ASan suppressions are different from LSan (LeakSanitizer) suppressions
+
+# Common interceptor suppressions
+interceptor_name:pthread_create
+interceptor_name:pthread_join
+interceptor_name:dlopen
+interceptor_name:dlclose
+
+# Node.js/V8 related suppressions
+interceptor_name:__cxa_atexit
+interceptor_name:__tls_get_addr

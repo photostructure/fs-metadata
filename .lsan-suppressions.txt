@@ -1,0 +1,45 @@
+# LeakSanitizer suppressions for @photostructure/fs-metadata
+# This file filters out known false positives from Node.js/V8 internals
+
+# V8 internal allocations
+leak:v8::internal::Isolate::
+leak:v8::internal::Heap::
+leak:v8::internal::Factory::
+leak:v8::internal::Deserializer
+leak:v8::internal::TypedSlots::
+leak:v8::internal::Scavenger::
+leak:v8::internal::CodeSerializer::
+leak:v8::internal::Compiler::
+leak:v8::internal::BodyDescriptorBase::
+leak:v8::internal::BaseNameDictionary
+leak:v8::internal::HashTable
+leak:v8::internal::WasmTrustedInstanceData::
+leak:v8::internal::wasm::
+leak:v8::internal::Runtime_
+leak:v8::platform::DefaultJobWorker::
+
+# Node.js internal allocations
+leak:node::
+leak:node::builtins::BuiltinLoader::
+leak:node::StartExecution
+leak:node::LoadEnvironment
+leak:node::NodeMainInstance::Run
+leak:node::Start
+
+# System library allocations
+leak:__libc_start
+leak:start_thread
+leak:pthread_create
+
+# GLib/GIO allocations (for Linux builds with GIO support)
+leak:g_malloc
+leak:g_slice_alloc
+leak:g_object_new
+leak:g_type_create_instance
+leak:gio_init
+leak:g_io_module_load
+leak:g_thread_pool_new
+
+# libuv allocations
+leak:uv_
+leak:uv__work_submit

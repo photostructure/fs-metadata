@@ -1,0 +1,21 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  misc-unused-parameters,
+  modernize-use-nullptr,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -bugprone-casting-through-void,
+  -bugprone-assignment-in-if-condition,
+  -clang-analyzer-valist.Uninitialized
+
+WarningsAsErrors: ''
+HeaderFilterRegex: '^((?!/usr/include/).)*$'
+FormatStyle: none
+SystemHeaders: false
+CheckOptions:
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: false
