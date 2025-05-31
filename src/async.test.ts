@@ -397,7 +397,8 @@ describe("async", () => {
         });
         expect(results).toEqual(times(10, (i) => i * 2));
         // This should complete in ~100ms, but GHA runners are slow -- the alpine ARM runner took 243ms (!!)
-        expect(Date.now() - start).toBeLessThan(isArm || isWindows ? 300 : 200);
+        // Alpine on ARM64 is exceptionally slow and has been seen to take 392ms
+        expect(Date.now() - start).toBeLessThan(isArm || isWindows ? 500 : 200);
       });
 
       it("should maintain proper order even with varying execution times", async () => {
