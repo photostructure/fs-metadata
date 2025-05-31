@@ -1,6 +1,12 @@
 // src/path.test.ts
 
-import { normalizePosixPath, normalizeWindowsPath } from "./path";
+import {
+  isRootDirectory,
+  normalizePath,
+  normalizePosixPath,
+  normalizeWindowsPath,
+} from "./path";
+import { isWindows } from "./platform";
 
 describe("mount_point", () => {
   describe("normalizeLinuxPath", () => {
@@ -22,6 +28,12 @@ describe("mount_point", () => {
       expect(normalizePosixPath("//")).toBe("/");
       expect(normalizePosixPath("/home//")).toBe("/home");
       expect(normalizePosixPath("/usr////")).toBe("/usr");
+    });
+
+    it("handles undefined and blank inputs", () => {
+      expect(normalizePosixPath(undefined)).toBe(undefined);
+      expect(normalizePosixPath("")).toBe(undefined);
+      expect(normalizePosixPath("   ")).toBe(undefined);
     });
   });
 
@@ -45,6 +57,43 @@ describe("mount_point", () => {
     it("preserves mixed case drive letters", () => {
       expect(normalizeWindowsPath("c:")).toBe("C:\\");
       expect(normalizeWindowsPath("C:")).toBe("C:\\");
+    });
+  });
+
+  describe("normalizePath", () => {
+    it("handles undefined and blank inputs", () => {
+      expect(normalizePath(undefined)).toBe(undefined);
+      expect(normalizePath("")).toBe(undefined);
+      expect(normalizePath("   ")).toBe(undefined);
+    });
+
+    it("normalizes paths based on platform", () => {
+      if (isWindows) {
+        const result = normalizePath("C:");
+        expect(result).toMatch(/^C:\\/);
+      } else {
+        const result = normalizePath("/home/");
+        expect(result).toMatch(/^\/home$/);
+      }
+    });
+  });
+
+  describe("isRootDirectory", () => {
+    it("correctly identifies root directories", () => {
+      if (isWindows) {
+        expect(isRootDirectory("C:\\")).toBe(true);
+        expect(isRootDirectory("D:\\")).toBe(true);
+        expect(isRootDirectory("C:\\Windows")).toBe(false);
+      } else {
+        expect(isRootDirectory("/")).toBe(true);
+        expect(isRootDirectory("/home")).toBe(false);
+        expect(isRootDirectory("/usr/")).toBe(false);
+      }
+    });
+
+    it("handles invalid paths", () => {
+      expect(isRootDirectory("")).toBe(false);
+      expect(isRootDirectory("   ")).toBe(false);
     });
   });
 });
