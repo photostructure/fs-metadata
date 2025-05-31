@@ -4,7 +4,9 @@
   "compilerOptions": {
     "noEmit": true,
     "module": "ESNext",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "types": ["node", "jest"]
   },
-  "exclude": ["dist", "coverage", "docs"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "coverage", "docs", "node_modules"]
 }
