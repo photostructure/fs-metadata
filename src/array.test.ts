@@ -55,6 +55,28 @@ describe("Array", () => {
     it("should return empty array when input is empty", () => {
       expect(uniqBy([], (item) => item)).toEqual([]);
     });
+
+    it("should handle null values from key function", () => {
+      const objects = [
+        { id: 1, name: "Alice" },
+        { id: null, name: "Bob" },
+        { id: 2, name: "Charlie" },
+        { id: undefined, name: "David" },
+      ];
+      const result = uniqBy(objects, (item) => item.id);
+      expect(result).toEqual([
+        { id: 1, name: "Alice" },
+        { id: 2, name: "Charlie" },
+      ]);
+    });
+
+    it("should handle undefined returned from key function", () => {
+      const objects = [{ id: 1 }, { id: 2 }, { id: 3 }];
+      const result = uniqBy(objects, (item) =>
+        item.id > 1 ? item.id : undefined,
+      );
+      expect(result).toEqual([{ id: 2 }, { id: 3 }]);
+    });
   });
 
   describe("times", () => {
@@ -92,6 +114,12 @@ describe("Array", () => {
 
     it("should handle undefined input", () => {
       expect(compact(undefined)).toEqual([]);
+    });
+
+    it("should handle null input", () => {
+      // Testing the null branch of arr == null check
+      const nullInput: Parameters<typeof compact>[0] = null as never;
+      expect(compact(nullInput)).toEqual([]);
     });
 
     it("should preserve falsy values that aren't null/undefined", () => {
