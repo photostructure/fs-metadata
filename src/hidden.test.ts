@@ -74,9 +74,9 @@ describe("hidden file tests", () => {
     });
 
     it("should throw error for invalid pathname", () => {
-      expect(() => createHiddenPosixPath(null as unknown as string, true)).toThrow(
-        "Invalid pathname",
-      );
+      expect(() =>
+        createHiddenPosixPath(null as unknown as string, true),
+      ).toThrow("Invalid pathname");
       expect(() => createHiddenPosixPath("", true)).toThrow("Invalid pathname");
     });
   });
@@ -111,7 +111,9 @@ describe("hidden file tests", () => {
       });
 
       it("should throw error for invalid pathname (null)", async () => {
-        await expect(isHidden(null as unknown as string)).rejects.toThrow("Invalid pathname");
+        await expect(isHidden(null as unknown as string)).rejects.toThrow(
+          "Invalid pathname",
+        );
       });
 
       it("should throw error for invalid pathname (empty string after normalization)", async () => {
@@ -240,9 +242,9 @@ describe("hidden file tests", () => {
     });
 
     it("should throw error for invalid pathname", async () => {
-      await expect(isHiddenRecursive(null as unknown as string)).rejects.toThrow(
-        "Invalid path",
-      );
+      await expect(
+        isHiddenRecursive(null as unknown as string),
+      ).rejects.toThrow("Invalid path");
       await expect(isHiddenRecursive("")).rejects.toThrow("Invalid path");
     });
 
@@ -445,9 +447,9 @@ describe("hidden file tests", () => {
       });
 
       it("should throw error for invalid pathname", async () => {
-        await expect(setHidden(null as unknown as string, true)).rejects.toThrow(
-          "Invalid pathname",
-        );
+        await expect(
+          setHidden(null as unknown as string, true),
+        ).rejects.toThrow("Invalid pathname");
         await expect(setHidden("", true)).rejects.toThrow("Invalid pathname");
       });
 
@@ -575,9 +577,9 @@ describe("hidden file tests", () => {
       });
 
       it("should throw error for invalid pathname", async () => {
-        await expect(getHiddenMetadata(null as unknown as string)).rejects.toThrow(
-          "Invalid pathname",
-        );
+        await expect(
+          getHiddenMetadata(null as unknown as string),
+        ).rejects.toThrow("Invalid pathname");
         await expect(getHiddenMetadata("")).rejects.toThrow("Invalid pathname");
       });
     });
