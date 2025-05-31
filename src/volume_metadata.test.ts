@@ -56,6 +56,22 @@ describe("Volume Metadata errors", () => {
       /ENOENT|not accessible/i,
     );
   });
+
+  it("handles null mountPoint", async () => {
+    await expect(getVolumeMetadata(null as unknown as string)).rejects.toThrow(
+      /Invalid mountPoint/,
+    );
+  });
+
+  it("handles empty string mountPoint", async () => {
+    await expect(getVolumeMetadata("")).rejects.toThrow(/Invalid mountPoint/);
+  });
+
+  it("handles whitespace-only mountPoint", async () => {
+    await expect(getVolumeMetadata("   ")).rejects.toThrow(
+      /Invalid mountPoint/,
+    );
+  });
 });
 
 describe("concurrent", () => {
