@@ -140,4 +140,22 @@ describe("WrappedError", () => {
     // The cause object is converted to an Error in toError, so it will have a stack
     expect(error.stack).toContain("Caused by:");
   });
+
+  it("should handle numeric causes", () => {
+    const error = new WrappedError("Context message", { cause: 42 });
+    expect(error.message).toBe("Context message: 42");
+  });
+
+  it("should handle boolean causes", () => {
+    const errorFalse = new WrappedError("Context message", { cause: false });
+    expect(errorFalse.message).toBe("Context message"); // false is falsy, so no cause added
+
+    const errorTrue = new WrappedError("Context message", { cause: true });
+    expect(errorTrue.message).toBe("Context message: true");
+  });
+
+  it("should handle array causes", () => {
+    const error = new WrappedError("Context message", { cause: [1, 2, 3] });
+    expect(error.message).toBe("Context message: [1,2,3]");
+  });
 });

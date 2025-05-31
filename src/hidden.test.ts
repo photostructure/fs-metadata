@@ -37,6 +37,50 @@ describe("hidden file tests", () => {
 
   it("runs validateHidden()", () => validateHidden(tempDir));
 
+  describe("createHiddenPosixPath()", () => {
+    it("should add dot prefix when hiding", () => {
+      const filePath = path.join(tempDir, "file.txt");
+      const hiddenPath = path.join(tempDir, ".file.txt");
+      expect(createHiddenPosixPath(filePath, true)).toBe(hiddenPath);
+
+      const dirPath = path.join(tempDir, "dir");
+      const hiddenDirPath = path.join(tempDir, ".dir");
+      expect(createHiddenPosixPath(dirPath, true)).toBe(hiddenDirPath);
+    });
+
+    it("should remove dot prefix when unhiding", () => {
+      const hiddenFilePath = path.join(tempDir, ".file.txt");
+      const filePath = path.join(tempDir, "file.txt");
+      expect(createHiddenPosixPath(hiddenFilePath, false)).toBe(filePath);
+
+      const hiddenDirPath = path.join(tempDir, ".dir");
+      const dirPath = path.join(tempDir, "dir");
+      expect(createHiddenPosixPath(hiddenDirPath, false)).toBe(dirPath);
+    });
+
+    it("should handle already hidden/unhidden paths", () => {
+      const alreadyHidden = path.join(tempDir, ".hidden");
+      expect(createHiddenPosixPath(alreadyHidden, true)).toBe(alreadyHidden);
+
+      const alreadyNormal = path.join(tempDir, "normal");
+      expect(createHiddenPosixPath(alreadyNormal, false)).toBe(alreadyNormal);
+    });
+
+    it("should handle special characters", () => {
+      const specialPath = path.join(tempDir, "file!@#.txt");
+      const hiddenSpecialPath = path.join(tempDir, ".file!@#.txt");
+      expect(createHiddenPosixPath(specialPath, true)).toBe(hiddenSpecialPath);
+      expect(createHiddenPosixPath(hiddenSpecialPath, false)).toBe(specialPath);
+    });
+
+    it("should throw error for invalid pathname", () => {
+      expect(() => createHiddenPosixPath(null as unknown as string, true)).toThrow(
+        "Invalid pathname",
+      );
+      expect(() => createHiddenPosixPath("", true)).toThrow("Invalid pathname");
+    });
+  });
+
   describe("isHidden()", () => {
     describe("basic functionality", () => {
       it("should not detect normal files as hidden", async () => {
@@ -64,6 +108,15 @@ describe("hidden file tests", () => {
         expect(await isHidden(path.join(tempDir, "does-not-exist"))).toBe(
           false,
         );
+      });
+
+      it("should throw error for invalid pathname (null)", async () => {
+        await expect(isHidden(null as unknown as string)).rejects.toThrow("Invalid pathname");
+      });
+
+      it("should throw error for invalid pathname (empty string after normalization)", async () => {
+        // Test with a path that normalizes to null/empty
+        await expect(isHidden("")).rejects.toThrow("Invalid pathname");
       });
     });
 
@@ -184,6 +237,13 @@ describe("hidden file tests", () => {
 
     it("should return false for root path", async () => {
       expect(await isHiddenRecursive(isWindows ? "C:\\" : "/")).toBe(false);
+    });
+
+    it("should throw error for invalid pathname", async () => {
+      await expect(isHiddenRecursive(null as unknown as string)).rejects.toThrow(
+        "Invalid path",
+      );
+      await expect(isHiddenRecursive("")).rejects.toThrow("Invalid path");
     });
 
     it("should handle special characters in paths", async () => {
@@ -376,6 +436,29 @@ describe("hidden file tests", () => {
         });
       }
     });
+
+    describe("error handling", () => {
+      it("should throw error for non-existent file", async () => {
+        await expect(
+          setHidden(path.join(tempDir, "does-not-exist.txt"), true),
+        ).rejects.toThrow();
+      });
+
+      it("should throw error for invalid pathname", async () => {
+        await expect(setHidden(null as unknown as string, true)).rejects.toThrow(
+          "Invalid pathname",
+        );
+        await expect(setHidden("", true)).rejects.toThrow("Invalid pathname");
+      });
+
+      if (isWindows) {
+        it("should throw error when trying to hide root directory", async () => {
+          await expect(setHidden("C:\\", true)).rejects.toThrow(
+            "Cannot hide root directory",
+          );
+        });
+      }
+    });
   });
 
   describe("getHiddenMetadata()", () => {
@@ -489,6 +572,13 @@ describe("hidden file tests", () => {
           systemFlag: false,
           supported: LocalSupport,
         });
+      });
+
+      it("should throw error for invalid pathname", async () => {
+        await expect(getHiddenMetadata(null as unknown as string)).rejects.toThrow(
+          "Invalid pathname",
+        );
+        await expect(getHiddenMetadata("")).rejects.toThrow("Invalid pathname");
       });
     });
 

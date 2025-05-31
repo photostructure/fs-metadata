@@ -1,7 +1,7 @@
+import { jest } from "@jest/globals";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { env } from "node:process";
-import { jest } from "@jest/globals";
 import { debug } from "./debuglog";
 import { _dirname } from "./dirname";
 

@@ -113,4 +113,29 @@ describe("parseUNCPath", () => {
       remote: true,
     });
   });
+
+  // Additional test cases to ensure all branches are covered
+  test("returns undefined for blank string input", () => {
+    expect(parseUNCPath("   ")).toBeUndefined();
+    expect(parseUNCPath("\t\n")).toBeUndefined();
+  });
+
+  test("returns undefined for path with only server (no slash after)", () => {
+    expect(parseUNCPath("\\\\server")).toBeUndefined();
+    expect(parseUNCPath("//server")).toBeUndefined();
+  });
+
+  test("returns undefined for non-string falsy values", () => {
+    // @ts-expect-error Testing invalid input
+    expect(parseUNCPath(0)).toBeUndefined();
+    // @ts-expect-error Testing invalid input
+    expect(parseUNCPath(false)).toBeUndefined();
+  });
+
+  test("returns undefined for array or object inputs", () => {
+    // @ts-expect-error Testing invalid input
+    expect(parseUNCPath([])).toBeUndefined();
+    // @ts-expect-error Testing invalid input
+    expect(parseUNCPath({})).toBeUndefined();
+  });
 });
