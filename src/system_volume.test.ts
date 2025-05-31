@@ -53,8 +53,8 @@ describe("isSystemVolume", () => {
       const originalSystemDrive = process.env["SystemDrive"];
       try {
         process.env["SystemDrive"] = "C:";
-        expect(isSystemVolume("C:", "NTFS")).toBe(true);
-        expect(isSystemVolume("D:", "NTFS")).toBe(false);
+        expect(isSystemVolume("C:\\", "NTFS")).toBe(true);
+        expect(isSystemVolume("D:\\", "NTFS")).toBe(false);
       } finally {
         if (originalSystemDrive !== undefined) {
           process.env["SystemDrive"] = originalSystemDrive;
