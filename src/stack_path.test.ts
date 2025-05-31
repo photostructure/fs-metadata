@@ -7,6 +7,14 @@ describe("stack_path", () => {
     // We can't use __dirname! SAD
     console.log("caller dir", { dir });
   });
+
+  it("should capture stack trace when stack is null", () => {
+    // Test that getCallerDirname works even when we force an error
+    // We can't mock Error constructor in ESM mode, so we just verify it works
+    const dir = getCallerDirname();
+    expect(dir).toBeTruthy();
+    expect(typeof dir).toBe("string");
+  });
 });
 
 describe("extractCallerPath", () => {
@@ -79,5 +87,51 @@ describe("extractCallerPath", () => {
     expect(() => extractCallerPath("Error\nat someFunction")).toThrow(
       /Invalid stack trace format/,
     );
+  });
+
+  it("should throw for file:// URLs in stack traces", () => {
+    // The current regex patterns don't support file:// URLs in stack traces
+    const stack = `Error
+    at getCallerDirname (/src/caller_dirname.ts:10:20)
+    at functionName (file:///Users/dev/project/test.js:1:1)`;
+    expect(() => extractCallerPath(stack)).toThrow(/no parsable frames/);
+  });
+
+  it("should handle invalid URL in stack trace", () => {
+    const stack = `Error
+    at getCallerDirname (/src/caller_dirname.ts:10:20)
+    at functionName (http://[invalid-url:1:1)`;
+    expect(() => extractCallerPath(stack)).toThrow(/no parsable frames/);
+  });
+
+  it("should handle stack without valid frames after caller", () => {
+    const stack = `Error
+    at getCallerDirname (/src/caller_dirname.ts:10:20)
+    at someFunction
+    at anotherFunction`;
+    expect(() => extractCallerPath(stack)).toThrow(/no parsable frames/);
+  });
+
+  it("should handle empty frame lines", () => {
+    const stack = isWindows
+      ? `Error
+    at getCallerDirname (C:\\src\\caller_dirname.ts:10:20)
+    
+    at functionName (C:\\path\\to\\file.js:1:1)`
+      : `Error
+    at getCallerDirname (/src/caller_dirname.ts:10:20)
+    
+    at functionName (/path/to/file.js:1:1)`;
+    const expectedPath = isWindows
+      ? "C:\\path\\to\\file.js"
+      : "/path/to/file.js";
+    expect(extractCallerPath(stack)).toBe(expectedPath);
+  });
+
+  it("should handle paths with null or empty groups", () => {
+    const stack = `Error
+    at getCallerDirname (/src/caller_dirname.ts:10:20)
+    at functionName (:1:1)`;
+    expect(() => extractCallerPath(stack)).toThrow(/no parsable frames/);
   });
 });

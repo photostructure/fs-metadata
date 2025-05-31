@@ -69,4 +69,12 @@ describe("debuglog integration tests", () => {
       debugLogContext: "fs-metadata",
     });
   });
+
+  test("handles FS-META uppercase", () => {
+    const result = runChildTest("FS-META");
+    expect(result).toEqual({
+      isDebugEnabled: true,
+      debugLogContext: "fs-meta",
+    });
+  });
 });
