@@ -1,7 +1,7 @@
 // src/unc.ts
 
-import { isBlank, isString } from "./string.js";
-import { RemoteInfo } from "./types/remote_info.js";
+import { isBlank, isString } from "./string";
+import { RemoteInfo } from "./types/remote_info";
 
 /**
  * Checks if a string is formatted as a valid UNC path.

@@ -1,6 +1,6 @@
 // src/object.test.ts
 
-import { compactValues, omit } from "./object.js";
+import { compactValues, omit } from "./object";
 
 describe("object", () => {
   describe("omit", () => {

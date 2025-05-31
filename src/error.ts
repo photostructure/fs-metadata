@@ -1,8 +1,8 @@
 // src/error.ts
 
-import { isNumber } from "./number.js";
-import { compactValues, map, omit } from "./object.js";
-import { isBlank, isNotBlank } from "./string.js";
+import { isNumber } from "./number";
+import { compactValues, map, omit } from "./object";
+import { isBlank, isNotBlank } from "./string";
 
 function toMessage(context: string, cause: unknown): string {
   const causeStr =

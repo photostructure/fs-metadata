@@ -5,7 +5,7 @@ import {
   isRemoteFsType,
   normalizeFsType,
   parseURL,
-} from "./remote_info.js";
+} from "./remote_info";
 
 describe("remote_info tests", () => {
   describe("normalizeFsType", () => {

@@ -10,7 +10,7 @@ import {
   sortObjectsByLocale,
   toNotBlank,
   toS,
-} from "./string.js";
+} from "./string";
 
 describe("decodeOctalEscapes", () => {
   it("decodes simple space character \\040", () => {

@@ -1,4 +1,4 @@
-import { GiB, KiB, MiB, TiB, fmtBytes } from "./units.js";
+import { GiB, KiB, MiB, TiB, fmtBytes } from "./units";
 
 describe("units", () => {
   describe("fmtBytes", () => {

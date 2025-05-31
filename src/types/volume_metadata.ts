@@ -1,7 +1,7 @@
 // src/types/volume_metadata.ts
 
-import type { MountPoint } from "./mount_point.js";
-import type { RemoteInfo } from "./remote_info.js";
+import type { MountPoint } from "./mount_point";
+import type { RemoteInfo } from "./remote_info";
 
 /**
  * Metadata associated to a volume.

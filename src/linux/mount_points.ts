@@ -1,14 +1,14 @@
 // src/linux/mount_points.ts
 import { readFile } from "node:fs/promises";
-import { debug } from "../debuglog.js";
-import { toError, WrappedError } from "../error.js";
-import { isMountPoint } from "../mount_point.js";
-import { compactValues } from "../object.js";
-import { optionsWithDefaults } from "../options.js";
-import { type MountPoint } from "../types/mount_point.js";
-import type { NativeBindingsFn } from "../types/native_bindings.js";
-import type { Options } from "../types/options.js";
-import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab.js";
+import { debug } from "../debuglog";
+import { toError, WrappedError } from "../error";
+import { isMountPoint } from "../mount_point";
+import { compactValues } from "../object";
+import { optionsWithDefaults } from "../options";
+import { type MountPoint } from "../types/mount_point";
+import type { NativeBindingsFn } from "../types/native_bindings";
+import type { Options } from "../types/options";
+import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab";
 
 export async function getLinuxMountPoints(
   native: NativeBindingsFn,

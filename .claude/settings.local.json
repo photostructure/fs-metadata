@@ -11,7 +11,15 @@
       "Bash(find:*)",
       "Bash(sed:*)",
       "Bash(mv:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(jq:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:tsup.egoist.dev)",
+      "WebFetch(domain:chatgpt.com)",
+      "Bash(npx tsup:*)",
+      "Bash(rg:*)",
+      "Bash(node:*)",
+      "Bash(npx jest:*)"
     ],
     "deny": []
   },

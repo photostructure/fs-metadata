@@ -3,7 +3,7 @@
 import { type PathLike, type StatOptions, Stats, statSync } from "node:fs";
 import { opendir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { withTimeout } from "./async.js";
+import { withTimeout } from "./async";
 
 /**
  * Wrapping node:fs/promises.stat() so we can mock it in tests.

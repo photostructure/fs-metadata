@@ -1,8 +1,8 @@
 // src/path.ts
 
 import { dirname, resolve } from "node:path";
-import { isWindows } from "./platform.js";
-import { isBlank } from "./string.js";
+import { isWindows } from "./platform";
+import { isBlank } from "./string";
 
 export function normalizePath(
   mountPoint: string | undefined,

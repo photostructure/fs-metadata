@@ -1,9 +1,9 @@
 // src/options.ts
 
 import { availableParallelism } from "node:os";
-import { compactValues, isObject } from "./object.js";
-import { isWindows } from "./platform.js";
-import type { Options } from "./types/options.js";
+import { compactValues, isObject } from "./object";
+import { isWindows } from "./platform";
+import type { Options } from "./types/options";
 
 /**
  * Default timeout in milliseconds for {@link Options.timeoutMs}.

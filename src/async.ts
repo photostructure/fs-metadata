@@ -1,8 +1,8 @@
 import { availableParallelism } from "node:os";
 import { env } from "node:process";
-import { gt0, isNumber } from "./number.js";
-import { isBlank } from "./string.js";
-import { DayMs } from "./units.js";
+import { gt0, isNumber } from "./number";
+import { isBlank } from "./string";
+import { DayMs } from "./units";
 
 /**
  * An error that is thrown when a promise does not resolve within the specified

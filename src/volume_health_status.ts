@@ -1,11 +1,11 @@
 // src/volume_health_status.ts
 
-import { TimeoutError } from "./async.js";
-import { debug } from "./debuglog.js";
-import { toError } from "./error.js";
-import { canReaddir } from "./fs.js";
-import { isObject } from "./object.js";
-import { stringEnum, StringEnumKeys } from "./string_enum.js";
+import { TimeoutError } from "./async";
+import { debug } from "./debuglog";
+import { toError } from "./error";
+import { canReaddir } from "./fs";
+import { isObject } from "./object";
+import { stringEnum, StringEnumKeys } from "./string_enum";
 
 /**
  * Health statuses for volumes (mostly applicable to Windows).

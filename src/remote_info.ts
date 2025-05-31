@@ -1,10 +1,10 @@
 // src/remote_info.ts
 
-import { debug } from "./debuglog.js";
-import { compactValues, isObject } from "./object.js";
-import { isWindows } from "./platform.js";
-import { isBlank, isNotBlank, toS } from "./string.js";
-import { RemoteInfo } from "./types/remote_info.js";
+import { debug } from "./debuglog";
+import { compactValues, isObject } from "./object";
+import { isWindows } from "./platform";
+import { isBlank, isNotBlank, toS } from "./string";
+import { RemoteInfo } from "./types/remote_info";
 
 export function isRemoteInfo(obj: unknown): obj is RemoteInfo {
   if (!isObject(obj)) return false;

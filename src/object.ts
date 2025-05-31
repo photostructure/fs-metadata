@@ -1,6 +1,6 @@
 // src/object.js
 
-import { isNotBlank, isString } from "./string.js";
+import { isNotBlank, isString } from "./string";
 
 /**
  * @return true iff value is an object and not an array

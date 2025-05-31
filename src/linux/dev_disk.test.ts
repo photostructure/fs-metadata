@@ -3,8 +3,8 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describePlatform } from "../test-utils/platform.js";
-import { getBasenameLinkedTo } from "./dev_disk.js";
+import { describePlatform } from "../test-utils/platform";
+import { getBasenameLinkedTo } from "./dev_disk";
 
 /*
 Rather than fooling around with mocks, we're going to create a temporary

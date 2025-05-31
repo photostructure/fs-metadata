@@ -1,7 +1,0 @@
-{
-  "compilerOptions": {
-    "noEmit": true,
-    "types": ["node", "jest"]
-  },
-  "exclude": ["node_modules"]
-}

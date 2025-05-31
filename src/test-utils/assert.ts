@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 // src/test-utils/assert.ts
-import { isMacOS } from "../platform.js";
-import type { VolumeMetadata } from "../types/volume_metadata.js";
+import { isMacOS } from "../platform";
+import type { VolumeMetadata } from "../types/volume_metadata";
 
 /**
  * Asserts that the given metadata object has valid filesystem metadata

@@ -4,18 +4,18 @@ import { jest } from "@jest/globals";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { delay } from "./async";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
   isHidden,
   setHidden,
-} from "..";
-import { delay } from "./async.js";
-import { randomLetters } from "./random.js";
-import { validateHidden } from "./test-utils/hidden-tests.js";
-import { tmpDirNotHidden } from "./test-utils/platform.js";
-import { fmtBytes, MiB } from "./units.js";
+} from "./index";
+import { randomLetters } from "./random";
+import { validateHidden } from "./test-utils/hidden-tests";
+import { tmpDirNotHidden } from "./test-utils/platform";
+import { fmtBytes, MiB } from "./units";
 
 // THIS IS ALL A HORRIBLE HACK. THIS "test" SHOULD BE REPLACED WITH AN ACTUAL
 // MEMORY LEAK TESTER (like with valgrind). PULL REQUESTS ARE WELCOME.

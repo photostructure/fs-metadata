@@ -1,8 +1,8 @@
 import { jest } from "@jest/globals";
-import { times } from "./array.js";
-import { delay, mapConcurrent, TimeoutError, withTimeout } from "./async.js";
-import { isArm, isWindows } from "./platform.js";
-import { DayMs, HourMs } from "./units.js";
+import { times } from "./array";
+import { delay, mapConcurrent, TimeoutError, withTimeout } from "./async";
+import { isArm, isWindows } from "./platform";
+import { DayMs, HourMs } from "./units";
 
 describe("async", () => {
   describe("withTimeout", () => {

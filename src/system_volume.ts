@@ -1,13 +1,13 @@
 // src/system_volume.ts
 
-import { debug } from "./debuglog.js";
-import { compileGlob } from "./glob.js";
-import { SystemFsTypesDefault, SystemPathPatternsDefault } from "./options.js";
-import { normalizePath } from "./path.js";
-import { isWindows } from "./platform.js";
-import { isNotBlank } from "./string.js";
-import type { MountPoint } from "./types/mount_point.js";
-import type { Options } from "./types/options.js";
+import { debug } from "./debuglog";
+import { compileGlob } from "./glob";
+import { SystemFsTypesDefault, SystemPathPatternsDefault } from "./options";
+import { normalizePath } from "./path";
+import { isWindows } from "./platform";
+import { isNotBlank } from "./string";
+import type { MountPoint } from "./types/mount_point";
+import type { Options } from "./types/options";
 
 /**
  * Configuration for system volume detection

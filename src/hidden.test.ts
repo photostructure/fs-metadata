@@ -4,17 +4,22 @@ import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import { homedir } from "node:os";
 import path, { join } from "node:path";
-import { getHiddenMetadata, isHidden, isHiddenRecursive, setHidden } from "..";
-import { statAsync } from "./fs.js";
-import { createHiddenPosixPath, LocalSupport } from "./hidden.js";
-import { isLinux, isMacOS, isWindows } from "./platform.js";
-import { validateHidden } from "./test-utils/hidden-tests.js";
+import { statAsync } from "./fs";
+import { createHiddenPosixPath, LocalSupport } from "./hidden";
+import {
+  getHiddenMetadata,
+  isHidden,
+  isHiddenRecursive,
+  setHidden,
+} from "./index";
+import { isLinux, isMacOS, isWindows } from "./platform";
+import { validateHidden } from "./test-utils/hidden-tests";
 import {
   runItIf,
   skipItIf,
   systemDrive,
   tmpDirNotHidden,
-} from "./test-utils/platform.js";
+} from "./test-utils/platform";
 
 describe("hidden file tests", () => {
   let tempDir: string;

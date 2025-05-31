@@ -2,12 +2,12 @@
 
 import { rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { WrappedError } from "./error.js";
-import { canStatAsync, statAsync } from "./fs.js";
-import { isRootDirectory, normalizePath } from "./path.js";
-import { isWindows } from "./platform.js";
-import type { HiddenMetadata } from "./types/hidden_metadata.js";
-import type { NativeBindingsFn } from "./types/native_bindings.js";
+import { WrappedError } from "./error";
+import { canStatAsync, statAsync } from "./fs";
+import { isRootDirectory, normalizePath } from "./path";
+import { isWindows } from "./platform";
+import type { HiddenMetadata } from "./types/hidden_metadata";
+import type { NativeBindingsFn } from "./types/native_bindings";
 
 const HiddenSupportByPlatform: Partial<
   Record<NodeJS.Platform, Pick<HiddenMetadata, "supported">>

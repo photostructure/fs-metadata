@@ -9,7 +9,7 @@ import {
   existsSync,
   findAncestorDir,
   isDirectory,
-} from "./fs.js";
+} from "./fs";
 
 describe("fs", () => {
   let tempDir: string;

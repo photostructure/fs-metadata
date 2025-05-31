@@ -1,17 +1,17 @@
 // src/linux/mtab.ts
 
-import { toInt } from "../number.js";
-import { normalizePosixPath } from "../path.js";
-import { extractRemoteInfo } from "../remote_info.js";
+import { toInt } from "../number";
+import { normalizePosixPath } from "../path";
+import { extractRemoteInfo } from "../remote_info";
 import {
   decodeEscapeSequences,
   encodeEscapeSequences,
   isBlank,
   toNotBlank,
-} from "../string.js";
-import { isSystemVolume, SystemVolumeConfig } from "../system_volume.js";
-import type { MountPoint } from "../types/mount_point.js";
-import type { VolumeMetadata } from "../types/volume_metadata.js";
+} from "../string";
+import { isSystemVolume, SystemVolumeConfig } from "../system_volume";
+import type { MountPoint } from "../types/mount_point";
+import type { VolumeMetadata } from "../types/volume_metadata";
 
 /**
  * Represents an entry in the mount table.

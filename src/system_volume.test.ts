@@ -1,6 +1,6 @@
 // src/system_volume.test.ts
 
-import { isSystemVolume } from "./system_volume.js";
+import { isSystemVolume } from "./system_volume";
 
 describe("isSystemVolume", () => {
   for (const { mountPoint, fstype, expected } of [

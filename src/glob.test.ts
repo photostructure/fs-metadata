@@ -1,6 +1,6 @@
 // src/glob.test.ts
 
-import { compileGlob } from "./glob.js";
+import { compileGlob } from "./glob";
 
 describe("compileGlob", () => {
   // Test basic literal matching

@@ -1,17 +1,17 @@
 // src/index.ts
 
 import NodeGypBuild from "node-gyp-build";
-import { debug, debugLogContext, isDebugEnabled } from "./debuglog.js";
-import { defer } from "./defer.js";
-import { _dirname } from "./dirname.js";
-import { findAncestorDir } from "./fs.js";
-import type { HideMethod, SetHiddenResult } from "./hidden.js";
+import { debug, debugLogContext, isDebugEnabled } from "./debuglog";
+import { defer } from "./defer";
+import { _dirname } from "./dirname";
+import { findAncestorDir } from "./fs";
+import type { HideMethod, SetHiddenResult } from "./hidden";
 import {
   getHiddenMetadataImpl,
   isHiddenImpl,
   isHiddenRecursiveImpl,
   setHiddenImpl,
-} from "./hidden.js";
+} from "./hidden";
 import {
   IncludeSystemVolumesDefault,
   LinuxMountTablePathsDefault,
@@ -20,26 +20,22 @@ import {
   SystemFsTypesDefault,
   SystemPathPatternsDefault,
   TimeoutMsDefault,
-} from "./options.js";
-import type {
-  StringEnum,
-  StringEnumKeys,
-  StringEnumType,
-} from "./string_enum.js";
-import type { SystemVolumeConfig } from "./system_volume.js";
-import type { HiddenMetadata } from "./types/hidden_metadata.js";
-import type { MountPoint } from "./types/mount_point.js";
-import { NativeBindings } from "./types/native_bindings.js";
-import type { Options } from "./types/options.js";
-import type { VolumeMetadata } from "./types/volume_metadata.js";
-import type { VolumeHealthStatus } from "./volume_health_status.js";
-import { VolumeHealthStatuses } from "./volume_health_status.js";
+} from "./options";
+import type { StringEnum, StringEnumKeys, StringEnumType } from "./string_enum";
+import type { SystemVolumeConfig } from "./system_volume";
+import type { HiddenMetadata } from "./types/hidden_metadata";
+import type { MountPoint } from "./types/mount_point";
+import { NativeBindings } from "./types/native_bindings";
+import type { Options } from "./types/options";
+import type { VolumeMetadata } from "./types/volume_metadata";
+import type { VolumeHealthStatus } from "./volume_health_status";
+import { VolumeHealthStatuses } from "./volume_health_status";
 import {
   getAllVolumeMetadataImpl,
   getVolumeMetadataImpl,
-} from "./volume_metadata.js";
-import type { GetVolumeMountPointOptions } from "./volume_mount_points.js";
-import { getVolumeMountPointsImpl } from "./volume_mount_points.js";
+} from "./volume_metadata";
+import type { GetVolumeMountPointOptions } from "./volume_mount_points";
+import { getVolumeMountPointsImpl } from "./volume_mount_points";
 
 export type {
   GetVolumeMountPointOptions,

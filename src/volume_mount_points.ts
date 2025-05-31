@@ -1,22 +1,17 @@
 // src/mount_point.ts
 
-import { uniqBy } from "./array.js";
-import { mapConcurrent, withTimeout } from "./async.js";
-import { debug } from "./debuglog.js";
-import { getLinuxMountPoints } from "./linux/mount_points.js";
-import { compactValues } from "./object.js";
-import { isMacOS, isWindows } from "./platform.js";
-import {
-  isBlank,
-  isNotBlank,
-  sortObjectsByLocale,
-  toNotBlank,
-} from "./string.js";
-import { assignSystemVolume, SystemVolumeConfig } from "./system_volume.js";
-import type { MountPoint } from "./types/mount_point.js";
-import type { NativeBindingsFn } from "./types/native_bindings.js";
-import type { Options } from "./types/options.js";
-import { directoryStatus } from "./volume_health_status.js";
+import { uniqBy } from "./array";
+import { mapConcurrent, withTimeout } from "./async";
+import { debug } from "./debuglog";
+import { getLinuxMountPoints } from "./linux/mount_points";
+import { compactValues } from "./object";
+import { isMacOS, isWindows } from "./platform";
+import { isBlank, isNotBlank, sortObjectsByLocale, toNotBlank } from "./string";
+import { assignSystemVolume, SystemVolumeConfig } from "./system_volume";
+import type { MountPoint } from "./types/mount_point";
+import type { NativeBindingsFn } from "./types/native_bindings";
+import type { Options } from "./types/options";
+import { directoryStatus } from "./volume_health_status";
 
 export type GetVolumeMountPointOptions = Partial<
   Pick<

@@ -1,11 +1,11 @@
 // src/mount_point.test.ts
 
 import { jest } from "@jest/globals";
-import { getVolumeMountPoints } from "..";
-import { times, uniq } from "./array.js";
-import { isWindows } from "./platform.js";
-import { sortByLocale } from "./string.js";
-import type { MountPoint } from "./types/mount_point.js";
+import { times, uniq } from "./array";
+import { getVolumeMountPoints } from "./index";
+import { isWindows } from "./platform";
+import { sortByLocale } from "./string";
+import type { MountPoint } from "./types/mount_point";
 
 describe("Filesystem Metadata", () => {
   jest.setTimeout(15_000);

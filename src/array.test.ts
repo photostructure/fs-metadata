@@ -1,6 +1,6 @@
 // src/array.test.ts
 
-import { compact, times, uniq, uniqBy } from "./array.js";
+import { compact, times, uniq, uniqBy } from "./array";
 
 describe("Array", () => {
   describe("uniq", () => {

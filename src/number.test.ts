@@ -1,6 +1,6 @@
 // src/number.test.ts
 
-import { gt0, isNumber, toInt } from "./number.js";
+import { gt0, isNumber, toInt } from "./number";
 
 describe("number", () => {
   describe("isNumber", () => {

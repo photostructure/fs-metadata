@@ -1,6 +1,6 @@
 // src/uuid.ts
 
-import { toS } from "./string.js";
+import { toS } from "./string";
 
 const uuidRegex = /[a-z0-9][a-z0-9-]{7,}/i;
 

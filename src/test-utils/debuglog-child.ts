@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 
-import { debugLogContext, isDebugEnabled } from "../debuglog.js";
+import { debugLogContext, isDebugEnabled } from "../debuglog";
 
 try {
   const result = {

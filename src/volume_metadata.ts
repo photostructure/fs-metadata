@@ -1,34 +1,31 @@
 // src/volume_metadata.ts
 
-import { mapConcurrent, withTimeout } from "./async.js";
-import { debug } from "./debuglog.js";
-import { WrappedError } from "./error.js";
-import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk.js";
-import { getLinuxMtabMetadata } from "./linux/mount_points.js";
+import { mapConcurrent, withTimeout } from "./async";
+import { debug } from "./debuglog";
+import { WrappedError } from "./error";
+import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk";
+import { getLinuxMtabMetadata } from "./linux/mount_points";
 import {
   type MtabVolumeMetadata,
   mountEntryToPartialVolumeMetadata,
-} from "./linux/mtab.js";
-import { compactValues } from "./object.js";
-import { IncludeSystemVolumesDefault, optionsWithDefaults } from "./options.js";
-import { normalizePath } from "./path.js";
-import { isLinux, isWindows } from "./platform.js";
-import { extractRemoteInfo, isRemoteFsType } from "./remote_info.js";
-import { isBlank, isNotBlank } from "./string.js";
-import { assignSystemVolume } from "./system_volume.js";
+} from "./linux/mtab";
+import { compactValues } from "./object";
+import { IncludeSystemVolumesDefault, optionsWithDefaults } from "./options";
+import { normalizePath } from "./path";
+import { isLinux, isWindows } from "./platform";
+import { extractRemoteInfo, isRemoteFsType } from "./remote_info";
+import { isBlank, isNotBlank } from "./string";
+import { assignSystemVolume } from "./system_volume";
 import type {
   GetVolumeMetadataOptions,
   NativeBindingsFn,
-} from "./types/native_bindings.js";
-import type { Options } from "./types/options.js";
-import type { VolumeMetadata } from "./types/volume_metadata.js";
-import { parseUNCPath } from "./unc.js";
-import { extractUUID } from "./uuid.js";
-import {
-  VolumeHealthStatuses,
-  directoryStatus,
-} from "./volume_health_status.js";
-import { getVolumeMountPointsImpl } from "./volume_mount_points.js";
+} from "./types/native_bindings";
+import type { Options } from "./types/options";
+import type { VolumeMetadata } from "./types/volume_metadata";
+import { parseUNCPath } from "./unc";
+import { extractUUID } from "./uuid";
+import { VolumeHealthStatuses, directoryStatus } from "./volume_health_status";
+import { getVolumeMountPointsImpl } from "./volume_mount_points";
 
 export async function getVolumeMetadataImpl(
   o: GetVolumeMetadataOptions & Options,

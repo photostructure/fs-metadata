@@ -1,7 +1,7 @@
 // src/random.test.ts
 
-import { times } from "./array.js";
-import { pickRandom, randomLetter, randomLetters, shuffle } from "./random.js";
+import { times } from "./array";
+import { pickRandom, randomLetter, randomLetters, shuffle } from "./random";
 
 describe("random", () => {
   describe("randomLetter", () => {

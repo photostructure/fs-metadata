@@ -4,9 +4,9 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { env, platform } from "node:process";
-import { normalizePath } from "../path.js";
-import { isMacOS, isWindows } from "../platform.js";
-import { toNotBlank } from "../string.js";
+import { normalizePath } from "../path";
+import { isMacOS, isWindows } from "../platform";
+import { toNotBlank } from "../string";
 
 /**
  * Helper function to skip tests based on platform

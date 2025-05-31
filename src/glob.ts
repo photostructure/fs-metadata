@@ -1,7 +1,7 @@
 // src/glob.ts
 
-import { isWindows } from "./platform.js";
-import { isNotBlank } from "./string.js";
+import { isWindows } from "./platform";
+import { isNotBlank } from "./string";
 
 const cache = new Map<string, RegExp>();
 

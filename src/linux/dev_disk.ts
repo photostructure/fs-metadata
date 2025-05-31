@@ -3,8 +3,8 @@
 import { Dirent } from "node:fs";
 import { readdir, readlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { debug } from "../debuglog.js";
-import { decodeEscapeSequences } from "../string.js";
+import { debug } from "../debuglog";
+import { decodeEscapeSequences } from "../string";
 
 /**
  * Gets the UUID from symlinks for a given device path asynchronously

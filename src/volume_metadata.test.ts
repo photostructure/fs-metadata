@@ -2,20 +2,20 @@
 
 import { jest } from "@jest/globals";
 import { join } from "node:path";
+import { compact, times } from "./array";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
   VolumeHealthStatuses,
-} from "..";
-import { compact, times } from "./array.js";
-import { omit } from "./object.js";
-import { IncludeSystemVolumesDefault } from "./options.js";
-import { isLinux, isMacOS, isWindows } from "./platform.js";
-import { pickRandom, randomLetter, randomLetters, shuffle } from "./random.js";
-import { assertMetadata } from "./test-utils/assert.js";
-import { systemDrive } from "./test-utils/platform.js";
-import { MiB } from "./units.js";
+} from "./index";
+import { omit } from "./object";
+import { IncludeSystemVolumesDefault } from "./options";
+import { isLinux, isMacOS, isWindows } from "./platform";
+import { pickRandom, randomLetter, randomLetters, shuffle } from "./random";
+import { assertMetadata } from "./test-utils/assert";
+import { systemDrive } from "./test-utils/platform";
+import { MiB } from "./units";
 
 const rootPath = systemDrive();
 

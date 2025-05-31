@@ -3,7 +3,7 @@ import {
   formatMtab,
   mountEntryToPartialVolumeMetadata,
   parseMtab,
-} from "./mtab.js";
+} from "./mtab";
 
 describe("mtab", () => {
   describe("parseMtab()", () => {
