@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { env } from "node:process";
+import { debug } from "./debuglog";
 import { _dirname } from "./dirname";
 
 describe("debuglog integration tests", () => {
@@ -76,5 +77,52 @@ describe("debuglog integration tests", () => {
       isDebugEnabled: true,
       debugLogContext: "fs-meta",
     });
+  });
+});
+
+describe("debug function", () => {
+  test("should not write when debug is disabled", () => {
+    // Mock stderr.write to verify it's not called
+    const mockWrite = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    // Ensure debug is disabled (default state)
+    debug("test message", "arg1", "arg2");
+    expect(mockWrite).not.toHaveBeenCalled();
+
+    mockWrite.mockRestore();
+  });
+
+  test("debug function handles various argument types", () => {
+    const mockWrite = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    // Even when disabled, this tests that the function doesn't crash
+    debug("test %s %d %o", "string", 123, { key: "value" });
+    debug("no args");
+    debug("with error", new Error("test error"));
+    expect(mockWrite).not.toHaveBeenCalled();
+
+    mockWrite.mockRestore();
+  });
+
+  test("debug writes output when enabled", () => {
+    const childEnv: Record<string, string | undefined> = {
+      ...env,
+      NODE_DEBUG: "fs-metadata",
+    };
+
+    const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
+
+    const result = execFileSync(process.execPath, ["--import=tsx", script], {
+      env: childEnv,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    // The stdout should contain "DONE"
+    expect(result.trim()).toBe("DONE");
   });
 });
