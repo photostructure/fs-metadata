@@ -84,4 +84,60 @@ describe("WrappedError", () => {
     expect(error.details).toEqual({});
     expect(error.toString()).toBe("Error: Simple error");
   });
+
+  it("should inherit errno from a cause that is an Error with errno", () => {
+    const cause = new Error("Original error") as Error & { errno?: number };
+    cause.errno = 13;
+    const error = new WrappedError("Context message", { cause });
+    expect(error.errno).toBe(13);
+  });
+
+  it("should inherit code from a cause that is an Error with code", () => {
+    const cause = new Error("Original error") as Error & { code?: string };
+    cause.code = "EACCES";
+    const error = new WrappedError("Context message", { cause });
+    expect(error.code).toBe("EACCES");
+  });
+
+  it("should inherit syscall from a cause that is an Error with syscall", () => {
+    const cause = new Error("Original error") as Error & { syscall?: string };
+    cause.syscall = "chmod";
+    const error = new WrappedError("Context message", { cause });
+    expect(error.syscall).toBe("chmod");
+  });
+
+  it("should prefer explicit options over inherited values from cause", () => {
+    const cause = new Error("Original error") as Error & {
+      errno?: number;
+      code?: string;
+    };
+    cause.errno = 13;
+    cause.code = "EACCES";
+    const error = new WrappedError("Context message", {
+      cause,
+      errno: 2,
+      code: "ENOENT",
+    });
+    expect(error.errno).toBe(2);
+    expect(error.code).toBe("ENOENT");
+  });
+
+  it("should handle blank code and syscall options", () => {
+    const error = new WrappedError("Context message", {
+      code: "",
+      syscall: "   ",
+      path: "",
+    });
+    expect(error.code).toBeUndefined();
+    expect(error.syscall).toBeUndefined();
+    expect(error.path).toBeUndefined();
+  });
+
+  it("should handle cause without stack", () => {
+    const cause = { message: "Not a real error" };
+    const error = new WrappedError("Context message", { cause });
+    expect(error.stack).toBeDefined();
+    // The cause object is converted to an Error in toError, so it will have a stack
+    expect(error.stack).toContain("Caused by:");
+  });
 });
