@@ -37,4 +37,10 @@ export default [
       "no-console": "off",
     },
   },
+  {
+    files: ["**/*.test.ts", "**/*.test.js", "**/*.test.mjs"],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "off",
+    },
+  },
 ];
