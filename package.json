@@ -35,7 +35,7 @@
     "prebuildify": "prebuildify --napi --tag-libc --strip",
     "prebuild": "run-s configure prebuildify",
     "// clang-tidy": "on ubuntu: `sudo apt install clang-tidy`, on mac: `brew install llvm && alias clang-tidy=$(brew --prefix llvm)/bin/clang-tidy`. Note that there will be warnings for non-platform-relevant files.",
-    "clang-tidy": "npm run configure && bear -- npm run node-gyp-rebuild && find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy",
+    "clang-tidy": "node scripts/is-platform.mjs win32 || (npm run configure && bear -- npm run node-gyp-rebuild && find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy)",
     "clang-tidy:simple": "node-gyp configure -- -f compile_commands_json && clang-tidy -p build/Release src/**/*.cpp",
     "compile": "tsc -p tsconfig.build.json --noEmit",
     "bundle": "tsup && node scripts/post-build.mjs",
