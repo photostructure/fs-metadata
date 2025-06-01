@@ -25,19 +25,19 @@ class WNetConnection {
 public:
   explicit WNetConnection(const std::string &path)
       : drivePath(path.substr(0, 2)), bufferSize(MAX_PATH) {
-    
+
     // Allocate initial buffer
     buffer = std::make_unique<char[]>(bufferSize);
-    
+
     DWORD result =
         WNetGetConnectionA(drivePath.c_str(), buffer.get(), &bufferSize);
-    
+
     if (result == ERROR_MORE_DATA) {
       // bufferSize now contains the required size
       buffer = std::make_unique<char[]>(bufferSize);
       result = WNetGetConnectionA(drivePath.c_str(), buffer.get(), &bufferSize);
     }
-    
+
     isValid = (result == NO_ERROR);
   }
 
@@ -79,7 +79,7 @@ inline std::string GetVolumeGUID(const std::string &mountPoint) {
 
 // RAII wrapper for volume information
 class VolumeInfo {
-  static constexpr DWORD VOLUME_NAME_SIZE = MAX_PATH + 1;  // 261 characters
+  static constexpr DWORD VOLUME_NAME_SIZE = MAX_PATH + 1; // 261 characters
   char volumeName[VOLUME_NAME_SIZE];
   char fstype[VOLUME_NAME_SIZE];
   DWORD serialNumber;
@@ -89,9 +89,9 @@ class VolumeInfo {
 
 public:
   explicit VolumeInfo(const std::string &mountPoint) {
-    valid = GetVolumeInformationA(mountPoint.c_str(), volumeName, VOLUME_NAME_SIZE,
-                                  &serialNumber, &maxComponentLen, &fsFlags,
-                                  fstype, VOLUME_NAME_SIZE);
+    valid = GetVolumeInformationA(
+        mountPoint.c_str(), volumeName, VOLUME_NAME_SIZE, &serialNumber,
+        &maxComponentLen, &fsFlags, fstype, VOLUME_NAME_SIZE);
 
     if (!valid && GetLastError() != ERROR_NOT_READY) {
       throw FSException("GetVolumeInformation", GetLastError());

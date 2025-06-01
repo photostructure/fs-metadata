@@ -61,14 +61,16 @@ public:
       DEBUG_LOG("[IOOperation] Cleaning up thread %lu", threadId);
       // Signal termination
       shouldTerminate.store(true, std::memory_order_release);
-      
+
       // Wake up thread if it's waiting on something
       SetEvent(completionEvent);
 
       // Give thread chance to exit gracefully (increased timeout)
       DWORD waitResult = WaitForSingleObject(threadHandle, 1000);
       if (waitResult != WAIT_OBJECT_0) {
-        DEBUG_LOG("[IOOperation] WARNING: Thread %lu did not exit gracefully after 1000ms", threadId);
+        DEBUG_LOG("[IOOperation] WARNING: Thread %lu did not exit gracefully "
+                  "after 1000ms",
+                  threadId);
         // NEVER use TerminateThread - it's extremely dangerous
         // Instead, log the issue and abandon the thread
         // The thread will eventually exit when the process terminates
@@ -90,7 +92,8 @@ public:
 
     // Check if we should terminate before starting work
     if (self->shouldTerminate.load(std::memory_order_acquire)) {
-      DEBUG_LOG("[WorkerThread] Thread %lu terminating before work", self->threadId);
+      DEBUG_LOG("[WorkerThread] Thread %lu terminating before work",
+                self->threadId);
       return 0;
     }
 
@@ -99,7 +102,8 @@ public:
         NULL, FIND_FIRST_EX_LARGE_FETCH | FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY);
 
     if (findHandle == INVALID_HANDLE_VALUE) {
-      self->result.store(self->MapErrorToDriveStatus(GetLastError()), std::memory_order_release);
+      self->result.store(self->MapErrorToDriveStatus(GetLastError()),
+                         std::memory_order_release);
       DEBUG_LOG("[WorkerThread] Search failed with error: %lu", GetLastError());
     } else {
       self->result.store(DriveStatus::Healthy, std::memory_order_release);
