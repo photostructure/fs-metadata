@@ -4,9 +4,7 @@ import { isWindows } from "./platform";
 describe("Thread Safety Tests", () => {
   // This test is designed to stress the Windows thread safety implementation
   // Without the atomic fixes, this could cause race conditions or crashes
-  it(
-    "should handle concurrent volume metadata requests without race conditions",
-    async () => {
+  it("should handle concurrent volume metadata requests without race conditions", async () => {
     if (!isWindows) {
       console.log(
         "Skipping Windows thread safety test on non-Windows platform",
@@ -85,9 +83,7 @@ describe("Thread Safety Tests", () => {
     // The test passes if we don't crash and have reasonable consistency
     expect(inconsistencies).toBe(0);
     expect(successCount + failureCount).toBe(totalRequests);
-  },
-  20000, // 20 second timeout for this test
-  );
+  }, 20000); // 20 second timeout for this test
 
   // This test specifically targets the drive status checker timeout behavior
   it("should handle timeouts gracefully without thread termination issues", async () => {
@@ -133,13 +129,11 @@ describe("Thread Safety Tests", () => {
   });
 
   // Memory stress test to detect potential memory leaks from improper thread cleanup
-  it(
-    "should not leak memory with repeated concurrent operations",
-    async () => {
-      if (!isWindows) {
-        console.log("Skipping Windows memory test on non-Windows platform");
-        return;
-      }
+  it("should not leak memory with repeated concurrent operations", async () => {
+    if (!isWindows) {
+      console.log("Skipping Windows memory test on non-Windows platform");
+      return;
+    }
 
     const mountPoints = await getVolumeMountPoints();
     if (mountPoints.length === 0) {
@@ -196,7 +190,5 @@ describe("Thread Safety Tests", () => {
     // Allow for some memory growth but fail if it's excessive
     // This would catch major leaks from improper thread cleanup
     expect(heapGrowthMB).toBeLessThan(50);
-  },
-  30000, // 30 second timeout for this memory-intensive test
-  );
+  }, 30000); // 30 second timeout for this memory-intensive test
 });
