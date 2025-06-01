@@ -52,7 +52,7 @@
     "lint:fix": "eslint --fix",
     "snyk": "snyk code test",
     "fmt": "run-p fmt:*",
-    "// fmt:cpp": "on ubuntu: `sudo apt install clang-format`",
+    "// fmt:cpp": "on ubuntu: `sudo apt install clang-format`. Note that windows emits `invalid format` with this || true approach, but it works and is better than introducing Yet Another Script Script (like scripts/clang-format.mjs).",
     "fmt:cpp": "clang-format --style=LLVM -i src/*.cpp src/*/*.cpp src/*/*.h || true",
     "fmt:js": "prettier --write \"scripts/**/*.?js\" \"*.?js\"",
     "fmt:json": "prettier --write \"**/*.json\"",
