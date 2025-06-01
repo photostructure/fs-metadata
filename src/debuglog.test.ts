@@ -16,9 +16,10 @@ describe("debuglog integration tests", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-child.ts");
 
-    const result = execFileSync(process.execPath, ["--import=tsx", script], {
+    const result = execFileSync("npx", ["tsx", script], {
       env: childEnv,
       encoding: "utf8",
+      shell: true,
     });
 
     return JSON.parse(result);
@@ -117,10 +118,11 @@ describe("debug function", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
 
-    const result = execFileSync(process.execPath, ["--import=tsx", script], {
+    const result = execFileSync("npx", ["tsx", script], {
       env: childEnv,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: true,
     });
 
     // The stdout should contain "DONE"
