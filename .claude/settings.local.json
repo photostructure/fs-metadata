@@ -20,7 +20,7 @@
       "Bash(rg:*)",
       "Bash(node:*)",
       "Bash(npx jest:*)",
-      "WebFetch(domain:nodejs.org)"
+      "WebFetch(domain:nodejs.org)",
       "WebFetch(domain:learn.microsoft.com)",
       "Bash(npx tsc:*)",
       "Bash(npm --version)",
