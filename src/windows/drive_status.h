@@ -2,6 +2,7 @@
 
 #pragma once
 #include "../common/debug_log.h"
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,15 +36,15 @@ inline std::string DriveStatusToString(DriveStatus status) {
 class IOOperation {
 private:
   HANDLE completionEvent;
-  DriveStatus result;
+  std::atomic<DriveStatus> result;
   std::string path;
   DWORD threadId;
-  volatile bool shouldTerminate;
+  std::atomic<bool> shouldTerminate;
   HANDLE threadHandle; // Store thread handle as member
 
 public:
   IOOperation()
-      : result(DriveStatus::Unknown), threadId(0), shouldTerminate(false),
+      : result{DriveStatus::Unknown}, threadId(0), shouldTerminate{false},
         threadHandle(NULL) {
     completionEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
   }
@@ -59,12 +60,18 @@ public:
     if (threadHandle) {
       DEBUG_LOG("[IOOperation] Cleaning up thread %lu", threadId);
       // Signal termination
-      shouldTerminate = true;
+      shouldTerminate.store(true, std::memory_order_release);
+      
+      // Wake up thread if it's waiting on something
+      SetEvent(completionEvent);
 
-      // Give thread chance to exit gracefully
-      if (WaitForSingleObject(threadHandle, 100) != WAIT_OBJECT_0) {
-        DEBUG_LOG("[IOOperation] Force terminating thread %lu", threadId);
-        TerminateThread(threadHandle, 1);
+      // Give thread chance to exit gracefully (increased timeout)
+      DWORD waitResult = WaitForSingleObject(threadHandle, 1000);
+      if (waitResult != WAIT_OBJECT_0) {
+        DEBUG_LOG("[IOOperation] WARNING: Thread %lu did not exit gracefully after 1000ms", threadId);
+        // NEVER use TerminateThread - it's extremely dangerous
+        // Instead, log the issue and abandon the thread
+        // The thread will eventually exit when the process terminates
       }
 
       CloseHandle(threadHandle);
@@ -81,15 +88,21 @@ public:
 
     DEBUG_LOG("[WorkerThread] Starting search on path: %s", searchPath.c_str());
 
+    // Check if we should terminate before starting work
+    if (self->shouldTerminate.load(std::memory_order_acquire)) {
+      DEBUG_LOG("[WorkerThread] Thread %lu terminating before work", self->threadId);
+      return 0;
+    }
+
     findHandle = FindFirstFileExA(
         searchPath.c_str(), FindExInfoBasic, &findData, FindExSearchNameMatch,
         NULL, FIND_FIRST_EX_LARGE_FETCH | FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY);
 
     if (findHandle == INVALID_HANDLE_VALUE) {
-      self->result = self->MapErrorToDriveStatus(GetLastError());
+      self->result.store(self->MapErrorToDriveStatus(GetLastError()), std::memory_order_release);
       DEBUG_LOG("[WorkerThread] Search failed with error: %lu", GetLastError());
     } else {
-      self->result = DriveStatus::Healthy;
+      self->result.store(DriveStatus::Healthy, std::memory_order_release);
       FindClose(findHandle);
       DEBUG_LOG("[WorkerThread] Search completed successfully");
     }
@@ -109,7 +122,7 @@ public:
 
     path = checkPath;
     ResetEvent(completionEvent);
-    shouldTerminate = false;
+    shouldTerminate.store(false, std::memory_order_release);
 
     threadHandle = CreateThread(NULL, 0, WorkerThread, this, 0, &threadId);
     if (!threadHandle) {
@@ -131,7 +144,7 @@ public:
     CloseHandle(threadHandle);
     DEBUG_LOG("[CheckDriveStatus] CloseHandle %lu completed", threadId);
     threadHandle = NULL;
-    return result;
+    return result.load(std::memory_order_acquire);
   }
 
 private:
