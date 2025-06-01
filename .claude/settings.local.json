@@ -19,7 +19,8 @@
       "Bash(npx tsup:*)",
       "Bash(rg:*)",
       "Bash(node:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "WebFetch(domain:nodejs.org)"
     ],
     "deny": []
   },
