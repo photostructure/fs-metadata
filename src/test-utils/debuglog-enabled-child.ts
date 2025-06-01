@@ -1,5 +1,3 @@
-#!/usr/bin/env -S npx tsx
-
 import { debug } from "../debuglog";
 
 // This will be run with NODE_DEBUG set, so debug should be enabled

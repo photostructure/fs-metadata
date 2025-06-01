@@ -1,5 +1,3 @@
-#!/usr/bin/env -S npx tsx
-
 import { debugLogContext, isDebugEnabled } from "../debuglog";
 
 try {
