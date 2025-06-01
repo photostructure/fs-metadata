@@ -25,6 +25,9 @@ stage/
 *.node
 config.gypi
 
+# Dynamically created by Bear and fed to clang-tidy:
+compile_commands.json
+
 # temporary files from tools
 .idea/
 *.swp
