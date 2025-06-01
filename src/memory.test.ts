@@ -1,9 +1,9 @@
 // src/memory.test.ts
 
 import { jest } from "@jest/globals";
-import { mkdtemp, rm } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { delay } from "./async";
 import {
   getAllVolumeMetadata,
