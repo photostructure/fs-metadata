@@ -70,6 +70,11 @@ public:
 
   void Execute() override {
     try {
+      // Add path validation to prevent directory traversal
+      if (path.find("..") != std::string::npos) {
+        throw FSException("Invalid path containing '..'", ERROR_INVALID_PARAMETER);
+      }
+      
       auto wpath = PathConverter::ToWString(path);
       FileAttributeHandler handler(wpath);
       result = handler.isHidden();
@@ -98,6 +103,11 @@ public:
 
   void Execute() override {
     try {
+      // Add path validation to prevent directory traversal
+      if (path.find("..") != std::string::npos) {
+        throw FSException("Invalid path containing '..'", ERROR_INVALID_PARAMETER);
+      }
+      
       auto wpath = PathConverter::ToWString(path);
       FileAttributeHandler handler(wpath);
       handler.setHidden(value);
