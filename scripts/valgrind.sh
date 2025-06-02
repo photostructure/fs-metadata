@@ -35,6 +35,21 @@ if [ ! -f "$VALGRIND_TEST" ]; then
     exit 1
 fi
 
+# Check if dist directory exists (indicates build completed)
+if [ ! -d "$ROOT_DIR/dist" ]; then
+    echo -e "${RED}Error: dist/ directory not found. Run 'npm run assemble' first.${NC}"
+    exit 1
+fi
+
+# Pre-flight check: run the test script without valgrind first
+echo "Running pre-flight check..."
+if ! node "$VALGRIND_TEST" > /dev/null 2>&1; then
+    echo -e "${RED}Error: Test script failed to run. Running again to show error:${NC}"
+    node "$VALGRIND_TEST"
+    exit 1
+fi
+echo -e "${GREEN}✓ Pre-flight check passed${NC}"
+
 # Use the committed suppressions file
 SUPP_FILE="$ROOT_DIR/.valgrind.supp"
 
