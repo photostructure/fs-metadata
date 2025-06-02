@@ -15,7 +15,7 @@ import {
   getVolumeMetadata,
   getVolumeMountPoints,
   isHidden,
-} from "../dist/index.js";
+} from "../dist/index.mjs";
 
 async function runTests() {
   console.log("Starting valgrind memory leak tests...");
