@@ -14,6 +14,34 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## [0.5.0] - 2025-06-01
+
+### Added
+
+- Comprehensive memory testing framework with Valgrind and AddressSanitizer support
+- Thread safety tests for Windows platform
+- Platform-specific build scripts with automatic OS detection
+- Clang-tidy integration for C++ code analysis
+
+### Breaking
+
+- Dropped support for Node.js v18, added support for Node.js v24
+
+### Changed
+
+- Simplified ESM/CJS dual module support with unified build configuration
+- Enhanced test coverage with additional error handling and edge case tests
+- Updated all imports to use `node:` prefix for built-in modules
+
+### Fixed
+
+- Added path validation to prevent directory traversal vulnerabilities in hidden file operations
+- Improved error handling and null checks across Linux GIO implementation
+- Fixed buffer allocation issues in Windows networking and volume operations
+- Enhanced resource management with better validation for empty mount points
+- Made `SystemPathPatternsDefault` values visible in TypeScript typings
+- Improved test reliability across different CI environments
+
 ## [0.4.0] - 2025-01-09
 
 - `Fixed`: Switch to thread-safe `getmntinfo_r_np()` for macOS. Improved darwin resource management.
@@ -23,7 +51,7 @@ Security in case of vulnerabilities.
 - `Packaging`: Improved ESM/CJS support with common `__dirname` implementation thanks to `tsup` [shims](https://tsup.egoist.dev/#inject-cjs-and-esm-shims).
 
   This change simplifies the implementation and improves inline jsdocs as the exported code and docs have been inlined.
-  
+
 - `Packaging`: Re-enabled test coverage assertions (after finding the magicks to get istanbul to see what the tests were exercising)
 
 - `Packaging`: Added debuglog tests

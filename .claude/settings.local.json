@@ -24,7 +24,8 @@
       "WebFetch(domain:learn.microsoft.com)",
       "Bash(npx tsc:*)",
       "Bash(npm --version)",
-      "Bash(npm pkg fix:*)"
+      "Bash(npm pkg fix:*)",
+      "WebFetch(domain:keepachangelog.com)"
     ],
     "deny": []
   },
