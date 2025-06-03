@@ -1,6 +1,7 @@
 // src/darwin/hidden.cpp
 #include "hidden.h"
 #include "../common/debug_log.h"
+#include "../common/error_utils.h"
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -27,11 +28,11 @@ void GetHiddenWorker::Execute() {
     int error = errno;
     if (error == ENOENT) {
       DEBUG_LOG("[GetHiddenWorker] path not found: %s", path_.c_str());
-      SetError("Path not found");
+      SetError("Path not found: '" + path_ + "'");
     } else {
       DEBUG_LOG("[GetHiddenWorker] failed to stat path %s: %s (%d)",
                 path_.c_str(), strerror(error), error);
-      SetError(std::string("Failed to stat path: ") + strerror(error));
+      SetError(CreatePathErrorMessage("stat", path_, error));
     }
     return;
   }
@@ -94,11 +95,11 @@ void SetHiddenWorker::Execute() {
     int error = errno;
     if (error == ENOENT) {
       DEBUG_LOG("[SetHiddenWorker] path not found: %s", path_.c_str());
-      SetError("Path not found");
+      SetError("Path not found: '" + path_ + "'");
     } else {
       DEBUG_LOG("[SetHiddenWorker] failed to stat path %s: %s (%d)",
                 path_.c_str(), strerror(error), error);
-      SetError(std::string("Failed to stat path: ") + strerror(error));
+      SetError(CreatePathErrorMessage("stat", path_, error));
     }
     return;
   }
@@ -111,8 +112,10 @@ void SetHiddenWorker::Execute() {
   }
 
   if (chflags(path_.c_str(), new_flags) != 0) {
-    DEBUG_LOG("[SetHiddenWorker] failed to set flags for: %s", path_.c_str());
-    SetError("Failed to set flags");
+    int error = errno;
+    DEBUG_LOG("[SetHiddenWorker] failed to set flags for %s: %s (%d)",
+              path_.c_str(), strerror(error), error);
+    SetError(CreatePathErrorMessage("chflags", path_, error));
     return;
   }
   DEBUG_LOG("[SetHiddenWorker] successfully set hidden=%d for: %s", hidden_,

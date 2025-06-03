@@ -1,6 +1,7 @@
 // src/darwin/volume_mount_points.cpp
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
+#include "../common/error_utils.h"
 #include "./fs_meta.h"
 #include "./raii_utils.h"
 #include <chrono>
@@ -33,7 +34,13 @@ public:
       int count = getmntinfo_r_np(mntbuf.ptr(), MNT_NOWAIT);
 
       if (count <= 0) {
-        throw std::runtime_error("Failed to get mount information");
+        if (count == 0) {
+          throw std::runtime_error("No mount points found");
+        } else {
+          // getmntinfo_r_np returns -1 on error and sets errno
+          throw FSException(
+              CreateDetailedErrorMessage("getmntinfo_r_np", errno));
+        }
       }
 
       for (int i = 0; i < count; i++) {

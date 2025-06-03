@@ -31,7 +31,7 @@ public:
                 mountPoint.c_str());
       struct statvfs vfs;
       if (statvfs(mountPoint.c_str(), &vfs) != 0) {
-        throw FSException(CreateErrorMessage("statvfs", errno));
+        throw FSException(CreatePathErrorMessage("statvfs", mountPoint, errno));
       }
 
       const uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;

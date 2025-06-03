@@ -70,14 +70,14 @@ private:
     if (statvfs(mountPoint.c_str(), &vfs) != 0) {
       DEBUG_LOG("[GetVolumeMetadataWorker] statvfs failed: %s (%d)",
                 strerror(errno), errno);
-      SetError(CreateErrorMessage("statvfs", errno));
+      SetError(CreatePathErrorMessage("statvfs", mountPoint, errno));
       return false;
     }
 
     if (statfs(mountPoint.c_str(), &fs) != 0) {
       DEBUG_LOG("[GetVolumeMetadataWorker] statfs failed: %s (%d)",
                 strerror(errno), errno);
-      SetError(CreateErrorMessage("statfs", errno));
+      SetError(CreatePathErrorMessage("statfs", mountPoint, errno));
       return false;
     }
 

@@ -2,6 +2,7 @@
 
 #include "blkid_cache.h"
 #include "../common/debug_log.h"
+#include "../common/error_utils.h"
 #include <stdexcept>
 
 namespace FSMeta {
@@ -14,8 +15,13 @@ BlkidCache::BlkidCache() : cache_(nullptr) {
   const std::lock_guard<std::mutex> lock(mutex_);
   DEBUG_LOG("[BlkidCache] initializing cache");
   if (blkid_get_cache(&cache_, nullptr) != 0) {
-    DEBUG_LOG("[BlkidCache] failed to initialize cache");
-    throw std::runtime_error("Failed to initialize blkid cache");
+    int error = errno;
+    DEBUG_LOG("[BlkidCache] failed to initialize cache: errno=%d", error);
+    if (error != 0) {
+      throw FSException(CreateDetailedErrorMessage("blkid_get_cache", error));
+    } else {
+      throw FSException("Failed to initialize blkid cache (no errno set)");
+    }
   }
   DEBUG_LOG("[BlkidCache] cache initialized successfully");
 }
