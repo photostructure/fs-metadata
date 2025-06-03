@@ -30,7 +30,9 @@
       "Bash(diff:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(npx eslint:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:semantic-release.gitbook.io)"
     ],
     "deny": []
   },
