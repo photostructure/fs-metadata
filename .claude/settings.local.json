@@ -28,7 +28,8 @@
       "WebFetch(domain:keepachangelog.com)",
       "WebFetch(domain:docs.github.com)",
       "Bash(diff:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npx eslint:*)"
     ],
     "deny": []
   },
