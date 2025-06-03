@@ -17,17 +17,14 @@ jobs:
     # At a minimum this job should upload artifacts using actions/upload-pages-artifact
     runs-on: ubuntu-latest
     steps:
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (ignore scripts to prevent node-gyp-build from running)
+        run: npm ci --ignore-scripts
 
       - name: Generate documentation
         run: npm run docs
