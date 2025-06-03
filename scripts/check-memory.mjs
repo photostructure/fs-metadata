@@ -37,9 +37,20 @@ console.log(color(colors.YELLOW, "\nRunning JavaScript memory tests..."));
 try {
   // Use node to execute jest.js for cross-platform compatibility
   const jestPath = path.join("node_modules", "jest", "bin", "jest.js");
+  const nodeExe = process.execPath;
+  const args = [jestPath, "--no-coverage", "src/memory.test.ts"];
+  
+  // Debug output
+  console.log("Debug: Node executable:", nodeExe);
+  console.log("Debug: Jest path:", jestPath);
+  console.log("Debug: Full command:", nodeExe, args.join(" "));
+  console.log("Debug: Current directory:", process.cwd());
+  console.log("Debug: Platform:", os.platform());
+  console.log("Debug: Node version:", process.version);
+  
   execFileSync(
-    process.execPath,
-    [jestPath, "--no-coverage", "src/memory.test.ts"],
+    nodeExe,
+    args,
     {
       stdio: "inherit",
       env: {
@@ -51,8 +62,15 @@ try {
     },
   );
   console.log(color(colors.GREEN, "✓ JavaScript memory tests passed"));
-} catch {
+} catch (error) {
   console.log(color(colors.RED, "✗ JavaScript memory tests failed"));
+  console.error("Debug: Error details:", error.message);
+  if (error.code) {
+    console.error("Debug: Error code:", error.code);
+  }
+  if (error.signal) {
+    console.error("Debug: Error signal:", error.signal);
+  }
   exitCode = 1;
 }
 
