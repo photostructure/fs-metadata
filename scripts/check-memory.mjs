@@ -39,7 +39,7 @@ try {
   const jestPath = path.join("node_modules", "jest", "bin", "jest.js");
   const nodeExe = process.execPath;
   const args = [jestPath, "--no-coverage", "src/memory.test.ts"];
-  
+
   // Debug output
   console.log("Debug: Node executable:", nodeExe);
   console.log("Debug: Jest path:", jestPath);
@@ -47,20 +47,16 @@ try {
   console.log("Debug: Current directory:", process.cwd());
   console.log("Debug: Platform:", os.platform());
   console.log("Debug: Node version:", process.version);
-  
-  execFileSync(
-    nodeExe,
-    args,
-    {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        TEST_MEMORY: "1",
-        TEST_ESM: "1",
-        NODE_OPTIONS: "--expose-gc --experimental-vm-modules --no-warnings",
-      },
+
+  execFileSync(nodeExe, args, {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      TEST_MEMORY: "1",
+      TEST_ESM: "1",
+      NODE_OPTIONS: "--expose-gc --experimental-vm-modules --no-warnings",
     },
-  );
+  });
   console.log(color(colors.GREEN, "✓ JavaScript memory tests passed"));
 } catch (error) {
   console.log(color(colors.RED, "✗ JavaScript memory tests failed"));
