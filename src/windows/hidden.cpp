@@ -66,7 +66,7 @@ class GetHiddenWorker : public Napi::AsyncWorker {
 
 public:
   GetHiddenWorker(Napi::Env env, std::string p, Napi::Promise::Deferred def)
-      : Napi::AsyncWorker(env), path(std::move(p)), deferred(std::move(def)) {}
+      : Napi::AsyncWorker(env), path(std::move(p)), deferred(def) {}
 
   void Execute() override {
     try {
@@ -86,9 +86,15 @@ public:
     }
   }
 
-  void OnOK() override { deferred.Resolve(Napi::Boolean::New(Env(), result)); }
+  void OnOK() override {
+    Napi::HandleScope scope(Env());
+    deferred.Resolve(Napi::Boolean::New(Env(), result));
+  }
 
-  void OnError(const Napi::Error &e) override { deferred.Reject(e.Value()); }
+  void OnError(const Napi::Error &e) override {
+    Napi::HandleScope scope(Env());
+    deferred.Reject(e.Value());
+  }
 };
 
 class SetHiddenWorker : public Napi::AsyncWorker {
@@ -99,8 +105,7 @@ class SetHiddenWorker : public Napi::AsyncWorker {
 public:
   SetHiddenWorker(Napi::Env env, std::string p, bool v,
                   Napi::Promise::Deferred def)
-      : Napi::AsyncWorker(env), path(std::move(p)), value(v),
-        deferred(std::move(def)) {}
+      : Napi::AsyncWorker(env), path(std::move(p)), value(v), deferred(def) {}
 
   void Execute() override {
     try {
@@ -120,9 +125,15 @@ public:
     }
   }
 
-  void OnOK() override { deferred.Resolve(Napi::Boolean::New(Env(), true)); }
+  void OnOK() override {
+    Napi::HandleScope scope(Env());
+    deferred.Resolve(Napi::Boolean::New(Env(), true));
+  }
 
-  void OnError(const Napi::Error &e) override { deferred.Reject(e.Value()); }
+  void OnError(const Napi::Error &e) override {
+    Napi::HandleScope scope(Env());
+    deferred.Reject(e.Value());
+  }
 };
 
 Napi::Promise GetHiddenAttribute(const Napi::CallbackInfo &info) {
@@ -135,8 +146,7 @@ Napi::Promise GetHiddenAttribute(const Napi::CallbackInfo &info) {
     }
 
     std::string path = info[0].As<Napi::String>();
-    auto *worker =
-        new GetHiddenWorker(env, std::move(path), std::move(deferred));
+    auto *worker = new GetHiddenWorker(env, std::move(path), deferred);
     worker->Queue();
 
     return deferred.Promise();
@@ -158,8 +168,7 @@ Napi::Promise SetHiddenAttribute(const Napi::CallbackInfo &info) {
     std::string path = info[0].As<Napi::String>();
     bool value = info[1].As<Napi::Boolean>();
 
-    auto *worker =
-        new SetHiddenWorker(env, std::move(path), value, std::move(deferred));
+    auto *worker = new SetHiddenWorker(env, std::move(path), value, deferred);
     worker->Queue();
 
     return deferred.Promise();
