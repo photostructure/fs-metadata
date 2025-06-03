@@ -14,7 +14,7 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## [0.5.0] - 2025-06-01
+## [0.6.0] - 2025-06-03
 
 ### Added
 
@@ -22,6 +22,8 @@ Security in case of vulnerabilities.
 - Thread safety tests for Windows platform
 - Platform-specific build scripts with automatic OS detection
 - Clang-tidy integration for C++ code analysis
+- Worker thread helper for volume metadata operations
+- NAPI_VERSION=9 definition for improved compatibility
 
 ### Breaking
 
@@ -32,6 +34,8 @@ Security in case of vulnerabilities.
 - Simplified ESM/CJS dual module support with unified build configuration
 - Enhanced test coverage with additional error handling and edge case tests
 - Updated all imports to use `node:` prefix for built-in modules
+- Reorganized build and test scripts for better clarity
+- Improved memory test workflow for cross-platform compatibility
 
 ### Fixed
 
@@ -41,6 +45,12 @@ Security in case of vulnerabilities.
 - Enhanced resource management with better validation for empty mount points
 - Made `SystemPathPatternsDefault` values visible in TypeScript typings
 - Improved test reliability across different CI environments
+- Added Napi::HandleScope to OnOK and OnError methods for proper scope management
+- Removed unnecessary std::move operations in worker implementations
+- Updated filesystem metadata tests to verify type and existence instead of specific values
+- Improved error handling and messages in various components
+- Enhanced error message validation for file access in worker thread tests
+- Updated tests to use healthy mount points for volume metadata retrieval
 
 ## [0.4.0] - 2025-01-09
 

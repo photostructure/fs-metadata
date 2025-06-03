@@ -29,7 +29,8 @@
       "WebFetch(domain:docs.github.com)",
       "Bash(diff:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(git tag:*)"
     ],
     "deny": []
   },
