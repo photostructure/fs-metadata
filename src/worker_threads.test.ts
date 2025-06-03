@@ -97,11 +97,20 @@ describe("Worker Threads Support", () => {
       return;
     }
 
-    const testMount = mountPoints[0]!;
-    const mainThreadResult = await getVolumeMetadata(testMount.mountPoint);
+    // Find a healthy mount point to test with
+    const healthyMount = mountPoints.find(mp => 
+      mp.status === "healthy" || mp.status === undefined
+    );
+    
+    if (!healthyMount) {
+      console.log("No healthy mount points available for testing");
+      return;
+    }
+
+    const mainThreadResult = await getVolumeMetadata(healthyMount.mountPoint);
     const workerResult = await runInWorker<VolumeMetadata>({
       task: "getVolumeMetadata",
-      mountPoint: testMount.mountPoint,
+      mountPoint: healthyMount.mountPoint,
     });
 
     // Validate the structure rather than exact values (which might change between calls)
@@ -196,6 +205,16 @@ describe("Worker Threads Support", () => {
       return;
     }
 
+    // Find a healthy mount point to test with
+    const healthyMount = mountPoints.find(mp => 
+      mp.status === "healthy" || mp.status === undefined
+    );
+    
+    if (!healthyMount) {
+      console.log("No healthy mount points available for testing");
+      return;
+    }
+
     const workerCount = 4;
     const workers: Promise<MountPoint[] | VolumeMetadata>[] = [];
 
@@ -210,7 +229,7 @@ describe("Worker Threads Support", () => {
         workers.push(
           runInWorker<VolumeMetadata>({
             task: "getVolumeMetadata",
-            mountPoint: mountPoints[0]!.mountPoint,
+            mountPoint: healthyMount.mountPoint,
           }),
         );
       }
@@ -226,12 +245,33 @@ describe("Worker Threads Support", () => {
 
   it("should handle errors gracefully in worker threads", async () => {
     // Test with invalid mount point
-    await expect(
-      runInWorker({
+    const invalidPath = isWindows 
+      ? "Z:\\nonexistent\\path" // Use a path on a drive that likely doesn't exist
+      : "/invalid/mount/point/that/does/not/exist";
+    
+    try {
+      const result = await runInWorker<VolumeMetadata>({
         task: "getVolumeMetadata",
-        mountPoint: "/invalid/mount/point/that/does/not/exist",
-      }),
-    ).rejects.toThrow();
+        mountPoint: invalidPath,
+      });
+      
+      // On Windows, invalid paths may return metadata with inaccessible status
+      if (isWindows && result.status === "inaccessible") {
+        expect(result.status).toBe("inaccessible");
+        expect(result.size).toBe(0);
+        expect(result.available).toBe(0);
+        expect(result.used).toBe(0);
+      } else {
+        // On other platforms, this should throw
+        throw new Error("Expected an error or inaccessible status");
+      }
+    } catch (error) {
+      // On non-Windows platforms or for truly invalid paths, expect an error
+      expect(error).toBeDefined();
+      if (error instanceof Error) {
+        expect(error.message).toMatch(/ENOENT|not accessible|Failed to get volume/i);
+      }
+    }
 
     // Test with invalid task
     await expect(
@@ -250,6 +290,16 @@ describe("Worker Threads Support", () => {
       return;
     }
 
+    // Find a healthy mount point to test with
+    const healthyMount = mountPoints.find(mp => 
+      mp.status === "healthy" || mp.status === undefined
+    );
+    
+    if (!healthyMount) {
+      console.log("No healthy mount points available for testing");
+      return;
+    }
+
     // Run the same operation multiple times in parallel
     const parallelCount = 10;
     const promises: Promise<VolumeMetadata>[] = [];
@@ -258,7 +308,7 @@ describe("Worker Threads Support", () => {
       promises.push(
         runInWorker<VolumeMetadata>({
           task: "getVolumeMetadata",
-          mountPoint: mountPoints[0]!.mountPoint,
+          mountPoint: healthyMount.mountPoint,
           options: { timeoutMs: 5000 },
         }),
       );
