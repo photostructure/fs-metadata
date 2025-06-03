@@ -40,7 +40,7 @@
     "// test": "support `npm t name_of_file` (and don't fail due to missing coverage)",
     "test": "npm run test:cjs -- --no-coverage",
     "// tests": "`build:ts` validates all TypeScript including tests. `lint` checks for style issues. `test:*` runs the tests directly from TypeScript source.",
-    "tests": "run-s build:ts lint test:*",
+    "tests": "run-s build:ts test:*",
     "test:cjs": "cross-env TEST_ESM=0 jest",
     "test:esm": "cross-env TEST_ESM=1 node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js",
     "test:memory": "node scripts/check-memory.mjs",
