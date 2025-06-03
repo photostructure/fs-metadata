@@ -31,7 +31,8 @@ jobs:
           node-version: 20
           cache: "npm"
       - run: npm ci
-      - run: npm run prebuild
+      - run: npm run configure:native
+      - run: npm run build:native
       - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ matrix.os }}
@@ -55,7 +56,8 @@ jobs:
           node-version: 20
           cache: "npm"
       - run: npm ci
-      - run: npm run prebuild
+      - run: npm run configure:native
+      - run: npm run build:native
       - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-linux-${{ matrix.arch }}-glibc
@@ -77,7 +79,8 @@ jobs:
           apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
           cd /tmp/project && \
           npm ci && \
-          npm run prebuild"
+          npm run configure:native && \
+          npm run build:native"
       - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-linux-${{ matrix.arch }}-musl
@@ -165,17 +168,7 @@ jobs:
           node-version: 20
           cache: "npm"
       - run: npm ci
-      - run: npm run configure
-      - name: Generate compile database
-        run: |
-          # Install bear to generate compile_commands.json
-          sudo apt-get install -y bear
-          # Generate compile_commands.json
-          bear -- npm run node-gyp-rebuild
-      - name: Run clang-tidy
-        run: |
-          # Run clang-tidy on Linux C++ source files only
-          find src -name "*.cpp" -o -name "*.h" | grep -E '\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy
+      - run: npm run lint:native
 
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}

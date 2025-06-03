@@ -56,7 +56,7 @@ if (!hasAllTools) {
 }
 
 // Run the clang-tidy command on Unix platforms
-const command = `npm run configure && bear -- npm run node-gyp-rebuild && find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy`;
+const command = `npm run configure:native && bear -- npm run node-gyp-rebuild && find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy`;
 
 const shell = spawn("sh", ["-c", command], {
   stdio: "inherit",

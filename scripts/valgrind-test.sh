@@ -37,7 +37,7 @@ fi
 
 # Check if dist directory exists (indicates build completed)
 if [ ! -d "$ROOT_DIR/dist" ]; then
-    echo -e "${RED}Error: dist/ directory not found. Run 'npm run assemble' first.${NC}"
+    echo -e "${RED}Error: dist/ directory not found. Run 'npm run build:dist' first.${NC}"
     exit 1
 fi
 

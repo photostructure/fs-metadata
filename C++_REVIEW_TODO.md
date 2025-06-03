@@ -243,7 +243,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 3. **Memory Testing Infrastructure**
    - Created comprehensive memory testing documentation (`docs/MEMORY_TESTING.md`)
    - Improved ASan configuration with proper suppressions
-   - Created standalone test runner (`scripts/run-asan.sh`)
+   - Created standalone test runner (`scripts/sanitizers-test.sh`)
    - Updated `scripts/check-memory.mjs` with better ASan support
    - All memory tests integrated into CI/CD
 

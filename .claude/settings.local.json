@@ -25,7 +25,9 @@
       "Bash(npx tsc:*)",
       "Bash(npm --version)",
       "Bash(npm pkg fix:*)",
-      "WebFetch(domain:keepachangelog.com)"
+      "WebFetch(domain:keepachangelog.com)",
+      "WebFetch(domain:docs.github.com)",
+      "Bash(diff:*)"
     ],
     "deny": []
   },
