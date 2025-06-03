@@ -98,10 +98,10 @@ describe("Worker Threads Support", () => {
     }
 
     // Find a healthy mount point to test with
-    const healthyMount = mountPoints.find(mp => 
-      mp.status === "healthy" || mp.status === undefined
+    const healthyMount = mountPoints.find(
+      (mp) => mp.status === "healthy" || mp.status === undefined,
     );
-    
+
     if (!healthyMount) {
       console.log("No healthy mount points available for testing");
       return;
@@ -206,10 +206,10 @@ describe("Worker Threads Support", () => {
     }
 
     // Find a healthy mount point to test with
-    const healthyMount = mountPoints.find(mp => 
-      mp.status === "healthy" || mp.status === undefined
+    const healthyMount = mountPoints.find(
+      (mp) => mp.status === "healthy" || mp.status === undefined,
     );
-    
+
     if (!healthyMount) {
       console.log("No healthy mount points available for testing");
       return;
@@ -245,16 +245,16 @@ describe("Worker Threads Support", () => {
 
   it("should handle errors gracefully in worker threads", async () => {
     // Test with invalid mount point
-    const invalidPath = isWindows 
+    const invalidPath = isWindows
       ? "Z:\\nonexistent\\path" // Use a path on a drive that likely doesn't exist
       : "/invalid/mount/point/that/does/not/exist";
-    
+
     try {
       const result = await runInWorker<VolumeMetadata>({
         task: "getVolumeMetadata",
         mountPoint: invalidPath,
       });
-      
+
       // On Windows, invalid paths may return metadata with inaccessible status
       if (isWindows && result.status === "inaccessible") {
         expect(result.status).toBe("inaccessible");
@@ -269,7 +269,9 @@ describe("Worker Threads Support", () => {
       // On non-Windows platforms or for truly invalid paths, expect an error
       expect(error).toBeDefined();
       if (error instanceof Error) {
-        expect(error.message).toMatch(/ENOENT|No such file or directory|not accessible|Failed to get volume|statvfs failed/i);
+        expect(error.message).toMatch(
+          /ENOENT|No such file or directory|not accessible|Failed to get volume|statvfs failed/i,
+        );
       }
     }
 
@@ -291,10 +293,10 @@ describe("Worker Threads Support", () => {
     }
 
     // Find a healthy mount point to test with
-    const healthyMount = mountPoints.find(mp => 
-      mp.status === "healthy" || mp.status === undefined
+    const healthyMount = mountPoints.find(
+      (mp) => mp.status === "healthy" || mp.status === undefined,
     );
-    
+
     if (!healthyMount) {
       console.log("No healthy mount points available for testing");
       return;
