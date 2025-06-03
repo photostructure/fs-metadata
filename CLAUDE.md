@@ -15,6 +15,7 @@ This is @photostructure/fs-metadata - a cross-platform native Node.js module for
 - Timeout handling for unresponsive network volumes
 - ESM and CJS module support
 - Full TypeScript type definitions
+- Worker threads support with proper context isolation
 
 ### Platform-Specific Notes
 - **Linux**: Optional GIO/GVfs mount support via Gnome libraries
