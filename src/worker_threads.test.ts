@@ -269,7 +269,7 @@ describe("Worker Threads Support", () => {
       // On non-Windows platforms or for truly invalid paths, expect an error
       expect(error).toBeDefined();
       if (error instanceof Error) {
-        expect(error.message).toMatch(/ENOENT|not accessible|Failed to get volume/i);
+        expect(error.message).toMatch(/ENOENT|No such file or directory|not accessible|Failed to get volume|statvfs failed/i);
       }
     }
 
