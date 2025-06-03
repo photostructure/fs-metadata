@@ -123,11 +123,29 @@ npm run docs
 - Provides prebuilt binaries via `prebuildify` for common platforms
 - Supports both ESM and CJS module formats
 
+### Cross-Module Compatibility
+- **Directory Path Resolution**: Use `_dirname()` from `./dirname` instead of `__dirname`
+  - Works in both CommonJS and ESM contexts
+  - Handles Jest test environments correctly
+  - Example: `const dir = _dirname()` instead of `const dir = __dirname`
+
 ### Testing Strategy
 - Jest for both CJS and ESM test suites
 - Platform-specific test expectations handled via `isWindows`, `isMacOS`, `isLinux` helpers
 - Memory leak testing with garbage collection monitoring
 - Coverage thresholds: 80% for all metrics
+
+### Testing File System Metadata
+- **Important**: File system metadata like `available` space, `used` space, and other dynamic properties change continuously as other processes run on the machine
+- Tests should **never** expect exact equality for these values between multiple calls
+- **Do not** make range assertions (e.g., `available > 0` or `used < size`) because:
+  - Files can be created or deleted between calls (potentially gigabytes)
+  - The changes can be dramatic and unpredictable
+- Instead, for dynamic metadata:
+  - Only verify the value exists and has the correct type
+  - Use `typeof result.available === 'number'` rather than range checks
+  - Focus on testing static properties (e.g., `size`, `mountFrom`, `fstype`) for exact equality
+  - Consider using snapshot testing only for stable properties
 
 ### Timeout Handling
 - Default timeout for volume operations to handle unresponsive network mounts
