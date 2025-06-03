@@ -35,9 +35,11 @@ let exitCode = 0;
 // 1. Run JavaScript memory tests (all platforms)
 console.log(color(colors.YELLOW, "\nRunning JavaScript memory tests..."));
 try {
+  // Use node to execute jest.js for cross-platform compatibility
+  const jestPath = path.join("node_modules", "jest", "bin", "jest.js");
   execFileSync(
-    "node_modules/jest/bin/jest.js",
-    ["--no-coverage", "src/memory.test.ts"],
+    process.execPath,
+    [jestPath, "--no-coverage", "src/memory.test.ts"],
     {
       stdio: "inherit",
       env: {
