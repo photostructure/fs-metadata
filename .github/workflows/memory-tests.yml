@@ -7,19 +7,22 @@ on:
     branches: [main]
 
 jobs:
-  valgrind:
-    runs-on: ubuntu-latest
+  # JavaScript memory tests - run on all platforms and Node versions
+  js-memory:
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node-version: [20, 22, 23, 24]
+    runs-on: ${{ matrix.os }}
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install system dependencies
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y valgrind libglib2.0-dev libblkid-dev uuid-dev build-essential
+          sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev build-essential
       
       - uses: actions/setup-node@v4
         with:
@@ -32,14 +35,43 @@ jobs:
       - name: Build native and javascript bundle
         run: npm run build
       
-      - name: Run comprehensive memory tests
-        run: npm run memory:test
+      - name: Run JavaScript memory tests
+        run: |
+          node --expose-gc --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --no-coverage src/memory.test.ts
+        env:
+          TEST_MEMORY: "1"
+          TEST_ESM: "1"
+
+  # Valgrind - Linux only, run on one Node version
+  valgrind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind libglib2.0-dev libblkid-dev uuid-dev build-essential
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build native and javascript bundle
+        run: npm run build
+      
+      - name: Run valgrind memory analysis
+        run: bash scripts/valgrind-test.sh
       
       - name: Upload valgrind results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: valgrind-results-node-${{ matrix.node-version }}
+          name: valgrind-results
           path: |
             valgrind-*.log
             core.*
@@ -56,14 +88,14 @@ jobs:
       
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
       
       - name: Install dependencies
         run: npm ci
       
       - name: Run ASAN tests
-        run: ENABLE_ASAN=1 npm run memory:test 2>&1 | tee asan-test.log
+        run: bash scripts/sanitizers-test.sh 2>&1 | tee asan-test.log
       
       - name: Check ASAN results
         run: |

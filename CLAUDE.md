@@ -61,10 +61,8 @@ bash scripts/valgrind-test.sh
 # Run AddressSanitizer and LeakSanitizer (Linux only)
 bash scripts/sanitizers-test.sh
 
-# Run comprehensive memory tests (JavaScript + valgrind + optionally sanitizers)
-npm run memory:test
-# Or with sanitizers enabled:
-ENABLE_ASAN=1 npm run memory:test
+# Run comprehensive memory tests (JavaScript + valgrind + sanitizers)
+npm run test:memory
 
 # Run a specific test file (no coverage)
 npm test volume_metadata
