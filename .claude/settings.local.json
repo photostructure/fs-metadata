@@ -27,7 +27,8 @@
       "Bash(npm pkg fix:*)",
       "WebFetch(domain:keepachangelog.com)",
       "WebFetch(domain:docs.github.com)",
-      "Bash(diff:*)"
+      "Bash(diff:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": []
   },
