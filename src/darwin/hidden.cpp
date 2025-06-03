@@ -41,11 +41,13 @@ void GetHiddenWorker::Execute() {
 }
 
 void GetHiddenWorker::OnOK() {
+  Napi::HandleScope scope(Env());
   auto env = Env();
   deferred_.Resolve(Napi::Boolean::New(env, is_hidden_));
 }
 
 void GetHiddenWorker::OnError(const Napi::Error &error) {
+  Napi::HandleScope scope(Env());
   deferred_.Reject(error.Value());
 }
 
@@ -118,11 +120,13 @@ void SetHiddenWorker::Execute() {
 }
 
 void SetHiddenWorker::OnOK() {
+  Napi::HandleScope scope(Env());
   auto env = Env();
   deferred_.Resolve(env.Undefined());
 }
 
 void SetHiddenWorker::OnError(const Napi::Error &error) {
+  Napi::HandleScope scope(Env());
   deferred_.Reject(error.Value());
 }
 
