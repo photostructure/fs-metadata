@@ -46,3 +46,4 @@ Thumbs.db
 # Config files written during publishing
 .npmrc
 asan-output.log
+asan-out.txt
