@@ -20,7 +20,10 @@ protected:
     deferred_.Reject(error.Value());
   }
 
-  void OnOK() override { deferred_.Resolve(metadata.ToObject(Env())); }
+  void OnOK() override {
+    Napi::HandleScope scope(Env());
+    deferred_.Resolve(metadata.ToObject(Env()));
+  }
 }; // class MetadataWorkerBase
 
 } // namespace FSMeta
