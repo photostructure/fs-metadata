@@ -148,4 +148,9 @@ if [[ "$VERBOSE" -eq 1 ]] && grep -q "Stats:" "$OUTPUT_FILE"; then
     grep -A 20 "Stats:" "$OUTPUT_FILE" | head -20
 fi
 
+# Clean build artifacts to ensure no ASAN-compiled code remains
+echo -e "\n${YELLOW}Cleaning build artifacts...${NC}"
+npm run clean:native > /dev/null 2>&1
+echo -e "${GREEN}✓ Build artifacts cleaned${NC}"
+
 exit $EXIT_CODE
