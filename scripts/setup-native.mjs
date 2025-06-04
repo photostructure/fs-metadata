@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
-// scripts/configure.mjs
+// scripts/setup-native.mjs
+
+// This script sets up the config.gypi file to include GIO support when available.
+// It should be run before building native modules with node-gyp.
 
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
