@@ -16,7 +16,8 @@ Built and supported by [PhotoStructure](https://photostructure.com).
 - Cross-platform support:
   - Windows 10+ (x64)
   - macOS 14+
-  - Ubuntu 22+ (x64, arm64) (with Gnome GIO/`GVfs` mount support where available)
+  - Debian 11/Ubuntu 20.04+ (x64, arm64) (with Gnome GIO/`GVfs` mount support where available)
+  - Alpine 3.21+ (x64, arm64)
 
 - [List all mounted volumes/drives](https://photostructure.github.io/fs-metadata/functions/getVolumeMountPoints.html)
 
@@ -40,6 +41,24 @@ Built and supported by [PhotoStructure](https://photostructure.com).
 - Compatible with all current Node.js and Electron versions via [Node-API v9](https://nodejs.org/api/n-api.html#node-api) and [prebuildify](https://github.com/prebuild/prebuildify)
 
 - Comprehensive test coverage
+
+## Supported Platforms
+
+Prebuilt binaries are provided for the following platforms:
+
+| Platform | Architecture | Node.js | Minimum OS Version |
+|----------|--------------|---------|-------------------|
+| Windows | x64 | 20+ | Windows 10 |
+| macOS | x64 | 20+ | macOS 14 (Sonoma) |
+| macOS | arm64 | 20+ | macOS 14 (Sonoma) |
+| Linux (glibc) | x64 | 20+ | Debian 11 (Bullseye), Ubuntu 20.04, GLIBC 2.31+ |
+| Linux (glibc) | arm64 | 20+ | Debian 11 (Bullseye), Ubuntu 20.04, GLIBC 2.31+ |
+| Linux (musl) | x64 | 20+ | Alpine 3.21 |
+| Linux (musl) | arm64 | 20+ | Alpine 3.21 |
+
+Notes:
+- Linux binaries require GLIBC 2.31+ (Debian 11 Bullseye or newer). **Note**: this means the `node:20` docker image is **not** supported, due to the last several major versions of `node-gyp-build` requiring both a newer python and newer C++ version.
+- Electron is supported via [Node-API](https://nodejs.org/api/n-api.html) compatibility
 
 ## Installation
 
