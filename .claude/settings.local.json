@@ -32,7 +32,11 @@
       "Bash(npx eslint:*)",
       "Bash(git tag:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:semantic-release.gitbook.io)"
+      "WebFetch(domain:semantic-release.gitbook.io)",
+      "Bash(prebuildify:*)",
+      "Bash(npx node-gyp:*)",
+      "Bash(clang-tidy:*)",
+      "Bash(true)"
     ],
     "deny": []
   },

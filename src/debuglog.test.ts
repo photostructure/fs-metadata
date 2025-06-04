@@ -6,6 +6,11 @@ import { debug } from "./debuglog";
 import { _dirname } from "./dirname";
 
 describe("debuglog integration tests", () => {
+  afterAll(() => {
+    // Give child processes time to fully exit
+    return new Promise((resolve) => setTimeout(resolve, 100));
+  });
+
   function runChildTest(nodeDebug?: string) {
     const childEnv: Record<string, string | undefined> = {
       ...env,
@@ -16,11 +21,20 @@ describe("debuglog integration tests", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-child.ts");
 
-    const result = execFileSync("npx", ["tsx", script], {
-      env: childEnv,
-      encoding: "utf8",
-      shell: true,
-    });
+    // Try to use tsx directly if available, otherwise fall back to npx
+    let result: string;
+    try {
+      result = execFileSync("tsx", [script], {
+        env: childEnv,
+        encoding: "utf8",
+      });
+    } catch {
+      // Fallback to npx if tsx is not in PATH
+      result = execFileSync("npx", ["tsx", script], {
+        env: childEnv,
+        encoding: "utf8",
+      });
+    }
 
     return JSON.parse(result);
   }
@@ -118,12 +132,22 @@ describe("debug function", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
 
-    const result = execFileSync("npx", ["tsx", script], {
-      env: childEnv,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-      shell: true,
-    });
+    // Try to use tsx directly if available, otherwise fall back to npx
+    let result: string;
+    try {
+      result = execFileSync("tsx", [script], {
+        env: childEnv,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch {
+      // Fallback to npx if tsx is not in PATH
+      result = execFileSync("npx", ["tsx", script], {
+        env: childEnv,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    }
 
     // The stdout should contain "DONE"
     expect(result.trim()).toBe("DONE");
