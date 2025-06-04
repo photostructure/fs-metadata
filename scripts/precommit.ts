@@ -32,8 +32,7 @@ if (isLinux && isGlibc) {
   run("npm run build:native", "Building native module");
 }
 
-run("npm run test:cjs", "Running tests in CJS mode");
-run("npm run test:esm", "Running tests in ESM mode");
+run("npm run tests", "Running tests in ESM & CJS mode");
 
 // Platform-specific checks
 if (isLinux || isMacOS) {
