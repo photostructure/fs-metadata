@@ -18,12 +18,6 @@ inline std::string CreateErrorMessage(const char *operation, int error) {
          " failed with error: " + std::to_string(error);
 }
 
-// Human-readable error with code (used by most callers)
-inline std::string CreateErrorMessageWithStrerror(const char *operation,
-                                                  int error) {
-  return std::string(strerror(error)) + " (" + std::to_string(error) + ")";
-}
-
 // Convenience function for common pattern: "operation failed for 'path': error"
 inline std::string CreatePathErrorMessage(const char *operation,
                                           const std::string &path, int error) {
