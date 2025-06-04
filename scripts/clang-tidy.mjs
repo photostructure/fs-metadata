@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execSync, spawn } from "child_process";
+import { existsSync } from "fs";
 import { platform } from "os";
 
 // Skip clang-tidy on Windows
@@ -55,8 +56,27 @@ if (!hasAllTools) {
   process.exit(1);
 }
 
-// Run the clang-tidy command on Unix platforms
-const command = `npm run configure:native && bear -- npm run node-gyp-rebuild && find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy`;
+// Generate compile_commands.json if needed
+if (existsSync("build/compile_commands.json")) {
+  console.log("Using existing compile_commands.json");
+} else {
+  console.log("Generating compile_commands.json...");
+
+  try {
+    execSync(
+      "npm run configure:native && node-gyp configure -- -f gyp.generator.compile_commands_json.py",
+      { stdio: "inherit" },
+    );
+  } catch (err) {
+    console.log("Falling back to bear for compile_commands.json generation");
+    execSync("npm run configure:native && bear -- npm run node-gyp-rebuild", {
+      stdio: "inherit",
+    });
+  }
+}
+
+// Run clang-tidy on source files
+const command = `find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' | grep -v -E '(windows|darwin)/' | xargs clang-tidy -p build/`;
 
 const shell = spawn("sh", ["-c", command], {
   stdio: "inherit",
