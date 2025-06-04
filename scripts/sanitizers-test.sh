@@ -76,7 +76,7 @@ fi
 
 # Build the native module
 echo "Building with AddressSanitizer..."
-npm run configure:native
+npm run setup:native
 npm run node-gyp-rebuild
 
 # Run tests and capture output
