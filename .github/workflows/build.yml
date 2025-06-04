@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version bump type"
+        description: "fs-metadata release: bump version"
         required: false
         type: choice
         options:
