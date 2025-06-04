@@ -106,7 +106,7 @@ Actions that have multiple targets can be run in parallel using wildcards:
 
 ### Naming Guidelines
 
-- Use explicit names to avoid ambiguity (e.g., `configure:native` instead of just `configure`)
+- Use explicit names to avoid ambiguity (e.g., `setup:native` instead of just `setup`)
 - Group related scripts by action prefix for easy wildcard execution
 - Avoid names that could cause npm lifecycle conflicts (e.g., `prebuild` vs `build`)
 - Use descriptive suffixes that clearly indicate the target or purpose
