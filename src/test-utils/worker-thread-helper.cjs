@@ -83,6 +83,10 @@ async function runWorkerTask() {
   } catch (error) {
     parentPort.postMessage({ success: false, error: error.message });
   }
+  
+  // Close the parent port to signal we're done
+  // This allows the worker to exit naturally
+  parentPort.close();
 }
 
 runWorkerTask();
