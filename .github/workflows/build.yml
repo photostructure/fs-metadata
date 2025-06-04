@@ -18,6 +18,20 @@ on:
         default: "minor"
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || format('Build - {0}', github.event.head_commit.message || github.event.pull_request.title) }}
 jobs:
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y clang-tidy bear build-essential libglib2.0-dev libblkid-dev uuid-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+
   prebuild-mac-win:
     strategy:
       fail-fast: false
@@ -30,40 +44,36 @@ jobs:
         with:
           node-version: 20
           cache: "npm"
-      - run: npm ci
-      - run: npm run configure:native
+      # We need to ignore scripts so the `install` script in package.json does
+      # not run node-gyp-build
+      - run: npm ci --ignore-scripts
       - run: npm run build:native
       - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ matrix.os }}
           path: prebuilds/
 
-  prebuild-ubuntu:
+  prebuild-linux-glibc:
     strategy:
       fail-fast: false
       matrix:
         arch: [x64, arm64]
-    runs-on: ubuntu-22.04 # < compile with oldest supported Ubuntu
+    runs-on: ubuntu-24.04 # Use newer runner for Docker support
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-qemu
         with:
           arch: ${{ matrix.arch }}
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-      - run: npm ci
-      - run: npm run configure:native
-      - run: npm run build:native
+      # Build in Debian 11 Bullseye container for GLIBC 2.31 compatibility
+      # This ensures compatibility with Ubuntu 20.04+ and modern Node.js Docker images
+      # Note: npm ci is run inside the container by the build:linux-glibc script
+      - run: TARGET_ARCH=${{ matrix.arch }} npm run build:linux-glibc
       - uses: actions/upload-artifact@v4
         with:
           name: prebuilds-linux-${{ matrix.arch }}-glibc
           path: prebuilds/
 
-  prebuild-alpine:
+  prebuild-linux-musl:
     strategy:
       fail-fast: false
       matrix:
@@ -75,11 +85,10 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
       - run: |
-          docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:20-alpine -c "\
+          docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform linux/${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }} node:20-alpine3.21 -c "\
           apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
           cd /tmp/project && \
-          npm ci && \
-          npm run configure:native && \
+          npm ci --ignore-scripts && \
           npm run build:native"
       - uses: actions/upload-artifact@v4
         with:
@@ -108,7 +117,7 @@ jobs:
       - run: npm run tests
 
   test-ubuntu:
-    needs: [prebuild-ubuntu]
+    needs: [prebuild-linux-glibc]
     strategy:
       fail-fast: false
       matrix:
@@ -134,7 +143,7 @@ jobs:
       - run: npm run tests
 
   test-alpine:
-    needs: [prebuild-alpine]
+    needs: [prebuild-linux-musl]
     strategy:
       fail-fast: false
       matrix:
@@ -157,23 +166,11 @@ jobs:
           npm ci && \
           npm run tests"
 
-  clang-tidy:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y clang-tidy bear build-essential libglib2.0-dev libblkid-dev uuid-dev
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-      - run: npm ci
-      - run: npm run lint:native
 
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
-    needs: [test-mac-win, test-ubuntu, test-alpine, clang-tidy]
+    needs: [test-mac-win, test-ubuntu, test-alpine, lint]
     permissions:
       contents: write
       packages: write
