@@ -62,9 +62,11 @@ describe("Worker Threads Support", () => {
         } else {
           reject(new Error(message.error));
         }
+        // Worker will exit naturally after closing parentPort
       });
 
       worker.on("error", reject);
+
       worker.on("exit", (code) => {
         if (code !== 0) {
           reject(new Error(`Worker stopped with exit code ${code}`));
