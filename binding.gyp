@@ -4,7 +4,7 @@
   },
   "targets": [
     {
-      "target_name": "node_fs_meta",
+      "target_name": "fs_metadata",
       "sources": [
         "src/binding.cpp"
       ],

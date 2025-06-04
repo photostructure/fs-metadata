@@ -93,6 +93,6 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   return exports;
 }
 
-NODE_API_MODULE(node_fs_meta, Init)
+NODE_API_MODULE(fs_metadata, Init)
 
 } // namespace
