@@ -11,6 +11,11 @@ describe("debuglog integration tests", () => {
     return new Promise((resolve) => setTimeout(resolve, 100));
   });
 
+  beforeEach(() => {
+    // Clear any module cache to ensure clean state
+    jest.clearAllMocks();
+  });
+
   function runChildTest(nodeDebug?: string) {
     const childEnv: Record<string, string | undefined> = {
       ...env,
