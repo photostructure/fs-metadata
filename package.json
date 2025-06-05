@@ -32,6 +32,7 @@
     "clean:native": "node-gyp clean",
     "node-gyp-rebuild": "node-gyp rebuild",
     "setup:native": "node scripts/setup-native.mjs",
+    "build": "run-s setup:native build:native build:dist",
     "build:native": "npm run setup:native && prebuildify --napi --tag-libc --strip",
     "build:linux-glibc": "bash scripts/prebuild-linux-glibc.sh",
     "build:dist": "tsup && node scripts/post-build.mjs",
