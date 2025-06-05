@@ -26,20 +26,11 @@ describe("debuglog integration tests", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-child.ts");
 
-    // Try to use tsx directly if available, otherwise fall back to npx
-    let result: string;
-    try {
-      result = execFileSync("tsx", [script], {
-        env: childEnv,
-        encoding: "utf8",
-      });
-    } catch {
-      // Fallback to npx if tsx is not in PATH
-      result = execFileSync("npx", ["tsx", script], {
-        env: childEnv,
-        encoding: "utf8",
-      });
-    }
+    // Use npx tsx which works in both local and CI environments
+    const result = execFileSync("npx", ["tsx", script], {
+      env: childEnv,
+      encoding: "utf8",
+    });
 
     return JSON.parse(result);
   }
@@ -137,22 +128,12 @@ describe("debug function", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
 
-    // Try to use tsx directly if available, otherwise fall back to npx
-    let result: string;
-    try {
-      result = execFileSync("tsx", [script], {
-        env: childEnv,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    } catch {
-      // Fallback to npx if tsx is not in PATH
-      result = execFileSync("npx", ["tsx", script], {
-        env: childEnv,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    }
+    // Use npx tsx which works in both local and CI environments
+    const result = execFileSync("npx", ["tsx", script], {
+      env: childEnv,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
 
     // The stdout should contain "DONE"
     expect(result.trim()).toBe("DONE");
