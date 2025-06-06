@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { env } from "node:process";
 import { debug } from "./debuglog";
@@ -26,13 +26,66 @@ describe("debuglog integration tests", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-child.ts");
 
-    // Use npx tsx which works in both local and CI environments
-    const result = execFileSync("npx", ["tsx", script], {
+    // Use spawnSync for better process control on Windows
+    const result = spawnSync("npx", ["tsx", script], {
       env: childEnv,
       encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true, // Hide console window on Windows
+      shell: process.platform === "win32", // Use shell on Windows for npx
+      timeout: 5000, // 5 second timeout
     });
 
-    return JSON.parse(result);
+    // Check for errors
+    if (result.error) {
+      // spawnSync errors should not have circular references
+      const errorInfo = {
+        message: result.error.message,
+        code: (result.error as any).code,
+        platform: process.platform,
+        nodeVersion: process.version,
+        script,
+        nodeDebug,
+      };
+      
+      // Log debugging info to help diagnose Windows issues
+      console.error("Windows child process spawn error:", errorInfo);
+      
+      throw new Error(`Failed to spawn child process: ${result.error.message}`);
+    }
+
+    if (result.status !== 0) {
+      const errorInfo = {
+        status: result.status,
+        signal: result.signal,
+        stderr: result.stderr?.toString?.() ?? "",
+        stdout: result.stdout?.toString?.() ?? "",
+        platform: process.platform,
+        nodeVersion: process.version,
+        script,
+        nodeDebug,
+      };
+      
+      // Log debugging info to help diagnose Windows issues
+      if (process.platform === "win32") {
+        console.error("Windows child process exit error:", errorInfo);
+      }
+      
+      throw new Error(
+        `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`
+      );
+    }
+
+    try {
+      return JSON.parse(result.stdout);
+    } catch (parseError) {
+      console.error("Failed to parse child output:", {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        parseError: (parseError as Error).message,
+      });
+      throw new Error(`Failed to parse child output: ${result.stdout}`);
+    }
   }
 
   test("uses fs-metadata when NODE_DEBUG=fs-metadata", () => {
@@ -128,14 +181,55 @@ describe("debug function", () => {
 
     const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
 
-    // Use npx tsx which works in both local and CI environments
-    const result = execFileSync("npx", ["tsx", script], {
+    // Use spawnSync for better process control on Windows
+    const result = spawnSync("npx", ["tsx", script], {
       env: childEnv,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true, // Hide console window on Windows
+      shell: process.platform === "win32", // Use shell on Windows for npx
+      timeout: 5000, // 5 second timeout
     });
 
+    // Check for errors
+    if (result.error) {
+      // spawnSync errors should not have circular references
+      const errorInfo = {
+        message: result.error.message,
+        code: (result.error as any).code,
+        platform: process.platform,
+        nodeVersion: process.version,
+        script,
+      };
+      
+      // Log debugging info to help diagnose Windows issues
+      console.error("Windows child process spawn error:", errorInfo);
+      
+      throw new Error(`Failed to spawn child process: ${result.error.message}`);
+    }
+
+    if (result.status !== 0) {
+      const errorInfo = {
+        status: result.status,
+        signal: result.signal,
+        stderr: result.stderr?.toString?.() ?? "",
+        stdout: result.stdout?.toString?.() ?? "",
+        platform: process.platform,
+        nodeVersion: process.version,
+        script,
+      };
+      
+      // Log debugging info to help diagnose Windows issues
+      if (process.platform === "win32") {
+        console.error("Windows child process exit error:", errorInfo);
+      }
+      
+      throw new Error(
+        `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`
+      );
+    }
+
     // The stdout should contain "DONE"
-    expect(result.trim()).toBe("DONE");
+    expect(result.stdout.trim()).toBe("DONE");
   });
 });
