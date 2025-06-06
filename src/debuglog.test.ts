@@ -41,7 +41,7 @@ describe("debuglog integration tests", () => {
       // spawnSync errors should not have circular references
       const errorInfo = {
         message: result.error.message,
-        code: (result.error as any).code,
+        code: (result.error as NodeJS.ErrnoException).code,
         platform: process.platform,
         nodeVersion: process.version,
         script,
@@ -196,7 +196,7 @@ describe("debug function", () => {
       // spawnSync errors should not have circular references
       const errorInfo = {
         message: result.error.message,
-        code: (result.error as any).code,
+        code: (result.error as NodeJS.ErrnoException).code,
         platform: process.platform,
         nodeVersion: process.version,
         script,
