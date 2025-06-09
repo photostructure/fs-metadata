@@ -1,15 +1,17 @@
-# Windows Debugging Guide for debuglog.test.ts
+# Windows and Alpine Linux Debugging Guide for debuglog.test.ts
 
 ## Issue Summary
-The debuglog.test.ts file was failing on Windows CI with a "Converting circular structure to JSON" error in Jest's message passing system. This occurred when `execFileSync` threw errors with circular references.
+The debuglog.test.ts file was failing on:
+1. **Windows CI**: "Converting circular structure to JSON" error in Jest's message passing system when `execFileSync` threw errors with circular references
+2. **Alpine Linux**: `ETIMEDOUT` errors when spawning child processes with `npx`
 
 ## Changes Made
 
 1. **Replaced execFileSync with spawnSync**
    - `spawnSync` provides better process control and doesn't throw errors with circular references
-   - Added `windowsHide: true` to prevent console windows from appearing
-   - Added `shell: true` on Windows for proper npx execution
-   - Added 5-second timeout to prevent hanging processes
+   - Added `windowsHide: true` to prevent console windows from appearing on Windows
+   - Added `shell: true` on Windows only for proper npx execution
+   - Increased timeout to 30 seconds for slower environments like Alpine Linux containers
 
 2. **Enhanced Error Handling**
    - Extract only serializable properties from errors (message, code, status, stderr, stdout)
