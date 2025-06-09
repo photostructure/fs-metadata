@@ -28,16 +28,7 @@ describe("debuglog integration tests", () => {
     const script = join(_dirname(), "test-utils", "debuglog-child.ts");
     const timeout = getTestTimeout(3000); // Base 3s timeout, adjusted for environment
 
-    // Debug timeout calculation on Alpine
-    if (process.platform === "linux") {
-      console.log(
-        `[DEBUG] Test timeout calculated: ${timeout}ms for platform: ${process.platform}, arch: ${process.arch}`,
-      );
-    }
-
-    // Try different approaches based on platform
-    // On Alpine, npx might have timeout issues
-    // Always use npx but with --yes flag to avoid prompts
+    // Use npx with --yes flag to avoid prompts
     const command = "npx";
     const args = ["--yes", "tsx", script];
 
@@ -198,18 +189,9 @@ describe("debug function", () => {
     };
 
     const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
-    const timeout = getTestTimeout(3000); // Base 3s timeout, adjusted for environment
+    const timeout = getTestTimeout(6000); // Base 6s timeout, adjusted for environment
 
-    // Debug timeout calculation on Alpine
-    if (process.platform === "linux") {
-      console.log(
-        `[DEBUG] Test timeout calculated: ${timeout}ms for platform: ${process.platform}, arch: ${process.arch}`,
-      );
-    }
-
-    // Try different approaches based on platform
-    // On Alpine, npx might have timeout issues
-    // Always use npx but with --yes flag to avoid prompts
+    // Use npx with --yes flag to avoid prompts
     const command = "npx";
     const args = ["--yes", "tsx", script];
 
