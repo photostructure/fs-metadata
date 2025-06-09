@@ -3,13 +3,18 @@ import { debug } from "../debuglog";
 // Ensure clean process state on Windows
 process.on("uncaughtException", (err) => {
   const errorMessage = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`Uncaught exception in debuglog-enabled-child: ${errorMessage}\n`);
+  process.stderr.write(
+    `Uncaught exception in debuglog-enabled-child: ${errorMessage}\n`,
+  );
   process.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
-  const errorMessage = reason instanceof Error ? reason.message : String(reason);
-  process.stderr.write(`Unhandled rejection in debuglog-enabled-child: ${errorMessage}\n`);
+  const errorMessage =
+    reason instanceof Error ? reason.message : String(reason);
+  process.stderr.write(
+    `Unhandled rejection in debuglog-enabled-child: ${errorMessage}\n`,
+  );
   process.exit(1);
 });
 
@@ -25,11 +30,11 @@ try {
 } catch (err) {
   const errorMessage = err instanceof Error ? err.message : String(err);
   process.stderr.write(`Error in debuglog-enabled-child: ${errorMessage}\n`);
-  
+
   // Also log stack trace for debugging
   if (err instanceof Error && err.stack) {
     process.stderr.write(`Stack trace:\n${err.stack}\n`);
   }
-  
+
   process.exit(1);
 }

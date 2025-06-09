@@ -13,7 +13,17 @@ export default [
       },
     },
   },
-  { ignores: ["build", "coverage", "dist", "docs", "*.cts", "*.cjs"] },
+  {
+    ignores: [
+      "build",
+      "coverage",
+      "dist",
+      "docs",
+      "*.cts",
+      "*.cjs",
+      "**/*.cjs",
+    ],
+  },
   pluginJs.configs.recommended,
   ...ts_eslint.configs.recommended,
   ...ts_eslint.configs.strict,
