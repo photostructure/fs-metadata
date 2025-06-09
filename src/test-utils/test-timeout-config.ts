@@ -68,9 +68,28 @@ export function getTimingMultiplier(): number {
  * @returns Timeout in milliseconds
  */
 export function getTestTimeout(baseTimeout = 10000): number {
-  if (!process.env["CI"]) return baseTimeout; // Local development uses base timeout
+  // Debug CI detection on Alpine
+  if (platform === "linux" && arch === "arm64") {
+    console.log(
+      `[DEBUG] getTestTimeout: CI=${process.env["CI"]}, GITHUB_ACTIONS=${process.env["GITHUB_ACTIONS"]}`,
+    );
+  }
+
+  // Apply multipliers in CI or when GITHUB_ACTIONS is set
+  if (!process.env["CI"] && !process.env["GITHUB_ACTIONS"]) {
+    return baseTimeout; // Local development uses base timeout
+  }
 
   // Apply environment-specific multipliers
   const multiplier = getTimingMultiplier();
-  return baseTimeout * multiplier;
+  const result = baseTimeout * multiplier;
+
+  // Debug timeout calculation on Alpine ARM64
+  if (platform === "linux" && arch === "arm64") {
+    console.log(
+      `[DEBUG] Timeout calculation: base=${baseTimeout}, multiplier=${multiplier}, result=${result}`,
+    );
+  }
+
+  return result;
 }
