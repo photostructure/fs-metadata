@@ -1,3 +1,7 @@
+export declare function isAlpineLinux(): boolean;
+
+export declare function isEmulated(): boolean;
+
 /**
  * Get timing multiplier for the current environment
  * @returns {number}

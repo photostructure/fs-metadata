@@ -50,7 +50,7 @@ function getTimingMultiplier() {
 
   // Windows is slow to fork
   if (platform === "win32") multiplier *= 4;
-  
+
   // MacOS VMs are glacial:
   if (platform === "darwin") multiplier *= 4;
 
@@ -70,11 +70,6 @@ function getTimingMultiplier() {
  * @returns {number} Timeout in milliseconds
  */
 function getTestTimeout(baseTimeout = 10000) {
-  // Debug CI detection on Alpine
-  if (platform === "linux" && arch === "arm64") {
-    console.log(`[DEBUG] getTestTimeout: CI=${process.env.CI}, GITHUB_ACTIONS=${process.env.GITHUB_ACTIONS}`);
-  }
-  
   // Apply multipliers in CI or when GITHUB_ACTIONS is set
   if (!process.env.CI && !process.env.GITHUB_ACTIONS) {
     return baseTimeout; // Local development uses base timeout
@@ -82,14 +77,11 @@ function getTestTimeout(baseTimeout = 10000) {
 
   // Apply environment-specific multipliers
   const multiplier = getTimingMultiplier();
-  const result = baseTimeout * multiplier;
-  
-  // Debug timeout calculation on Alpine ARM64
-  if (platform === "linux" && arch === "arm64") {
-    console.log(`[DEBUG] Timeout calculation: base=${baseTimeout}, multiplier=${multiplier}, result=${result}`);
-  }
-  
-  return result;
+  return baseTimeout * multiplier;
 }
-
-module.exports = { getTestTimeout, getTimingMultiplier };
+module.exports = {
+  isEmulated,
+  isAlpineLinux,
+  getTestTimeout,
+  getTimingMultiplier,
+};
