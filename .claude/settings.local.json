@@ -36,7 +36,9 @@
       "Bash(prebuildify:*)",
       "Bash(npx node-gyp:*)",
       "Bash(clang-tidy:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)"
     ],
     "deny": []
   },
