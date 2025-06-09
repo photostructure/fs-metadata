@@ -26,6 +26,12 @@ function isAlpineLinux() {
  * @returns {boolean}
  */
 function isEmulated() {
+  // Alpine ARM64 is always emulated in CI since GitHub Actions doesn't have native ARM64 runners
+  // This is true even inside Docker containers where GITHUB_ACTIONS env vars might not be present
+  if (isAlpineLinux() && arch === "arm64") {
+    return true;
+  }
+  
   // In GitHub Actions, we can check if we're running in a container with platform specified
   if (process.env.GITHUB_ACTIONS && process.env.RUNNER_OS === "Linux") {
     // If we're on Alpine ARM64, we're likely emulated on x64 runners
