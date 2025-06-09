@@ -94,8 +94,8 @@
     "@eslint/js": "^9.28.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.30",
-    "@typescript-eslint/eslint-plugin": "^8.33.1",
-    "@typescript-eslint/parser": "^8.33.1",
+    "@typescript-eslint/eslint-plugin": "^8.34.0",
+    "@typescript-eslint/parser": "^8.34.0",
     "cross-env": "^7.0.3",
     "del-cli": "^6.0.0",
     "detect-libc": "^2.0.4",
@@ -112,12 +112,12 @@
     "prettier-plugin-organize-imports": "4.1.0",
     "release-it": "^19.0.3",
     "snyk": "^1.1297.1",
-    "terser": "^5.41.0",
+    "terser": "^5.42.0",
     "ts-jest": "^29.3.4",
     "tsup": "^8.5.0",
     "tsx": "^4.19.4",
     "typedoc": "^0.28.5",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.33.1"
+    "typescript-eslint": "^8.34.0"
   }
 }
