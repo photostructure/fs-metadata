@@ -14,7 +14,7 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## [0.6.0] - 2025-06-03
+## [0.6.0] - 2025-06-09
 
 ### Added
 
@@ -24,6 +24,8 @@ Security in case of vulnerabilities.
 - Clang-tidy integration for C++ code analysis
 - Worker thread helper for volume metadata operations
 - NAPI_VERSION=9 definition for improved compatibility
+- Dynamic test timeout configuration based on environment (CI, platform, architecture)
+- Prebuild script for Linux GLIBC compatibility in Docker environments
 
 ### Breaking
 
@@ -36,6 +38,7 @@ Security in case of vulnerabilities.
 - Updated all imports to use `node:` prefix for built-in modules
 - Reorganized build and test scripts for better clarity
 - Improved memory test workflow for cross-platform compatibility
+- Renamed native module target from `node_fs_meta` to `fs_metadata` for consistency
 
 ### Fixed
 
@@ -44,13 +47,9 @@ Security in case of vulnerabilities.
 - Fixed buffer allocation issues in Windows networking and volume operations
 - Enhanced resource management with better validation for empty mount points
 - Made `SystemPathPatternsDefault` values visible in TypeScript typings
-- Improved test reliability across different CI environments
 - Added Napi::HandleScope to OnOK and OnError methods for proper scope management
 - Removed unnecessary std::move operations in worker implementations
-- Updated filesystem metadata tests to verify type and existence instead of specific values
-- Improved error handling and messages in various components
-- Enhanced error message validation for file access in worker thread tests
-- Updated tests to use healthy mount points for volume metadata retrieval
+- Resolved CI test reliability issues across different environments, particularly Alpine ARM64 emulation timeouts
 
 ## [0.4.0] - 2025-01-09
 
