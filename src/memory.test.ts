@@ -15,6 +15,7 @@ import {
 import { randomLetters } from "./random";
 import { validateHidden } from "./test-utils/hidden-tests";
 import { tmpDirNotHidden } from "./test-utils/platform";
+import { getTestTimeout } from "./test-utils/test-timeout-config";
 import { fmtBytes, MiB } from "./units";
 
 // THIS IS ALL A HORRIBLE HACK. THIS "test" SHOULD BE REPLACED WITH AN ACTUAL
@@ -30,7 +31,7 @@ const shouldRunMemoryTests = !!process.env["TEST_MEMORY"];
 const describeMemory = shouldRunMemoryTests ? describe : describe.skip;
 
 describeMemory("Memory Tests", () => {
-  jest.setTimeout(60_000);
+  jest.setTimeout(getTestTimeout(20_000)); // Base 20s timeout for memory-intensive tests
   const iterations = 100;
 
   // Helper to get memory usage after GC

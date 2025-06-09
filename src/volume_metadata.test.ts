@@ -15,12 +15,13 @@ import { isLinux, isMacOS, isWindows } from "./platform";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "./random";
 import { assertMetadata } from "./test-utils/assert";
 import { systemDrive } from "./test-utils/platform";
+import { getTestTimeout } from "./test-utils/test-timeout-config";
 
 const rootPath = systemDrive();
 
 describe("Volume Metadata", () => {
   beforeEach(() => {
-    jest.setTimeout(30_000);
+    jest.setTimeout(getTestTimeout()); // Uses default 10s base timeout
   });
   it("should get root filesystem metadata", async () => {
     const metadata = await getVolumeMetadata(rootPath);
@@ -232,7 +233,7 @@ describe("Error Handling", () => {
 });
 
 describe("Network Filesystems", () => {
-  jest.setTimeout(10_000);
+  jest.setTimeout(getTestTimeout()); // Uses default 10s base timeout
 
   it("should correctly identify network filesystems", async () => {
     for (const mp of await getVolumeMountPoints()) {

@@ -5,10 +5,11 @@ import { times, uniq } from "./array";
 import { getVolumeMountPoints } from "./index";
 import { isWindows } from "./platform";
 import { sortByLocale } from "./string";
+import { getTestTimeout } from "./test-utils/test-timeout-config";
 import type { MountPoint } from "./types/mount_point";
 
 describe("Filesystem Metadata", () => {
-  jest.setTimeout(15_000);
+  jest.setTimeout(getTestTimeout()); // Uses default 10s base timeout
 
   describe("Mount Points", () => {
     function assertMountPoints(arr: MountPoint[]) {

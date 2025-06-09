@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { env } from "node:process";
 import { debug } from "./debuglog";
 import { _dirname } from "./dirname";
+import { getTestTimeout } from "./test-utils/test-timeout-config";
 
 describe("debuglog integration tests", () => {
   afterAll(() => {
@@ -25,15 +26,29 @@ describe("debuglog integration tests", () => {
     }
 
     const script = join(_dirname(), "test-utils", "debuglog-child.ts");
+    const timeout = getTestTimeout(3000); // Base 3s timeout, adjusted for environment
 
-    // Use spawnSync for better process control on Windows
-    const result = spawnSync("npx", ["tsx", script], {
+    // Debug timeout calculation on Alpine
+    if (process.platform === "linux") {
+      console.log(
+        `[DEBUG] Test timeout calculated: ${timeout}ms for platform: ${process.platform}, arch: ${process.arch}`,
+      );
+    }
+
+    // Try different approaches based on platform
+    // On Alpine, npx might have timeout issues
+    // Always use npx but with --yes flag to avoid prompts
+    const command = "npx";
+    const args = ["--yes", "tsx", script];
+
+    // Use spawnSync for better process control
+    const result = spawnSync(command, args, {
       env: childEnv,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true, // Hide console window on Windows
-      shell: process.platform === "win32", // Use shell on Windows for npx
-      timeout: 5000, // 5 second timeout
+      shell: process.platform === "win32", // Windows requires shell for npx to work
+      timeout,
     });
 
     // Check for errors
@@ -47,10 +62,13 @@ describe("debuglog integration tests", () => {
         script,
         nodeDebug,
       };
-      
-      // Log debugging info to help diagnose Windows issues
-      console.error("Windows child process spawn error:", errorInfo);
-      
+
+      // Log debugging info to help diagnose spawn issues
+      console.error(
+        `${process.platform === "win32" ? "Windows" : process.platform} child process spawn error:`,
+        errorInfo,
+      );
+
       throw new Error(`Failed to spawn child process: ${result.error.message}`);
     }
 
@@ -65,14 +83,14 @@ describe("debuglog integration tests", () => {
         script,
         nodeDebug,
       };
-      
+
       // Log debugging info to help diagnose Windows issues
       if (process.platform === "win32") {
         console.error("Windows child process exit error:", errorInfo);
       }
-      
+
       throw new Error(
-        `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`
+        `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`,
       );
     }
 
@@ -180,15 +198,29 @@ describe("debug function", () => {
     };
 
     const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
+    const timeout = getTestTimeout(3000); // Base 3s timeout, adjusted for environment
 
-    // Use spawnSync for better process control on Windows
-    const result = spawnSync("npx", ["tsx", script], {
+    // Debug timeout calculation on Alpine
+    if (process.platform === "linux") {
+      console.log(
+        `[DEBUG] Test timeout calculated: ${timeout}ms for platform: ${process.platform}, arch: ${process.arch}`,
+      );
+    }
+
+    // Try different approaches based on platform
+    // On Alpine, npx might have timeout issues
+    // Always use npx but with --yes flag to avoid prompts
+    const command = "npx";
+    const args = ["--yes", "tsx", script];
+
+    // Use spawnSync for better process control
+    const result = spawnSync(command, args, {
       env: childEnv,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true, // Hide console window on Windows
-      shell: process.platform === "win32", // Use shell on Windows for npx
-      timeout: 5000, // 5 second timeout
+      shell: process.platform === "win32", // Windows requires shell for npx to work
+      timeout,
     });
 
     // Check for errors
@@ -201,10 +233,13 @@ describe("debug function", () => {
         nodeVersion: process.version,
         script,
       };
-      
-      // Log debugging info to help diagnose Windows issues
-      console.error("Windows child process spawn error:", errorInfo);
-      
+
+      // Log debugging info to help diagnose spawn issues
+      console.error(
+        `${process.platform === "win32" ? "Windows" : process.platform} child process spawn error:`,
+        errorInfo,
+      );
+
       throw new Error(`Failed to spawn child process: ${result.error.message}`);
     }
 
@@ -218,14 +253,14 @@ describe("debug function", () => {
         nodeVersion: process.version,
         script,
       };
-      
+
       // Log debugging info to help diagnose Windows issues
       if (process.platform === "win32") {
         console.error("Windows child process exit error:", errorInfo);
       }
-      
+
       throw new Error(
-        `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`
+        `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`,
       );
     }
 
