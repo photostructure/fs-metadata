@@ -38,7 +38,8 @@
       "Bash(clang-tidy:*)",
       "Bash(true)",
       "Bash(gh run list:*)",
-      "Bash(gh run view:*)"
+      "Bash(gh run view:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   },

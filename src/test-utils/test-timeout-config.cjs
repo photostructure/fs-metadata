@@ -76,6 +76,13 @@ function getTimingMultiplier() {
  * @returns {number} Timeout in milliseconds
  */
 function getTestTimeout(baseTimeout = 10000) {
+  // Always apply multipliers for emulated environments (e.g., Alpine ARM64)
+  // This is important because CI env vars may not be available inside Docker containers
+  if (isEmulated()) {
+    const multiplier = getTimingMultiplier();
+    return baseTimeout * multiplier;
+  }
+
   // Apply multipliers in CI or when GITHUB_ACTIONS is set
   if (!process.env.CI && !process.env.GITHUB_ACTIONS) {
     return baseTimeout; // Local development uses base timeout
