@@ -13,11 +13,14 @@ import {
 // Skip these process-spawning tests on Alpine ARM64 due to extreme emulation slowness
 const isEmulatedAlpine = isEmulated() && isAlpineLinux();
 
-describe("debuglog integration tests", () => {
+// Use describe.skip for the entire suite on Alpine ARM64
+const describeOrSkip = isEmulatedAlpine ? describe.skip : describe;
+
+describeOrSkip("debuglog integration tests (process spawning)", () => {
   beforeAll(() => {
     if (isEmulatedAlpine) {
       console.log(
-        "Skipping debuglog integration tests on Alpine ARM64 due to emulation performance issues",
+        "Skipping ALL process-spawning tests on Alpine ARM64 due to emulation performance issues",
       );
     }
   });
@@ -112,9 +115,7 @@ describe("debuglog integration tests", () => {
     }
   }
 
-  (isEmulatedAlpine ? test.skip : test)(
-    "uses fs-metadata when NODE_DEBUG=fs-metadata",
-    () => {
+  test("uses fs-metadata when NODE_DEBUG=fs-metadata", () => {
       const result = runChildTest("fs-metadata");
       expect(result).toEqual({
         isDebugEnabled: true,
@@ -123,7 +124,7 @@ describe("debuglog integration tests", () => {
     },
   );
 
-  (isEmulatedAlpine ? test.skip : test)(
+  test(
     "uses fs-meta when NODE_DEBUG=fs-meta",
     () => {
       const result = runChildTest("fs-meta");
@@ -134,7 +135,7 @@ describe("debuglog integration tests", () => {
     },
   );
 
-  (isEmulatedAlpine ? test.skip : test)(
+  test(
     "uses fs-meta when NODE_DEBUG=fs-*",
     () => {
       const result = runChildTest("fs-*");
@@ -145,7 +146,7 @@ describe("debuglog integration tests", () => {
     },
   );
 
-  (isEmulatedAlpine ? test.skip : test)(
+  test(
     "falls back to photostructure:fs-metadata when no debug enabled",
     () => {
       const result = runChildTest("");
@@ -156,7 +157,7 @@ describe("debuglog integration tests", () => {
     },
   );
 
-  (isEmulatedAlpine ? test.skip : test)(
+  test(
     "falls back to photostructure:fs-metadata when no debug enabled",
     () => {
       const result = runChildTest("photostructure*");
@@ -167,7 +168,7 @@ describe("debuglog integration tests", () => {
     },
   );
 
-  (isEmulatedAlpine ? test.skip : test)("handles uppercase debug names", () => {
+  test("handles uppercase debug names", () => {
     const result = runChildTest("FS-METADATA");
     expect(result).toEqual({
       isDebugEnabled: true,
@@ -175,7 +176,7 @@ describe("debuglog integration tests", () => {
     });
   });
 
-  (isEmulatedAlpine ? test.skip : test)("handles FS-META uppercase", () => {
+  test("handles FS-META uppercase", () => {
     const result = runChildTest("FS-META");
     expect(result).toEqual({
       isDebugEnabled: true,
@@ -212,7 +213,7 @@ describe("debug function", () => {
     mockWrite.mockRestore();
   });
 
-  (isEmulatedAlpine ? test.skip : test)(
+  test(
     "debug writes output when enabled",
     () => {
       const childEnv: Record<string, string | undefined> = {
