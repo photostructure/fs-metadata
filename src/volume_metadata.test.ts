@@ -26,8 +26,6 @@ describe("Volume Metadata", () => {
   it("should get root filesystem metadata", async () => {
     const metadata = await getVolumeMetadata(rootPath);
 
-    console.dir(metadata);
-
     expect(metadata.mountPoint).toBe(rootPath);
     assertMetadata(metadata);
 
@@ -107,15 +105,9 @@ describe("concurrent", () => {
           return await getVolumeMetadata(mountPoint, { timeoutMs });
         } catch (error) {
           if (timeoutMs === 1) {
-            console.log("Expected timeout", { mountPoint, timeoutMs, error });
             expect(String(error)).toMatch(/timeout/i); // < we can't check for instanceOf TimeoutError because it's imported from the tsup bundle
             return;
           } else if (!validMountPoints.includes(mountPoint)) {
-            console.log("Expected bad mount point", {
-              mountPoint,
-              timeoutMs,
-              error,
-            });
             expect(String(error)).toMatch(
               /EINVAL|ENOENT|not accessible|opendir/i,
             );

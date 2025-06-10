@@ -54,7 +54,6 @@ describe("Filesystem Metadata", () => {
           includeSystemVolumes: true,
         });
         const nonSystemMountPoints = await getVolumeMountPoints();
-        console.log({ allMountPoints, nonSystemMountPoints });
         const foundSystemVolumes = [];
         const mismarkedSystemVolumes = [];
         const systemVolumesInDefaultList = nonSystemMountPoints.filter(

@@ -1,5 +1,5 @@
 import { getVolumeMetadata, getVolumeMountPoints } from "./index";
-import { isWindows } from "./platform";
+import { isAlpine, isARM64, isWindows } from "./platform";
 import { runAdaptiveBenchmark } from "./test-utils/benchmark-harness";
 import { getTestTimeout } from "./test-utils/test-timeout-config";
 
@@ -10,9 +10,11 @@ describe("Thread Safety Tests", () => {
     "should handle concurrent volume metadata requests without race conditions",
     async () => {
       if (!isWindows) {
-        console.log(
-          "Skipping Windows thread safety test on non-Windows platform",
-        );
+        return;
+      }
+
+      // Skip on Alpine ARM64 due to emulation performance issues
+      if (isAlpine() && isARM64) {
         return;
       }
 
@@ -32,7 +34,7 @@ describe("Thread Safety Tests", () => {
       let currentAttempt = 0;
 
       // Use adaptive benchmark for concurrent requests
-      const result = await runAdaptiveBenchmark(
+      await runAdaptiveBenchmark(
         async () => {
           const promises: Promise<{
             success: boolean;
@@ -80,14 +82,7 @@ describe("Thread Safety Tests", () => {
       const failureCount = allResults.filter((r) => !r.success).length;
       const totalRequests = allResults.length;
 
-      console.log(`Thread safety test results:`);
-      console.log(
-        `  Test duration: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
-      );
-      console.log(`  Iterations: ${result.iterations}`);
-      console.log(`  Total requests: ${totalRequests}`);
-      console.log(`  Successful: ${successCount}`);
-      console.log(`  Failed: ${failureCount}`);
+      // Thread safety test results logging removed to prevent console issues
 
       // Group results by mount point to check consistency
       const resultsByMountPoint = new Map<string, (typeof allResults)[0][]>();
@@ -99,12 +94,9 @@ describe("Thread Safety Tests", () => {
 
       // Verify consistency - all requests for the same mount point should return the same status
       let inconsistencies = 0;
-      for (const [mountPoint, mountResults] of resultsByMountPoint) {
+      for (const [, mountResults] of resultsByMountPoint) {
         const statuses = new Set(mountResults.map((r) => r.status || r.error));
         if (statuses.size > 1) {
-          console.warn(
-            `Inconsistent results for ${mountPoint}: ${Array.from(statuses).join(", ")}`,
-          );
           inconsistencies++;
         }
       }
@@ -119,23 +111,20 @@ describe("Thread Safety Tests", () => {
   // This test specifically targets the drive status checker timeout behavior
   it("should handle timeouts gracefully without thread termination issues", async () => {
     if (!isWindows) {
-      console.log("Skipping Windows timeout test on non-Windows platform");
       return;
     }
 
     const mountPoints = await getVolumeMountPoints();
     if (mountPoints.length === 0) {
-      console.log("No mount points available for testing");
       return;
     }
 
     const testMount = mountPoints[0]!;
     let totalRequests = 0;
-    let totalTimeouts = 0;
     let currentIteration = 0;
 
     // Use adaptive benchmark to test timeout handling
-    const result = await runAdaptiveBenchmark(
+    await runAdaptiveBenchmark(
       async () => {
         // Create rapid-fire requests with short timeouts
         // This tests the thread cleanup path that previously used TerminateThread
@@ -159,9 +148,7 @@ describe("Thread Safety Tests", () => {
         // Small delay between requests to create overlapping operations
         await new Promise((resolve) => setTimeout(resolve, 5));
 
-        const batchResults = await Promise.all(batchPromises);
-        const batchTimeouts = batchResults.filter((r) => !r.success).length;
-        totalTimeouts += batchTimeouts;
+        await Promise.all(batchPromises);
         currentIteration++;
       },
       {
@@ -170,16 +157,6 @@ describe("Thread Safety Tests", () => {
         minIterations: 4, // At least 4 iterations (20 requests minimum)
         debug: !!process.env["DEBUG_BENCHMARK"],
       },
-    );
-
-    console.log(`Timeout test results:`);
-    console.log(
-      `  Test duration: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
-    );
-    console.log(`  Iterations: ${result.iterations}`);
-    console.log(`  Total requests: ${totalRequests}`);
-    console.log(
-      `  Timeouts: ${totalTimeouts} (${((totalTimeouts / totalRequests) * 100).toFixed(1)}%)`,
     );
 
     // The test passes if we don't crash
@@ -192,13 +169,16 @@ describe("Thread Safety Tests", () => {
     "should not leak memory with repeated concurrent operations",
     async () => {
       if (!isWindows) {
-        console.log("Skipping Windows memory test on non-Windows platform");
+        return;
+      }
+
+      // Skip on Alpine ARM64 due to emulation performance issues
+      if (isAlpine() && isARM64) {
         return;
       }
 
       const mountPoints = await getVolumeMountPoints();
       if (mountPoints.length === 0) {
-        console.log("No mount points available for testing");
         return;
       }
 
@@ -211,10 +191,9 @@ describe("Thread Safety Tests", () => {
       }
 
       const requestsPerIteration = 50;
-      let totalOperations = 0;
 
       // Run adaptive benchmark with concurrent operations
-      const result = await runAdaptiveBenchmark(
+      await runAdaptiveBenchmark(
         async () => {
           const promises: Promise<void>[] = [];
 
@@ -228,7 +207,6 @@ describe("Thread Safety Tests", () => {
           }
 
           await Promise.all(promises);
-          totalOperations += requestsPerIteration;
 
           // Force garbage collection if available
           if (global.gc) {
@@ -252,23 +230,6 @@ describe("Thread Safety Tests", () => {
       // Calculate memory growth
       const heapGrowth = finalMemory.heapUsed - initialMemory.heapUsed;
       const heapGrowthMB = heapGrowth / 1024 / 1024;
-
-      console.log(`Memory test results:`);
-      console.log(`  Total operations: ${totalOperations}`);
-      console.log(
-        `  Test duration: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
-      );
-      console.log(`  Iterations: ${result.iterations}`);
-      console.log(
-        `  Initial heap: ${(initialMemory.heapUsed / 1024 / 1024).toFixed(2)} MB`,
-      );
-      console.log(
-        `  Final heap: ${(finalMemory.heapUsed / 1024 / 1024).toFixed(2)} MB`,
-      );
-      console.log(`  Heap growth: ${heapGrowthMB.toFixed(2)} MB`);
-      console.log(
-        `  Growth per operation: ${(heapGrowth / totalOperations).toFixed(2)} bytes`,
-      );
 
       // Allow for some memory growth but fail if it's excessive
       // This would catch major leaks from improper thread cleanup

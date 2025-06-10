@@ -18,16 +18,11 @@ const describeOrSkip = isEmulatedAlpine ? describe.skip : describe;
 
 describeOrSkip("debuglog integration tests (process spawning)", () => {
   beforeAll(() => {
-    if (isEmulatedAlpine) {
-      console.log(
-        "Skipping ALL process-spawning tests on Alpine ARM64 due to emulation performance issues",
-      );
-    }
+    // Tests are already skipped via describe.skip when isEmulatedAlpine is true
   });
 
   afterAll(() => {
-    // Give child processes time to fully exit
-    return new Promise((resolve) => setTimeout(resolve, 100));
+    // spawnSync should handle process cleanup automatically
   });
 
   beforeEach(() => {
@@ -62,42 +57,12 @@ describeOrSkip("debuglog integration tests (process spawning)", () => {
 
     // Check for errors
     if (result.error) {
-      // spawnSync errors should not have circular references
-      const errorInfo = {
-        message: result.error.message,
-        code: (result.error as NodeJS.ErrnoException).code,
-        platform: process.platform,
-        nodeVersion: process.version,
-        script,
-        nodeDebug,
-      };
-
-      // Log debugging info to help diagnose spawn issues
-      console.error(
-        `${process.platform === "win32" ? "Windows" : process.platform} child process spawn error:`,
-        errorInfo,
+      throw new Error(
+        `Failed to spawn child process: ${result.error.message} (${(result.error as NodeJS.ErrnoException).code ?? "unknown code"})`,
       );
-
-      throw new Error(`Failed to spawn child process: ${result.error.message}`);
     }
 
     if (result.status !== 0) {
-      const errorInfo = {
-        status: result.status,
-        signal: result.signal,
-        stderr: result.stderr?.toString?.() ?? "",
-        stdout: result.stdout?.toString?.() ?? "",
-        platform: process.platform,
-        nodeVersion: process.version,
-        script,
-        nodeDebug,
-      };
-
-      // Log debugging info to help diagnose Windows issues
-      if (process.platform === "win32") {
-        console.error("Windows child process exit error:", errorInfo);
-      }
-
       throw new Error(
         `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`,
       );
@@ -105,13 +70,10 @@ describeOrSkip("debuglog integration tests (process spawning)", () => {
 
     try {
       return JSON.parse(result.stdout);
-    } catch (parseError) {
-      console.error("Failed to parse child output:", {
-        stdout: result.stdout,
-        stderr: result.stderr,
-        parseError: (parseError as Error).message,
-      });
-      throw new Error(`Failed to parse child output: ${result.stdout}`);
+    } catch {
+      throw new Error(
+        `Failed to parse child output: ${result.stdout}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`,
+      );
     }
   }
 
@@ -225,40 +187,12 @@ describe("debug function", () => {
 
     // Check for errors
     if (result.error) {
-      // spawnSync errors should not have circular references
-      const errorInfo = {
-        message: result.error.message,
-        code: (result.error as NodeJS.ErrnoException).code,
-        platform: process.platform,
-        nodeVersion: process.version,
-        script,
-      };
-
-      // Log debugging info to help diagnose spawn issues
-      console.error(
-        `${process.platform === "win32" ? "Windows" : process.platform} child process spawn error:`,
-        errorInfo,
+      throw new Error(
+        `Failed to spawn child process: ${result.error.message} (${(result.error as NodeJS.ErrnoException).code ?? "unknown code"})`,
       );
-
-      throw new Error(`Failed to spawn child process: ${result.error.message}`);
     }
 
     if (result.status !== 0) {
-      const errorInfo = {
-        status: result.status,
-        signal: result.signal,
-        stderr: result.stderr?.toString?.() ?? "",
-        stdout: result.stdout?.toString?.() ?? "",
-        platform: process.platform,
-        nodeVersion: process.version,
-        script,
-      };
-
-      // Log debugging info to help diagnose Windows issues
-      if (process.platform === "win32") {
-        console.error("Windows child process exit error:", errorInfo);
-      }
-
       throw new Error(
         `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`,
       );
