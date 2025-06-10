@@ -43,3 +43,28 @@ leak:g_thread_pool_new
 # libuv allocations
 leak:uv_
 leak:uv__work_submit
+
+# Python interpreter leaks - false positives from build process
+leak:PyMem_RawMalloc
+leak:PyObject_Malloc
+leak:_PyObject_Malloc
+leak:new_keys_object
+leak:dictresize
+leak:insertdict
+leak:insertion_resize
+leak:PyDict_SetDefault
+leak:type_add_getset
+leak:type_ready_fill_dict
+leak:type_ready
+leak:PyType_Ready
+leak:_PyType_FromMetaclass_impl
+leak:collections_exec
+leak:PyModule_ExecDef
+leak:import_find_and_load
+leak:PyImport_ImportModuleLevelObject
+leak:import_name
+leak:_PyEval_EvalFrameDefault
+leak:builtin_exec_impl
+leak:builtin_exec
+leak:cfunction_vectorcall_FASTCALL_KEYWORDS
+leak:cfunction_vectorcall_O
