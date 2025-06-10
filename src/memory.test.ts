@@ -2,7 +2,6 @@
 
 import { jest } from "@jest/globals";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { delay } from "./async";
 import {
@@ -17,7 +16,7 @@ import { runAdaptiveBenchmarkWithCallback } from "./test-utils/benchmark-harness
 import { validateHidden } from "./test-utils/hidden-tests";
 import { tmpDirNotHidden } from "./test-utils/platform";
 import { getTestTimeout } from "./test-utils/test-timeout-config";
-import { fmtBytes, MiB } from "./units";
+import { MiB } from "./units";
 
 // THIS IS ALL A HORRIBLE HACK. THIS "test" SHOULD BE REPLACED WITH AN ACTUAL
 // MEMORY LEAK TESTER (like with valgrind). PULL REQUESTS ARE WELCOME.
@@ -57,7 +56,7 @@ describeMemory("Memory Tests", () => {
     const memoryUsages: number[] = [1];
 
     // Run operations using adaptive benchmark
-    const result = await runAdaptiveBenchmarkWithCallback(
+    await runAdaptiveBenchmarkWithCallback(
       operation,
       async (_result, iteration) => {
         // Take memory snapshots approximately 10 times during the benchmark
@@ -79,15 +78,6 @@ describeMemory("Memory Tests", () => {
     const finalMemory = await getMemoryUsage();
     memoryUsages.push(finalMemory / initialMemory);
     const slope = leastSquaresSlope(memoryUsages);
-    console.dir({
-      iterations: result.iterations,
-      duration: `${(result.totalDurationMs / 1000).toFixed(1)}s`,
-      avgIterationTime: `${result.avgIterationMs.toFixed(2)}ms`,
-      initial: fmtBytes(initialMemory),
-      final: fmtBytes(finalMemory),
-      diff: fmtBytes(finalMemory - initialMemory),
-      slope,
-    });
     expect(finalMemory - initialMemory).toBeLessThan(errorMarginBytes);
     expect(slope).toBeLessThan(maxAllowedSlope);
   }
@@ -151,21 +141,31 @@ describeMemory("Memory Tests", () => {
     });
   });
   describe("isHidden/setHidden", () => {
+    let testDir: string;
+
+    beforeEach(async () => {
+      testDir = await mkdtemp(join(tmpDirNotHidden(), "memory-tests-"));
+    });
+
+    afterEach(async () => {
+      if (testDir) {
+        await rm(testDir, { recursive: true, force: true }).catch(() => null);
+      }
+    });
+
     it("should not leak memory under repeated calls", async () => {
+      let counter = 0;
       await checkMemoryUsage(async () => {
-        const dir = await mkdtemp(join(tmpDirNotHidden(), "memory-tests-"));
-        try {
-          await validateHidden(dir);
-        } finally {
-          await rm(dir, { recursive: true, maxRetries: 3 }).catch(() => null);
-        }
+        // Create a unique subdirectory for each iteration to avoid path conflicts
+        const iterationDir = join(testDir, `iteration-${counter++}`);
+        await validateHidden(iterationDir);
       });
     });
 
     it("should not leak memory under error conditions", async () => {
       await checkMemoryUsage(async () => {
         const notafile = join(
-          tmpdir(),
+          testDir,
           "nonexistent",
           "file-" + randomLetters(8),
         );
