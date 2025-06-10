@@ -31,8 +31,15 @@ describe("hidden file tests", () => {
 
   afterEach(async () => {
     await fs
-      .rm(tempDir, { recursive: true, force: true })
-      .catch((err) => console.warn(`Failed to rm ${tempDir}: ${err}`));
+      .rm(tempDir, {
+        recursive: true,
+        force: true,
+        maxRetries: 3,
+        retryDelay: 500,
+      })
+      .catch(() => {
+        // Ignore cleanup failures
+      });
   });
 
   it("runs validateHidden()", () => validateHidden(tempDir));
