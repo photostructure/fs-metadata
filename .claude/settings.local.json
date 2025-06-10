@@ -39,7 +39,8 @@
       "Bash(true)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(gh workflow:*)"
     ],
     "deny": []
   },
