@@ -109,60 +109,64 @@ describe("Thread Safety Tests", () => {
   ); // Base 5s timeout, adjusted for environment
 
   // This test specifically targets the drive status checker timeout behavior
-  it("should handle timeouts gracefully without thread termination issues", async () => {
-    if (!isWindows) {
-      return;
-    }
+  it(
+    "should handle timeouts gracefully without thread termination issues",
+    async () => {
+      if (!isWindows) {
+        return;
+      }
 
-    const mountPoints = await getVolumeMountPoints();
-    if (mountPoints.length === 0) {
-      return;
-    }
+      const mountPoints = await getVolumeMountPoints();
+      if (mountPoints.length === 0) {
+        return;
+      }
 
-    const testMount = mountPoints[0]!;
-    let totalRequests = 0;
-    let currentIteration = 0;
+      const testMount = mountPoints[0]!;
+      let totalRequests = 0;
+      let currentIteration = 0;
 
-    // Use adaptive benchmark to test timeout handling
-    await runAdaptiveBenchmark(
-      async () => {
-        // Create rapid-fire requests with short timeouts
-        // This tests the thread cleanup path that previously used TerminateThread
-        const batchPromises: Promise<{
-          success: boolean;
-          iteration: number;
-        }>[] = [];
-        const batchSize = 5; // Run 5 concurrent requests per iteration
+      // Use adaptive benchmark to test timeout handling
+      await runAdaptiveBenchmark(
+        async () => {
+          // Create rapid-fire requests with short timeouts
+          // This tests the thread cleanup path that previously used TerminateThread
+          const batchPromises: Promise<{
+            success: boolean;
+            iteration: number;
+          }>[] = [];
+          const batchSize = 5; // Run 5 concurrent requests per iteration
 
-        for (let i = 0; i < batchSize; i++) {
-          batchPromises.push(
-            getVolumeMetadata(testMount.mountPoint, {
-              timeoutMs: 10, // Very short timeout in ms
-            })
-              .then(() => ({ success: true, iteration: currentIteration }))
-              .catch(() => ({ success: false, iteration: currentIteration })),
-          );
-          totalRequests++;
-        }
+          for (let i = 0; i < batchSize; i++) {
+            batchPromises.push(
+              getVolumeMetadata(testMount.mountPoint, {
+                timeoutMs: 10, // Very short timeout in ms
+              })
+                .then(() => ({ success: true, iteration: currentIteration }))
+                .catch(() => ({ success: false, iteration: currentIteration })),
+            );
+            totalRequests++;
+          }
 
-        // Small delay between requests to create overlapping operations
-        await new Promise((resolve) => setTimeout(resolve, 5));
+          // Small delay between requests to create overlapping operations
+          await new Promise((resolve) => setTimeout(resolve, 5));
 
-        await Promise.all(batchPromises);
-        currentIteration++;
-      },
-      {
-        targetDurationMs: 5_000, // Target 5 seconds of testing
-        maxTimeoutMs: 15_000, // Max 15 seconds
-        minIterations: 4, // At least 4 iterations (20 requests minimum)
-        debug: !!process.env["DEBUG_BENCHMARK"],
-      },
-    );
+          await Promise.all(batchPromises);
+          currentIteration++;
+        },
+        {
+          targetDurationMs: 5_000, // Target 5 seconds of testing
+          maxTimeoutMs: 15_000, // Max 15 seconds
+          minIterations: 4, // At least 4 iterations (20 requests minimum)
+          debug: !!process.env["DEBUG_BENCHMARK"],
+        },
+      );
 
-    // The test passes if we don't crash
-    // We should have made at least the minimum number of requests
-    expect(totalRequests).toBeGreaterThanOrEqual(20);
-  });
+      // The test passes if we don't crash
+      // We should have made at least the minimum number of requests
+      expect(totalRequests).toBeGreaterThanOrEqual(20);
+    },
+    getTestTimeout(20_000),
+  ); // Base 20s timeout for benchmark test, adjusted for environment
 
   // Memory stress test to detect potential memory leaks from improper thread cleanup
   it(
