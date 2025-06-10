@@ -94,3 +94,81 @@ console.dir({ volumeMetadata });
 import { isHidden } from "@photostructure/fs-metadata";
 const hidden = await isHidden("/path/to/file");
 ```
+
+## CI/CD Test Reliability Guidelines
+
+Based on analysis of recent test failures, here are critical patterns to avoid flaky tests:
+
+### 1. Benchmark and Performance Tests
+- **Problem**: "Cannot log after tests are done" errors in worker_threads.test.ts
+- **Solution**: 
+  - Always await all async operations before test completion
+  - Use proper test lifecycle hooks (afterEach/afterAll) for cleanup
+  - Avoid console.log in async contexts without proper synchronization
+  - Consider using test.concurrent with explicit done() callbacks
+
+### 2. Alpine Linux ARM64 Issues
+- **Problem**: Tests timeout on emulated Alpine ARM64 environments
+- **Solution**:
+  - Skip process-spawning tests on Alpine ARM64 (`if (isAlpine && isARM64)`)
+  - Use increased timeout multipliers (20x) for emulated environments
+  - Detect emulation via `/proc/cpuinfo` or environment checks
+  - Consider separate test suites for native vs emulated environments
+
+### 3. Worker Thread Management
+- **Problem**: Race conditions in concurrent worker operations
+- **Solution**:
+  - Implement proper worker pool management with size limits
+  - Use Promise.allSettled() instead of Promise.all() for parallel operations
+  - Add explicit cleanup in test teardown to terminate all workers
+  - Set reasonable concurrency limits based on environment (CPU cores)
+
+### 4. Timeout Test Reliability
+- **Problem**: Timeout tests fail due to timing precision issues
+- **Solution**:
+  - Never use exact timing assertions (e.g., expect 100ms)
+  - Use ranges with adequate margins (e.g., 90-110ms)
+  - Account for CI environment variability (slower machines)
+  - Consider mocking timers for deterministic behavior
+
+### 5. File System Operations
+- **Problem**: ENOENT errors for test directories, permission issues
+- **Solution**:
+  - Always use unique temporary directories per test
+  - Clean up test artifacts in afterEach hooks
+  - Check directory existence before operations
+  - Handle platform-specific path separators
+
+### 6. Memory and Resource Leaks
+- **Problem**: Tests don't properly clean up resources
+- **Solution**:
+  - Explicitly close all file handles, network connections
+  - Use try-finally blocks for resource cleanup
+  - Monitor memory usage in long-running tests
+  - Implement proper garbage collection triggers
+
+### 7. Platform-Specific Failures
+- **Problem**: Different behavior across Windows/macOS/Linux
+- **Solution**:
+  - Use platform detection helpers consistently
+  - Skip platform-specific tests appropriately
+  - Account for filesystem differences (case sensitivity, path formats)
+  - Test with platform-specific CI matrices
+
+### 8. Jest Configuration
+- **Problem**: Tests interfere with each other
+- **Solution**:
+  - Use `--runInBand` for tests with shared resources
+  - Clear module cache between tests when needed
+  - Isolate tests that spawn processes
+  - Configure proper test timeouts per environment
+
+### Best Practices Summary
+1. **Always clean up**: Resources, timers, workers, file handles
+2. **Never assume timing**: Use ranges, not exact values
+3. **Isolate tests**: Each test should be independent
+4. **Platform awareness**: Skip tests that can't work on certain platforms
+5. **Proper async handling**: Always await or return promises
+6. **Resource limits**: Don't spawn unlimited workers/processes
+7. **Environment detection**: Adjust behavior for CI vs local
+8. **Deterministic tests**: Mock external dependencies when possible
