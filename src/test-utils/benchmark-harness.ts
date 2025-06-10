@@ -76,7 +76,6 @@ export async function runAdaptiveBenchmark(
     minIterations = 5,
     maxIterations = 10_000,
     warmupIterations = 2,
-    debug = false,
   } = options;
 
   // Apply timing multiplier based on environment
@@ -84,15 +83,9 @@ export async function runAdaptiveBenchmark(
   const adjustedTargetMs = targetDurationMs * multiplier;
   const adjustedTimeoutMs = maxTimeoutMs * multiplier;
 
-  if (debug) {
-    console.log(`[Benchmark] Environment multiplier: ${multiplier}x`);
-    console.log(`[Benchmark] Adjusted target: ${adjustedTargetMs}ms`);
-    console.log(`[Benchmark] Adjusted timeout: ${adjustedTimeoutMs}ms`);
-  }
+  // Debug logging removed to prevent 'Cannot log after tests are done' errors
 
   // Run warmup iterations
-  if (debug)
-    console.log(`[Benchmark] Running ${warmupIterations} warmup iterations...`);
 
   const warmupStart = Date.now();
   for (let i = 0; i < warmupIterations; i++) {
@@ -101,12 +94,7 @@ export async function runAdaptiveBenchmark(
   const warmupDuration = Date.now() - warmupStart;
   const avgWarmupTime = warmupDuration / warmupIterations;
 
-  if (debug) {
-    console.log(`[Benchmark] Warmup completed in ${warmupDuration}ms`);
-    console.log(
-      `[Benchmark] Average warmup time: ${avgWarmupTime.toFixed(2)}ms per iteration`,
-    );
-  }
+  // Warmup timing debug info removed to prevent console logging issues
 
   // Calculate target iterations based on warmup timing
   // Add 10% safety margin to avoid overshooting
@@ -121,11 +109,7 @@ export async function runAdaptiveBenchmark(
     Math.min(maxIterations, targetIterations),
   );
 
-  if (debug) {
-    console.log(
-      `[Benchmark] Calculated target iterations: ${targetIterations}`,
-    );
-  }
+  // Target iterations debug info removed to prevent console logging issues
 
   // Set up timeout promise
   let timeoutHandle: NodeJS.Timeout | undefined;
@@ -151,10 +135,7 @@ export async function runAdaptiveBenchmark(
           // Check if we're approaching the timeout
           const elapsed = Date.now() - benchmarkStart;
           if (elapsed > adjustedTimeoutMs * 0.95) {
-            if (debug)
-              console.log(
-                `[Benchmark] Approaching timeout, stopping at ${completedIterations} iterations`,
-              );
+            // Approaching timeout - stopping early
             break;
           }
         }
@@ -164,10 +145,7 @@ export async function runAdaptiveBenchmark(
   } catch (error) {
     if (error instanceof Error && error.message.includes("timeout")) {
       timedOut = true;
-      if (debug)
-        console.log(
-          `[Benchmark] Timed out after ${completedIterations} iterations`,
-        );
+      // Benchmark timed out
     } else {
       throw error;
     }
@@ -185,15 +163,7 @@ export async function runAdaptiveBenchmark(
     timedOut,
   };
 
-  if (debug) {
-    console.log(
-      `[Benchmark] Completed ${completedIterations} iterations in ${totalDuration}ms`,
-    );
-    console.log(
-      `[Benchmark] Average time per iteration: ${avgIterationTime.toFixed(2)}ms`,
-    );
-    if (timedOut) console.log(`[Benchmark] Note: Benchmark timed out`);
-  }
+  // Benchmark results debug info removed to prevent console logging issues
 
   return result;
 }
