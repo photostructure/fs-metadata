@@ -52,7 +52,7 @@ function getTimingMultiplier() {
   if (isAlpineLinux()) multiplier *= 2;
 
   // ARM emulation is extremely slow
-  if (isEmulated()) multiplier *= 5;
+  if (isEmulated()) multiplier *= 10;
 
   // Windows is slow to fork
   if (platform === "win32") multiplier *= 4;
