@@ -163,12 +163,184 @@ Based on analysis of recent test failures, here are critical patterns to avoid f
   - Isolate tests that spawn processes
   - Configure proper test timeouts per environment
 
+### Async Cleanup Anti-Patterns
+
+**IMPORTANT**: The following approaches are NOT valid solutions for async cleanup issues:
+
+```javascript
+// BAD: Arbitrary timeouts in tests
+await new Promise((resolve) => setTimeout(resolve, 100));
+
+// BAD: Forcing garbage collection
+if (global.gc) {
+  global.gc();
+}
+
+// BAD: Adding setImmediate in afterAll to "fix" hanging tests
+afterAll(async () => {
+  await new Promise((resolve) => setImmediate(resolve));
+});
+```
+
+**Why these are problematic:**
+
+1. **Arbitrary timeouts** are race conditions waiting to happen. They might work on fast machines but fail on slower CI runners.
+2. **Forcing GC** should never be required for correct behavior. If your code depends on GC for correctness, it has a fundamental design flaw.
+3. **setImmediate/nextTick delays** in cleanup hooks don't fix the root cause - they just paper over the real issue.
+4. These approaches mask the real problem instead of fixing it.
+
+**Note**: This is different from legitimate uses of timeouts, such as:
+
+- Waiting for time to pass to test timestamp changes
+- Rate limiting or throttling tests
+- Testing timeout behavior itself
+
+The anti-pattern is using timeouts or GC to "fix" async cleanup issues.
+
+**What to do instead:**
+
+1. Find the actual resource that's keeping the process alive (use `--detectOpenHandles`)
+2. Ensure all database connections are properly closed
+3. Ensure all file handles are closed
+4. Cancel or await all pending async operations
+5. Use proper resource management patterns (RAII, try-finally, using statements)
+
+### Windows-Compatible Directory Cleanup
+
+**IMPORTANT**: Never use `fs.rmSync()` or `fs.rm()` without proper Windows retry logic for directory cleanup in tests.
+
+**Problem**: On Windows, file handles and directory locks can remain active longer than on Unix systems, causing `EBUSY` errors during cleanup.
+
+**Proper Solution**: Use `fsp.rm()` (async) with retry options:
+
+```typescript
+await fsp.rm(tempDir, {
+  recursive: true,
+  force: true,
+  maxRetries: process.platform === "win32" ? 3 : 1,
+  retryDelay: process.platform === "win32" ? 100 : 0,
+});
+```
+
+**Best Practice**: Use existing test utilities that handle Windows-compatible cleanup patterns. Don't manually clean up temp directories - let the test framework handle it with proper retry logic.
+
+### Adaptive Timeout Testing
+
+**Problem**: Fixed timeouts don't account for varying CI environment performance.
+
+**Root Causes**:
+
+- Alpine Linux (musl libc) is 2x slower than glibc
+- ARM64 emulation on x64 runners is 5x slower
+- Windows process operations are 4x slower
+- macOS VMs are 4x slower
+- CI environments have resource constraints
+
+**Solutions**:
+
+```typescript
+// DON'T: Use fixed timeouts
+test("my test", async () => {
+  // Test code
+}, 10000);
+
+// DO: Use adaptive timeouts based on environment
+import { getTestTimeout } from "./test-utils/test-timeout-config";
+
+test(
+  "my test",
+  async () => {
+    // Test code
+  },
+  getTestTimeout(10000),
+);
+
+// DO: Account for platform timing differences
+const timingMultiplier = process.platform === "win32" ? 4 :
+                        process.platform === "darwin" ? 4 :
+                        process.env.CI ? 2 : 1;
+```
+
+### Multi-Process Test Synchronization
+
+**Problem**: Multi-process tests failing due to race conditions between process startup and test assertions.
+
+**Root Cause**: The timing between process startup and resource acquisition varies significantly by platform.
+
+**Solutions**:
+
+```typescript
+// DON'T: Assume immediate process readiness
+const proc = spawn(nodeCmd, [script]);
+const result = await waitForProcessResult(proc);
+expect(result).toBe("expected_outcome"); // May fail due to timing
+
+// DO: Use explicit synchronization signals
+const script = `
+  // Setup code
+  console.log("READY");  // Signal readiness
+  // Main test logic
+  console.log("RESULT:" + outcome);
+`;
+
+const proc = spawn(process.execPath, ["-e", script]);
+await waitForOutput(proc, "READY"); // Wait for process to be ready
+const result = await waitForOutput(proc, "RESULT:");
+expect(result.split(":")[1]).toBe("expected_outcome");
+```
+
+### Wait-for-Condition Pattern
+
+**Problem**: Tests failing because they don't wait for asynchronous conditions to be met.
+
+**Solution**: Implement robust condition waiting with platform-aware timing:
+
+```typescript
+async function waitForCondition(
+  check: () => boolean | Promise<boolean>,
+  options: {
+    maxAttempts?: number;
+    delay?: number;
+    timeoutMs?: number;
+  } = {}
+) {
+  const {
+    maxAttempts = 50,
+    delay = 100,
+    timeoutMs = 30000
+  } = options;
+  
+  const startTime = Date.now();
+  
+  for (let i = 0; i < maxAttempts; i++) {
+    if (Date.now() - startTime > timeoutMs) {
+      throw new Error(`Condition not met within ${timeoutMs}ms`);
+    }
+    
+    if (await check()) return true;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  
+  return false;
+}
+
+// Usage example
+await waitForCondition(
+  () => fs.existsSync(expectedFile),
+  { timeoutMs: getTestTimeout(10000) }
+);
+```
+
 ### Best Practices Summary
 1. **Always clean up**: Resources, timers, workers, file handles
-2. **Never assume timing**: Use ranges, not exact values
+2. **Never assume timing**: Use ranges and adaptive timeouts, not exact values
 3. **Isolate tests**: Each test should be independent
 4. **Platform awareness**: Skip tests that can't work on certain platforms
 5. **Proper async handling**: Always await or return promises
 6. **Resource limits**: Don't spawn unlimited workers/processes
 7. **Environment detection**: Adjust behavior for CI vs local
 8. **Deterministic tests**: Mock external dependencies when possible
+9. **Explicit synchronization**: Use signals for multi-process coordination
+10. **Robust waiting**: Use condition-based waiting instead of arbitrary timeouts
+11. **Windows compatibility**: Use retry logic for file operations on Windows
+12. **Anti-pattern awareness**: Avoid masking problems with timeouts or forced GC
