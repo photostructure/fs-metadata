@@ -227,18 +227,22 @@ describe("extractCallerPath", () => {
     at getCallerDirname (/src/other_caller.ts:5:10)
     at functionName (/path/to/file.js:1:1)`;
     // The function returns the path from the frame after the FIRST getCallerDirname
-    const expectedPath = isWindows ? "C:\\src\\other_caller.ts" : "/src/other_caller.ts";
+    const expectedPath = isWindows
+      ? "C:\\src\\other_caller.ts"
+      : "/src/other_caller.ts";
     const actualStack = stack.replace("/src/other_caller.ts", expectedPath);
     expect(extractCallerPath(actualStack)).toBe(expectedPath);
   });
 
   it("should handle Windows network paths", () => {
     if (!isWindows) return;
-    
+
     const stack = `Error
     at getCallerDirname (C:\\src\\caller_dirname.ts:10:20)
     at functionName (\\\\server\\share\\project\\file.js:1:1)`;
-    expect(extractCallerPath(stack)).toBe("\\\\server\\share\\project\\file.js");
+    expect(extractCallerPath(stack)).toBe(
+      "\\\\server\\share\\project\\file.js",
+    );
   });
 
   it("should handle paths with parentheses in directory names", () => {
@@ -255,7 +259,9 @@ describe("extractCallerPath", () => {
     const stack = `Error
     at getCallerDirname (/src/caller_dirname.ts:10:20)`;
     expect(() => extractCallerPath(stack)).toThrow(Error);
-    expect(() => extractCallerPath(stack)).toThrow("Invalid stack trace format: no parsable frames");
+    expect(() => extractCallerPath(stack)).toThrow(
+      "Invalid stack trace format: no parsable frames",
+    );
   });
 
   it("should handle malformed stack frames with partial paths", () => {
@@ -263,21 +269,25 @@ describe("extractCallerPath", () => {
     at getCallerDirname (/src/caller_dirname.ts:10:20)
     at functionName (/incomplete/path:)`;
     expect(() => extractCallerPath(stack)).toThrow(Error);
-    expect(() => extractCallerPath(stack)).toThrow("Invalid stack trace format: no parsable frames");
+    expect(() => extractCallerPath(stack)).toThrow(
+      "Invalid stack trace format: no parsable frames",
+    );
   });
 
   it("should extract path from arrow function frames", () => {
     const stack = `Error
     at getCallerDirname (/src/caller_dirname.ts:10:20)
     at Array.map.item => item (/arrow/function/file.js:1:1)`;
-    const expectedPath = isWindows ? "C:\\arrow\\function\\file.js" : "/arrow/function/file.js";
+    const expectedPath = isWindows
+      ? "C:\\arrow\\function\\file.js"
+      : "/arrow/function/file.js";
     const actualStack = stack.replace("/arrow/function/file.js", expectedPath);
     expect(extractCallerPath(actualStack)).toBe(expectedPath);
   });
 
   it("should handle Windows drive letters other than C:", () => {
     if (!isWindows) return;
-    
+
     const stack = `Error
     at getCallerDirname (C:\\src\\caller_dirname.ts:10:20)
     at functionName (D:\\projects\\app\\main.js:1:1)`;
