@@ -119,8 +119,6 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
         mountEntryToPartialVolumeMetadata(ea, {}),
       );
 
-      console.dir({ vm_arr });
-
       expect(vm_arr).toEqual([
         {
           fstype: "ext4",
