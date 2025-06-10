@@ -13,6 +13,7 @@ import {
   setHidden,
 } from "./index";
 import { randomLetters } from "./random";
+import { runAdaptiveBenchmarkWithCallback } from "./test-utils/benchmark-harness";
 import { validateHidden } from "./test-utils/hidden-tests";
 import { tmpDirNotHidden } from "./test-utils/platform";
 import { getTestTimeout } from "./test-utils/test-timeout-config";
@@ -31,8 +32,7 @@ const shouldRunMemoryTests = !!process.env["TEST_MEMORY"];
 const describeMemory = shouldRunMemoryTests ? describe : describe.skip;
 
 describeMemory("Memory Tests", () => {
-  jest.setTimeout(getTestTimeout(20_000)); // Base 20s timeout for memory-intensive tests
-  const iterations = 100;
+  jest.setTimeout(getTestTimeout(60_000)); // Base 60s timeout for memory-intensive tests
 
   // Helper to get memory usage after GC
   async function getMemoryUsage(): Promise<number> {
@@ -54,28 +54,35 @@ describeMemory("Memory Tests", () => {
 
     // __then__ take a snapshot
     const initialMemory = await getMemoryUsage();
-    const memoryUsages = [1];
+    const memoryUsages: number[] = [1];
 
-    // Run operations
-    for (let iteration = 0; iteration < iterations; iteration++) {
-      await operation();
-      if (iteration % Math.floor(iterations / 10) === 0) {
-        const currentMemory = await getMemoryUsage();
-        memoryUsages.push(currentMemory / initialMemory);
-        // console.dir({
-        //   iteration,
-        //   currentMemory: fmtBytes(currentMemory),
-        //   diff: fmtBytes(currentMemory - initialMemory),
-        //   slope: slope(memoryUsages),
-        // });
-      }
-    }
+    // Run operations using adaptive benchmark
+    const result = await runAdaptiveBenchmarkWithCallback(
+      operation,
+      async (_result, iteration) => {
+        // Take memory snapshots approximately 10 times during the benchmark
+        // Check every 10 iterations initially, will adjust based on actual runtime
+        if (iteration === 0 || iteration % 10 === 0) {
+          const currentMemory = await getMemoryUsage();
+          memoryUsages.push(currentMemory / initialMemory);
+        }
+      },
+      {
+        targetDurationMs: 20_000,
+        maxTimeoutMs: 60_000,
+        minIterations: 10,
+        debug: !!process.env["DEBUG_BENCHMARK"],
+      },
+    );
 
     // Final memory check
     const finalMemory = await getMemoryUsage();
     memoryUsages.push(finalMemory / initialMemory);
     const slope = leastSquaresSlope(memoryUsages);
     console.dir({
+      iterations: result.iterations,
+      duration: `${(result.totalDurationMs / 1000).toFixed(1)}s`,
+      avgIterationTime: `${result.avgIterationMs.toFixed(2)}ms`,
       initial: fmtBytes(initialMemory),
       final: fmtBytes(finalMemory),
       diff: fmtBytes(finalMemory - initialMemory),

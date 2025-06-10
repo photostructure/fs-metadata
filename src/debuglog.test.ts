@@ -116,57 +116,44 @@ describeOrSkip("debuglog integration tests (process spawning)", () => {
   }
 
   test("uses fs-metadata when NODE_DEBUG=fs-metadata", () => {
-      const result = runChildTest("fs-metadata");
-      expect(result).toEqual({
-        isDebugEnabled: true,
-        debugLogContext: "fs-metadata",
-      });
-    },
-  );
+    const result = runChildTest("fs-metadata");
+    expect(result).toEqual({
+      isDebugEnabled: true,
+      debugLogContext: "fs-metadata",
+    });
+  });
 
-  test(
-    "uses fs-meta when NODE_DEBUG=fs-meta",
-    () => {
-      const result = runChildTest("fs-meta");
-      expect(result).toEqual({
-        isDebugEnabled: true,
-        debugLogContext: "fs-meta",
-      });
-    },
-  );
+  test("uses fs-meta when NODE_DEBUG=fs-meta", () => {
+    const result = runChildTest("fs-meta");
+    expect(result).toEqual({
+      isDebugEnabled: true,
+      debugLogContext: "fs-meta",
+    });
+  });
 
-  test(
-    "uses fs-meta when NODE_DEBUG=fs-*",
-    () => {
-      const result = runChildTest("fs-*");
-      expect(result).toEqual({
-        isDebugEnabled: true,
-        debugLogContext: "fs-metadata",
-      });
-    },
-  );
+  test("uses fs-meta when NODE_DEBUG=fs-*", () => {
+    const result = runChildTest("fs-*");
+    expect(result).toEqual({
+      isDebugEnabled: true,
+      debugLogContext: "fs-metadata",
+    });
+  });
 
-  test(
-    "falls back to photostructure:fs-metadata when no debug enabled",
-    () => {
-      const result = runChildTest("");
-      expect(result).toEqual({
-        isDebugEnabled: false,
-        debugLogContext: "photostructure:fs-metadata",
-      });
-    },
-  );
+  test("falls back to photostructure:fs-metadata when no debug enabled", () => {
+    const result = runChildTest("");
+    expect(result).toEqual({
+      isDebugEnabled: false,
+      debugLogContext: "photostructure:fs-metadata",
+    });
+  });
 
-  test(
-    "falls back to photostructure:fs-metadata when no debug enabled",
-    () => {
-      const result = runChildTest("photostructure*");
-      expect(result).toEqual({
-        isDebugEnabled: true,
-        debugLogContext: "photostructure:fs-metadata",
-      });
-    },
-  );
+  test("falls back to photostructure:fs-metadata when no debug enabled", () => {
+    const result = runChildTest("photostructure*");
+    expect(result).toEqual({
+      isDebugEnabled: true,
+      debugLogContext: "photostructure:fs-metadata",
+    });
+  });
 
   test("handles uppercase debug names", () => {
     const result = runChildTest("FS-METADATA");
@@ -213,80 +200,71 @@ describe("debug function", () => {
     mockWrite.mockRestore();
   });
 
-  test(
-    "debug writes output when enabled",
-    () => {
-      const childEnv: Record<string, string | undefined> = {
-        ...env,
-        NODE_DEBUG: "fs-metadata",
+  test("debug writes output when enabled", () => {
+    const childEnv: Record<string, string | undefined> = {
+      ...env,
+      NODE_DEBUG: "fs-metadata",
+    };
+
+    const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
+    const timeout = getTestTimeout(6000); // Base 6s timeout, adjusted for environment
+
+    // Use npx with --yes flag to avoid prompts
+    const command = "npx";
+    const args = ["--yes", "tsx", script];
+
+    // Use spawnSync for better process control
+    const result = spawnSync(command, args, {
+      env: childEnv,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true, // Hide console window on Windows
+      shell: process.platform === "win32", // Windows requires shell for npx to work
+      timeout,
+    });
+
+    // Check for errors
+    if (result.error) {
+      // spawnSync errors should not have circular references
+      const errorInfo = {
+        message: result.error.message,
+        code: (result.error as NodeJS.ErrnoException).code,
+        platform: process.platform,
+        nodeVersion: process.version,
+        script,
       };
 
-      const script = join(
-        _dirname(),
-        "test-utils",
-        "debuglog-enabled-child.ts",
+      // Log debugging info to help diagnose spawn issues
+      console.error(
+        `${process.platform === "win32" ? "Windows" : process.platform} child process spawn error:`,
+        errorInfo,
       );
-      const timeout = getTestTimeout(6000); // Base 6s timeout, adjusted for environment
 
-      // Use npx with --yes flag to avoid prompts
-      const command = "npx";
-      const args = ["--yes", "tsx", script];
+      throw new Error(`Failed to spawn child process: ${result.error.message}`);
+    }
 
-      // Use spawnSync for better process control
-      const result = spawnSync(command, args, {
-        env: childEnv,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-        windowsHide: true, // Hide console window on Windows
-        shell: process.platform === "win32", // Windows requires shell for npx to work
-        timeout,
-      });
+    if (result.status !== 0) {
+      const errorInfo = {
+        status: result.status,
+        signal: result.signal,
+        stderr: result.stderr?.toString?.() ?? "",
+        stdout: result.stdout?.toString?.() ?? "",
+        platform: process.platform,
+        nodeVersion: process.version,
+        script,
+      };
 
-      // Check for errors
-      if (result.error) {
-        // spawnSync errors should not have circular references
-        const errorInfo = {
-          message: result.error.message,
-          code: (result.error as NodeJS.ErrnoException).code,
-          platform: process.platform,
-          nodeVersion: process.version,
-          script,
-        };
-
-        // Log debugging info to help diagnose spawn issues
-        console.error(
-          `${process.platform === "win32" ? "Windows" : process.platform} child process spawn error:`,
-          errorInfo,
-        );
-
-        throw new Error(
-          `Failed to spawn child process: ${result.error.message}`,
-        );
+      // Log debugging info to help diagnose Windows issues
+      if (process.platform === "win32") {
+        console.error("Windows child process exit error:", errorInfo);
       }
 
-      if (result.status !== 0) {
-        const errorInfo = {
-          status: result.status,
-          signal: result.signal,
-          stderr: result.stderr?.toString?.() ?? "",
-          stdout: result.stdout?.toString?.() ?? "",
-          platform: process.platform,
-          nodeVersion: process.version,
-          script,
-        };
+      throw new Error(
+        `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`,
+      );
+    }
 
-        // Log debugging info to help diagnose Windows issues
-        if (process.platform === "win32") {
-          console.error("Windows child process exit error:", errorInfo);
-        }
-
-        throw new Error(
-          `Child process exited with status ${result.status}${result.stderr ? `\nstderr: ${result.stderr}` : ""}`,
-        );
-      }
-
-      // The stdout should contain "DONE"
-      expect(result.stdout.trim()).toBe("DONE");
-    },
-  );
+    // The stdout should contain "DONE"
+    expect(result.stdout.trim()).toBe("DONE");
+  });
 });

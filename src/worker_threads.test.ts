@@ -5,6 +5,8 @@ import { Worker } from "node:worker_threads";
 import { _dirname } from "./dirname";
 import { getVolumeMetadata, getVolumeMountPoints, isHidden } from "./index";
 import { isMacOS, isWindows } from "./platform";
+import { runAdaptiveBenchmark } from "./test-utils/benchmark-harness";
+import { getTestTimeout } from "./test-utils/test-timeout-config";
 import type { MountPoint } from "./types/mount_point";
 import type { VolumeMetadata } from "./types/volume_metadata";
 
@@ -217,30 +219,54 @@ describe("Worker Threads Support", () => {
       return;
     }
 
-    const workerCount = 4;
-    const workers: Promise<MountPoint[] | VolumeMetadata>[] = [];
+    const allResults: (MountPoint[] | VolumeMetadata)[] = [];
+    let totalWorkers = 0;
 
-    // Create multiple workers doing different tasks concurrently
-    for (let i = 0; i < workerCount; i++) {
-      // Mix different operations
-      if (i % 2 === 0) {
-        workers.push(
-          runInWorker<MountPoint[]>({ task: "getVolumeMountPoints" }),
-        );
-      } else {
-        workers.push(
-          runInWorker<VolumeMetadata>({
-            task: "getVolumeMetadata",
-            mountPoint: healthyMount.mountPoint,
-          }),
-        );
-      }
-    }
+    // Use adaptive benchmark for concurrent worker operations
+    const benchmarkResult = await runAdaptiveBenchmark(
+      async () => {
+        const workerCount = 4;
+        const workers: Promise<MountPoint[] | VolumeMetadata>[] = [];
 
-    // All operations should complete successfully
-    const results = await Promise.all(workers);
-    expect(results).toHaveLength(workerCount);
-    results.forEach((result) => {
+        // Create multiple workers doing different tasks concurrently
+        for (let i = 0; i < workerCount; i++) {
+          // Mix different operations
+          if (i % 2 === 0) {
+            workers.push(
+              runInWorker<MountPoint[]>({ task: "getVolumeMountPoints" }),
+            );
+          } else {
+            workers.push(
+              runInWorker<VolumeMetadata>({
+                task: "getVolumeMetadata",
+                mountPoint: healthyMount.mountPoint,
+              }),
+            );
+          }
+        }
+
+        // All operations should complete successfully
+        const iterationResults = await Promise.all(workers);
+        allResults.push(...iterationResults);
+        totalWorkers += workerCount;
+      },
+      {
+        targetDurationMs: 5_000, // Target 5 seconds of testing
+        maxTimeoutMs: 15_000, // Max 15 seconds
+        minIterations: 2, // At least 2 iterations
+        debug: !!process.env["DEBUG_BENCHMARK"],
+      },
+    );
+
+    console.log(`Concurrent worker operations test results:`);
+    console.log(
+      `  Test duration: ${(benchmarkResult.totalDurationMs / 1000).toFixed(1)}s`,
+    );
+    console.log(`  Iterations: ${benchmarkResult.iterations}`);
+    console.log(`  Total workers: ${totalWorkers}`);
+
+    expect(allResults).toHaveLength(totalWorkers);
+    allResults.forEach((result) => {
       expect(result).toBeDefined();
     });
   });
@@ -285,73 +311,100 @@ describe("Worker Threads Support", () => {
     ).rejects.toThrow("Unknown task");
   });
 
-  it("should maintain thread isolation", async () => {
-    // This test verifies that each worker has its own context
-    // and operations in one worker don't affect another
-    const mountPoints = await getVolumeMountPoints();
-    if (mountPoints.length === 0) {
-      console.log("No mount points available for testing");
-      return;
-    }
-
-    // Find a healthy mount point to test with
-    const healthyMount = mountPoints.find(
-      (mp) => mp.status === "healthy" || mp.status === undefined,
-    );
-
-    if (!healthyMount) {
-      console.log("No healthy mount points available for testing");
-      return;
-    }
-
-    // Run the same operation multiple times in parallel
-    const parallelCount = 10;
-    const promises: Promise<VolumeMetadata>[] = [];
-
-    for (let i = 0; i < parallelCount; i++) {
-      promises.push(
-        runInWorker<VolumeMetadata>({
-          task: "getVolumeMetadata",
-          mountPoint: healthyMount.mountPoint,
-          options: { timeoutMs: 5000 },
-        }),
-      );
-    }
-
-    const results = await Promise.all(promises);
-
-    // All results should have consistent static properties
-    const firstResult = results[0];
-    expect(firstResult).toBeDefined();
-    results.forEach((result) => {
-      // Static properties should be identical
-      expect(result.size).toBe(firstResult!.size);
-      expect(result.mountFrom).toBe(firstResult!.mountFrom);
-      expect(result.fstype).toBe(firstResult!.fstype);
-
-      // Dynamic properties like 'available' and 'used' can change significantly
-      // between calls as other processes create/delete files
-      expect(typeof result.available).toBe("number");
-      expect(typeof result.used).toBe("number");
-
-      // Verify they are positive numbers
-      expect(result.available).toBeGreaterThanOrEqual(0);
-      expect(result.used).toBeGreaterThanOrEqual(0);
-
-      // Verify that available + used approximately equals size
-      // Allow for some difference due to filesystem overhead and concurrent changes
-      if (
-        result.size !== undefined &&
-        result.available !== undefined &&
-        result.used !== undefined
-      ) {
-        const sum = result.available + result.used;
-        const difference = Math.abs(result.size - sum);
-        const tolerance = result.size * 0.1; // Allow 10% tolerance
-
-        // The sum should be close to the total size
-        expect(difference).toBeLessThanOrEqual(tolerance);
+  it(
+    "should maintain thread isolation",
+    async () => {
+      // This test verifies that each worker has its own context
+      // and operations in one worker don't affect another
+      const mountPoints = await getVolumeMountPoints();
+      if (mountPoints.length === 0) {
+        console.log("No mount points available for testing");
+        return;
       }
-    });
-  });
+
+      // Find a healthy mount point to test with
+      const healthyMount = mountPoints.find(
+        (mp) => mp.status === "healthy" || mp.status === undefined,
+      );
+
+      if (!healthyMount) {
+        console.log("No healthy mount points available for testing");
+        return;
+      }
+
+      // Collect all results
+      const allResults: VolumeMetadata[] = [];
+
+      // Run adaptive benchmark with parallel workers
+      const benchmarkResult = await runAdaptiveBenchmark(
+        async () => {
+          const parallelCount = 5; // Run 5 parallel workers per iteration
+          const promises: Promise<VolumeMetadata>[] = [];
+
+          for (let i = 0; i < parallelCount; i++) {
+            promises.push(
+              runInWorker<VolumeMetadata>({
+                task: "getVolumeMetadata",
+                mountPoint: healthyMount.mountPoint,
+                options: { timeoutMs: 5000 },
+              }),
+            );
+          }
+
+          const iterationResults = await Promise.all(promises);
+          allResults.push(...iterationResults);
+        },
+        {
+          targetDurationMs: 5_000, // Target 5 seconds of testing
+          maxTimeoutMs: 15_000, // Max 15 seconds
+          minIterations: 2, // At least 2 iterations (10 results minimum)
+          debug: !!process.env["DEBUG_BENCHMARK"],
+        },
+      );
+
+      console.log(`Thread isolation test results:`);
+      console.log(
+        `  Test duration: ${(benchmarkResult.totalDurationMs / 1000).toFixed(1)}s`,
+      );
+      console.log(`  Iterations: ${benchmarkResult.iterations}`);
+      console.log(`  Total worker operations: ${allResults.length}`);
+
+      const results = allResults;
+
+      // All results should have consistent static properties
+      const firstResult = results[0];
+      expect(firstResult).toBeDefined();
+      results.forEach((result) => {
+        // Static properties should be identical
+        expect(result.size).toBe(firstResult!.size);
+        expect(result.mountFrom).toBe(firstResult!.mountFrom);
+        expect(result.fstype).toBe(firstResult!.fstype);
+
+        // Dynamic properties like 'available' and 'used' can change significantly
+        // between calls as other processes create/delete files
+        expect(typeof result.available).toBe("number");
+        expect(typeof result.used).toBe("number");
+
+        // Verify they are positive numbers
+        expect(result.available).toBeGreaterThanOrEqual(0);
+        expect(result.used).toBeGreaterThanOrEqual(0);
+
+        // Verify that available + used approximately equals size
+        // Allow for some difference due to filesystem overhead and concurrent changes
+        if (
+          result.size !== undefined &&
+          result.available !== undefined &&
+          result.used !== undefined
+        ) {
+          const sum = result.available + result.used;
+          const difference = Math.abs(result.size - sum);
+          const tolerance = result.size * 0.1; // Allow 10% tolerance
+
+          // The sum should be close to the total size
+          expect(difference).toBeLessThanOrEqual(tolerance);
+        }
+      });
+    },
+    getTestTimeout(20000),
+  ); // Base 20s timeout, adjusted for environment
 });

@@ -1,5 +1,6 @@
 import { getVolumeMetadata, getVolumeMountPoints } from "./index";
 import { isWindows } from "./platform";
+import { runAdaptiveBenchmark } from "./test-utils/benchmark-harness";
 import { getTestTimeout } from "./test-utils/test-timeout-config";
 
 describe("Thread Safety Tests", () => {
@@ -19,56 +20,81 @@ describe("Thread Safety Tests", () => {
       const mountPoints = await getVolumeMountPoints();
       console.log(`Testing ${mountPoints.length} mount points concurrently`);
 
-      // Create multiple concurrent requests for each mount point
-      const concurrentRequests = 10;
-      const promises: Promise<{
+      // Store all results
+      const allResults: {
         success: boolean;
         mountPoint: string;
         attempt: number;
         status?: string | undefined;
         error?: string;
-      }>[] = [];
+      }[] = [];
 
-      // Create a high-pressure scenario with many concurrent operations
-      for (let i = 0; i < concurrentRequests; i++) {
-        for (const mountPoint of mountPoints) {
-          promises.push(
-            getVolumeMetadata(mountPoint.mountPoint)
-              .then((metadata) => ({
-                success: true,
-                mountPoint: mountPoint.mountPoint,
-                attempt: i,
-                status: metadata.status,
-              }))
-              .catch((error) => ({
-                success: false,
-                mountPoint: mountPoint.mountPoint,
-                attempt: i,
-                error: error.message,
-              })),
-          );
-        }
-      }
+      let currentAttempt = 0;
 
-      // Wait for all operations to complete
-      const results = await Promise.all(promises);
+      // Use adaptive benchmark for concurrent requests
+      const result = await runAdaptiveBenchmark(
+        async () => {
+          const promises: Promise<{
+            success: boolean;
+            mountPoint: string;
+            attempt: number;
+            status?: string | undefined;
+            error?: string;
+          }>[] = [];
+
+          // Create concurrent requests for each mount point
+          for (const mountPoint of mountPoints) {
+            promises.push(
+              getVolumeMetadata(mountPoint.mountPoint)
+                .then((metadata) => ({
+                  success: true,
+                  mountPoint: mountPoint.mountPoint,
+                  attempt: currentAttempt,
+                  status: metadata.status,
+                }))
+                .catch((error) => ({
+                  success: false,
+                  mountPoint: mountPoint.mountPoint,
+                  attempt: currentAttempt,
+                  error: error.message,
+                })),
+            );
+          }
+
+          // Wait for all operations to complete
+          const iterationResults = await Promise.all(promises);
+          allResults.push(...iterationResults);
+          currentAttempt++;
+        },
+        {
+          targetDurationMs: 5_000, // Target 5 seconds of testing
+          maxTimeoutMs: 15_000, // Max 15 seconds
+          minIterations: 5, // At least 5 iterations for consistency checking
+          maxIterations: 50, // Don't go crazy with iterations
+          debug: !!process.env["DEBUG_BENCHMARK"],
+        },
+      );
 
       // Analyze results
-      const successCount = results.filter((r) => r.success).length;
-      const failureCount = results.filter((r) => !r.success).length;
-      const totalRequests = mountPoints.length * concurrentRequests;
+      const successCount = allResults.filter((r) => r.success).length;
+      const failureCount = allResults.filter((r) => !r.success).length;
+      const totalRequests = allResults.length;
 
       console.log(`Thread safety test results:`);
+      console.log(
+        `  Test duration: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
+      );
+      console.log(`  Iterations: ${result.iterations}`);
       console.log(`  Total requests: ${totalRequests}`);
       console.log(`  Successful: ${successCount}`);
       console.log(`  Failed: ${failureCount}`);
 
       // Group results by mount point to check consistency
-      const resultsByMountPoint = new Map<string, (typeof results)[0][]>();
-      for (const result of results) {
-        const existing = resultsByMountPoint.get(result.mountPoint) || [];
-        existing.push(result);
-        resultsByMountPoint.set(result.mountPoint, existing);
+      const resultsByMountPoint = new Map<string, (typeof allResults)[0][]>();
+      for (const res of allResults) {
+        const existing = resultsByMountPoint.get(res.mountPoint) || [];
+        existing.push(res);
+        resultsByMountPoint.set(res.mountPoint, existing);
       }
 
       // Verify consistency - all requests for the same mount point should return the same status
@@ -97,40 +123,68 @@ describe("Thread Safety Tests", () => {
       return;
     }
 
-    // Test with a very short timeout to trigger the timeout path
-    const promises: Promise<{ success: boolean; iteration: number }>[] = [];
     const mountPoints = await getVolumeMountPoints();
+    if (mountPoints.length === 0) {
+      console.log("No mount points available for testing");
+      return;
+    }
 
-    // Use first mount point for testing
-    if (mountPoints.length > 0) {
-      const testMount = mountPoints[0]!;
+    const testMount = mountPoints[0]!;
+    let totalRequests = 0;
+    let totalTimeouts = 0;
+    let currentIteration = 0;
 
-      // Create rapid-fire requests with short timeouts
-      // This tests the thread cleanup path that previously used TerminateThread
-      for (let i = 0; i < 20; i++) {
-        promises.push(
-          getVolumeMetadata(testMount.mountPoint, {
-            timeoutMs: 10, // Very short timeout in ms
-          })
-            .then(() => ({ success: true, iteration: i }))
-            .catch(() => ({ success: false, iteration: i })),
-        );
+    // Use adaptive benchmark to test timeout handling
+    const result = await runAdaptiveBenchmark(
+      async () => {
+        // Create rapid-fire requests with short timeouts
+        // This tests the thread cleanup path that previously used TerminateThread
+        const batchPromises: Promise<{
+          success: boolean;
+          iteration: number;
+        }>[] = [];
+        const batchSize = 5; // Run 5 concurrent requests per iteration
+
+        for (let i = 0; i < batchSize; i++) {
+          batchPromises.push(
+            getVolumeMetadata(testMount.mountPoint, {
+              timeoutMs: 10, // Very short timeout in ms
+            })
+              .then(() => ({ success: true, iteration: currentIteration }))
+              .catch(() => ({ success: false, iteration: currentIteration })),
+          );
+          totalRequests++;
+        }
 
         // Small delay between requests to create overlapping operations
         await new Promise((resolve) => setTimeout(resolve, 5));
-      }
 
-      const results = await Promise.all(promises);
-      const timeouts = results.filter((r) => !r.success).length;
+        const batchResults = await Promise.all(batchPromises);
+        const batchTimeouts = batchResults.filter((r) => !r.success).length;
+        totalTimeouts += batchTimeouts;
+        currentIteration++;
+      },
+      {
+        targetDurationMs: 5_000, // Target 5 seconds of testing
+        maxTimeoutMs: 15_000, // Max 15 seconds
+        minIterations: 4, // At least 4 iterations (20 requests minimum)
+        debug: !!process.env["DEBUG_BENCHMARK"],
+      },
+    );
 
-      console.log(
-        `Timeout test: ${timeouts} timeouts out of ${results.length} requests`,
-      );
+    console.log(`Timeout test results:`);
+    console.log(
+      `  Test duration: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
+    );
+    console.log(`  Iterations: ${result.iterations}`);
+    console.log(`  Total requests: ${totalRequests}`);
+    console.log(
+      `  Timeouts: ${totalTimeouts} (${((totalTimeouts / totalRequests) * 100).toFixed(1)}%)`,
+    );
 
-      // The test passes if we don't crash
-      // The number of timeouts will vary based on system performance
-      expect(results.length).toBe(20);
-    }
+    // The test passes if we don't crash
+    // We should have made at least the minimum number of requests
+    expect(totalRequests).toBeGreaterThanOrEqual(20);
   });
 
   // Memory stress test to detect potential memory leaks from improper thread cleanup
@@ -151,32 +205,46 @@ describe("Thread Safety Tests", () => {
       // Get initial memory usage
       const initialMemory = process.memoryUsage();
 
-      // Run multiple iterations of concurrent operations
-      const iterations = 5;
-      const requestsPerIteration = 50;
-
-      for (let iter = 0; iter < iterations; iter++) {
-        const promises: Promise<void>[] = [];
-
-        for (let i = 0; i < requestsPerIteration; i++) {
-          const mountPoint = mountPoints[i % mountPoints.length]!;
-          promises.push(
-            getVolumeMetadata(mountPoint.mountPoint)
-              .then(() => undefined)
-              .catch(() => undefined),
-          );
-        }
-
-        await Promise.all(promises);
-
-        // Force garbage collection if available
-        if (global.gc) {
-          global.gc();
-        }
-
-        // Small delay between iterations
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      // Force garbage collection before starting
+      if (global.gc) {
+        global.gc();
       }
+
+      const requestsPerIteration = 50;
+      let totalOperations = 0;
+
+      // Run adaptive benchmark with concurrent operations
+      const result = await runAdaptiveBenchmark(
+        async () => {
+          const promises: Promise<void>[] = [];
+
+          for (let i = 0; i < requestsPerIteration; i++) {
+            const mountPoint = mountPoints[i % mountPoints.length]!;
+            promises.push(
+              getVolumeMetadata(mountPoint.mountPoint)
+                .then(() => undefined)
+                .catch(() => undefined),
+            );
+          }
+
+          await Promise.all(promises);
+          totalOperations += requestsPerIteration;
+
+          // Force garbage collection if available
+          if (global.gc) {
+            global.gc();
+          }
+
+          // Small delay between iterations
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        },
+        {
+          targetDurationMs: 10_000, // Target 10 seconds of testing
+          maxTimeoutMs: 30_000, // Max 30 seconds
+          minIterations: 3, // At least 3 iterations to detect trends
+          debug: !!process.env["DEBUG_BENCHMARK"],
+        },
+      );
 
       // Get final memory usage
       const finalMemory = process.memoryUsage();
@@ -186,6 +254,11 @@ describe("Thread Safety Tests", () => {
       const heapGrowthMB = heapGrowth / 1024 / 1024;
 
       console.log(`Memory test results:`);
+      console.log(`  Total operations: ${totalOperations}`);
+      console.log(
+        `  Test duration: ${(result.totalDurationMs / 1000).toFixed(1)}s`,
+      );
+      console.log(`  Iterations: ${result.iterations}`);
       console.log(
         `  Initial heap: ${(initialMemory.heapUsed / 1024 / 1024).toFixed(2)} MB`,
       );
@@ -193,11 +266,14 @@ describe("Thread Safety Tests", () => {
         `  Final heap: ${(finalMemory.heapUsed / 1024 / 1024).toFixed(2)} MB`,
       );
       console.log(`  Heap growth: ${heapGrowthMB.toFixed(2)} MB`);
+      console.log(
+        `  Growth per operation: ${(heapGrowth / totalOperations).toFixed(2)} bytes`,
+      );
 
       // Allow for some memory growth but fail if it's excessive
       // This would catch major leaks from improper thread cleanup
       expect(heapGrowthMB).toBeLessThan(50);
     },
-    getTestTimeout(10000),
-  ); // Base 10s timeout for memory-intensive test, adjusted for environment
+    getTestTimeout(30_000),
+  ); // Base 30s timeout for memory-intensive test, adjusted for environment
 });
