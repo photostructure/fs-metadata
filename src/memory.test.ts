@@ -15,7 +15,10 @@ import { randomLetters } from "./random";
 import { runAdaptiveBenchmarkWithCallback } from "./test-utils/benchmark-harness";
 import { validateHidden } from "./test-utils/hidden-tests";
 import { tmpDirNotHidden } from "./test-utils/platform";
-import { getTestTimeout } from "./test-utils/test-timeout-config";
+import {
+  getTestTimeout,
+  getTimingMultiplier,
+} from "./test-utils/test-timeout-config";
 import { MiB } from "./units";
 
 // THIS IS ALL A HORRIBLE HACK. THIS "test" SHOULD BE REPLACED WITH AN ACTUAL
@@ -35,10 +38,12 @@ describeMemory("Memory Tests", () => {
 
   // Helper to get memory usage after GC
   async function getMemoryUsage(): Promise<number> {
-    // Give things a bit to fall out of scope. delay(1) should be enough.
-    await delay(100);
+    // Give things a bit to fall out of scope
+    // Use dynamic delay based on environment
+    const delayMs = Math.max(10, 100 * getTimingMultiplier());
+    await delay(delayMs);
     global.gc();
-    await delay(100);
+    await delay(delayMs);
     return process.memoryUsage().heapUsed;
   }
 

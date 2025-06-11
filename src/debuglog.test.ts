@@ -8,7 +8,7 @@ import {
   getTestTimeout,
   isAlpineLinux,
   isEmulated,
-} from "./test-utils/test-timeout-config.cjs";
+} from "./test-utils/test-timeout-config";
 
 // Skip these process-spawning tests on Alpine ARM64 due to extreme emulation slowness
 const isEmulatedAlpine = isEmulated() && isAlpineLinux();
