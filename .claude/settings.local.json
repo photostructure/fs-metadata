@@ -41,7 +41,8 @@
       "Bash(gh run view:*)",
       "Bash(git checkout:*)",
       "Bash(gh workflow:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(awk:*)"
     ],
     "deny": []
   },
