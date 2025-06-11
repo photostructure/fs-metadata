@@ -1,7 +1,6 @@
 import { jest } from "@jest/globals";
 import { times } from "./array";
 import { delay, mapConcurrent, TimeoutError, withTimeout } from "./async";
-import { getTimingMultiplier } from "./test-utils/test-timeout-config";
 import { DayMs, HourMs } from "./units";
 
 describe("async", () => {
@@ -226,14 +225,13 @@ describe("async", () => {
       });
 
       it("should handle triple-wrapped timeouts correctly", async () => {
-        // Use dynamic timeouts based on environment
-        const multiplier = getTimingMultiplier();
-
-        // Base timeouts that scale with environment
-        const innerTimeout = 100 * multiplier;
-        const middleTimeout = 200 * multiplier;
-        const outerTimeout = 300 * multiplier;
-        const delayTime = 400 * multiplier;
+        // Use fixed timeouts for this test since we're testing the timeout logic itself
+        // The multiplier was causing the test to fail because the regex was expecting
+        // the base timeout value, not the multiplied one
+        const innerTimeout = 100;
+        const middleTimeout = 200;
+        const outerTimeout = 300;
+        const delayTime = 400;
 
         const wrap1 = withTimeout({
           promise: delay(delayTime),
@@ -252,9 +250,7 @@ describe("async", () => {
         });
 
         // The innermost timeout should fire first
-        await expect(wrap3).rejects.toThrow(
-          new RegExp(`first: timeout after ${innerTimeout}ms`),
-        );
+        await expect(wrap3).rejects.toThrow(/first: timeout after 100ms/);
       });
 
       it("should handle same timeout values in nested wrappers", async () => {

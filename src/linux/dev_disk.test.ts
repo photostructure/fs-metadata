@@ -59,7 +59,13 @@ describePlatform("linux")("dev_disk", () => {
   });
 
   afterAll(async () => {
-    await rm(tempDir, { recursive: true, force: true });
+    // Use Windows-compatible cleanup pattern
+    await rm(tempDir, {
+      recursive: true,
+      force: true,
+      maxRetries: process.platform === "win32" ? 3 : 1,
+      retryDelay: process.platform === "win32" ? 100 : 0,
+    });
   });
 
   it("should find UUID for existing device", async () => {

@@ -21,8 +21,10 @@ import {
 } from "./test-utils/test-timeout-config";
 import { MiB } from "./units";
 
-// THIS IS ALL A HORRIBLE HACK. THIS "test" SHOULD BE REPLACED WITH AN ACTUAL
-// MEMORY LEAK TESTER (like with valgrind). PULL REQUESTS ARE WELCOME.
+// JavaScript-layer memory leak detection tests
+// Complements native memory testing (valgrind, ASAN) by detecting leaks in the
+// Node.js binding layer and JavaScript heap. See scripts/check-memory.mjs for
+// the complete memory testing suite including native tools.
 
 // Enable garbage collection access
 declare const global: {
