@@ -23,6 +23,7 @@ const config = {
   setupFilesAfterEnv: [
     "jest-extended/all",
     "<rootDir>/src/test-utils/jest-matchers.ts",
+    "<rootDir>/src/test-utils/jest-setup.ts",
   ],
   collectCoverage: !argv.includes("--no-coverage"),
   coverageDirectory: "coverage",
