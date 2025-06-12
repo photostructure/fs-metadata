@@ -197,21 +197,14 @@ jobs:
       - run: npm ci
       - run: npm run prepare-release
 
-      - name: Test GPG setup
-        run: |
-          echo "Test GPG setup"
-          echo "test" | gpg --clearsign
-
       - name: Version and tag release
         run: |
-          # Set GPG_TTY for terminal access
-          export GPG_TTY=$(tty)
-
           # Bump version and create signed tag
           npm version ${{ github.event.inputs.version }} --message "release: %s"
 
           # Get the new version for later use
           NEW_VERSION=$(node -p "require('./package.json').version")
+          # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#environment-files
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Publish to npm
