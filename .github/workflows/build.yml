@@ -186,22 +186,12 @@ jobs:
           node-version: lts/*
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
-
-      - name: Import GPG key for signed commits
-        uses: crazy-max/ghaction-import-gpg@v6
+      - uses: ./.github/actions/setup-gpg-bot
         with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          fingerprint: ${{ secrets.GPG_FINGERPRINT }}
-          git_config_global: true
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-          git_tag_gpgsign: true
-
-      - name: Configure git
-        run: |
-          git config user.name "${{ secrets.GIT_USER_NAME }}"
-          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git-user-name: ${{ secrets.GIT_USER_NAME }}
+          git-user-email: ${{ secrets.GIT_USER_EMAIL }}
 
       - run: ls -laR ./prebuilds
       - run: npm ci
@@ -214,16 +204,8 @@ jobs:
 
       - name: Version and tag release
         run: |
-          # Fix "gpg: signing failed: Inappropriate ioctl for device"
+          # Set GPG_TTY for terminal access
           export GPG_TTY=$(tty)
-          
-          # Configure GPG for non-interactive mode
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          
-          # Restart gpg-agent to pick up config
-          gpgconf --kill gpg-agent || true
-          gpgconf --launch gpg-agent || true
 
           # Bump version and create signed tag
           npm version ${{ github.event.inputs.version }} --message "release: %s"
@@ -249,3 +231,6 @@ jobs:
             --verify-tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: ./.github/actions/cleanup-gpg-bot
+        if: always()

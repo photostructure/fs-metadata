@@ -1,0 +1,15 @@
+name: 'Cleanup GPG Bot'
+description: 'Remove imported GPG keys, wrapper script, and sensitive files after workflow.'
+runs:
+  using: 'composite'
+  steps:
+    - name: Remove imported GPG key and sensitive files
+      shell: bash
+      run: |
+        echo "Cleaning up GPG key and sensitive files..."
+        gpg --batch --yes --delete-secret-keys || true
+        gpg --batch --yes --delete-keys || true
+        rm -rf ~/.gnupg
+        rm -f ./gpg.sh
+        rm -rf tmp
+        echo "Cleanup complete."

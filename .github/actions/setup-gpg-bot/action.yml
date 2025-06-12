@@ -1,0 +1,66 @@
+name: 'Setup GPG Bot'
+description: 'Import GPG key, configure trust, and set up git for GPG signing in CI.'
+inputs:
+  gpg-private-key:
+    description: 'ASCII-armored GPG private key'
+    required: true
+  gpg-passphrase:
+    description: 'GPG key passphrase'
+    required: true
+  git-user-name:
+    description: 'Git user.name for signing'
+    required: true
+  git-user-email:
+    description: 'Git user.email for signing (must match GPG key)'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Import GPG key
+      shell: bash
+      env:
+        GPG_PRIVATE_KEY: ${{ inputs.gpg-private-key }}
+      run: |
+        set -x
+        mkdir -p ~/.gnupg
+        chmod 700 ~/.gnupg
+        echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+        gpgconf --kill gpg-agent
+        echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+    - name: Install GPG signing script
+      shell: bash
+      run: |
+        cat << 'EOF' > ./gpg.sh
+        #!/usr/bin/env bash
+        gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "$GPG_PASSPHRASE" "$@"
+        EOF
+        chmod +x ./gpg.sh
+    - name: Set GPG key trust
+      shell: bash
+      env:
+        GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+      run: |
+        KEY_ID=$(./gpg.sh --list-keys --with-colons | awk -F: '/^pub/ {print $5; exit}')
+        echo -e "5\ny\n" | ./gpg.sh --command-fd 0 --edit-key "$KEY_ID" trust
+        ./gpg.sh --list-keys --keyid-format LONG
+    - name: Configure Git for GPG signing
+      shell: bash
+      env:
+        GIT_USER_NAME: ${{ inputs.git-user-name }}
+        GIT_USER_EMAIL: ${{ inputs.git-user-email }}
+        GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+      run: |
+        KEY_ID=$(./gpg.sh --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
+        GPG_EMAIL=$(./gpg.sh --list-secret-keys --with-colons | awk -F: '/^uid/ {print $10; exit}')
+        echo "GPG key email: $GPG_EMAIL"
+        echo "Git config email: $GIT_USER_EMAIL"
+        echo "Setting git user.signingkey to $KEY_ID"
+        git config --global user.name "$GIT_USER_NAME"
+        git config --global user.email "$GIT_USER_EMAIL"
+        git config --global user.signingkey "$KEY_ID"
+        git config --global gpg.program "$(pwd)/gpg.sh"
+        git config --global commit.gpgsign true
+        git config --global tag.gpgsign true
+        npm config set sign-git-tag true
