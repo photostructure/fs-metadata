@@ -55,9 +55,16 @@ jobs:
         env:
           GIT_USER_NAME: ${{ secrets.GIT_USER_NAME }}
           GIT_USER_EMAIL: ${{ secrets.GIT_USER_EMAIL }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
+          KEY_ID=$(./gpg.sh --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
+          GPG_EMAIL=$(./gpg.sh --list-secret-keys --with-colons | awk -F: '/^uid/ {print $10; exit}')
+          echo "GPG key email: $GPG_EMAIL"
+          echo "Git config email: $GIT_USER_EMAIL"
+          echo "Setting git user.signingkey to $KEY_ID"
           git config --global user.name "$GIT_USER_NAME"
           git config --global user.email "$GIT_USER_EMAIL"
+          git config --global user.signingkey "$KEY_ID"
           git config --global gpg.program "$(pwd)/gpg.sh"
           git config --global commit.gpgsign true
           git config --global tag.gpgsign true
