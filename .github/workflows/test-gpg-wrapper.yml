@@ -20,8 +20,7 @@ jobs:
       # 1. Import your GPG key and enable loopback pinentry
       - name: Import GPG key
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }} # Base64-encoded ASCII armoured key
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }} # ASCII armoured key
         run: |
           set -x
           mkdir -p ~/.gnupg
