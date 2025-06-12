@@ -23,7 +23,7 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }} # Base64-encoded ASCII armoured key
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
           mkdir -p ~/.gnupg
           # Allow loopback pinentry in both configs
           echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
