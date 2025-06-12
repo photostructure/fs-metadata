@@ -2,11 +2,6 @@ name: Test GPG Wrapper Signing
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/test-gpg-wrapper.yml'
 
 jobs:
   publish:
