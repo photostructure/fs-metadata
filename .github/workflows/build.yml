@@ -18,7 +18,6 @@ on:
         default: "minor"
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || format('Build - {0}', github.event.head_commit.message || github.event.pull_request.title) }}
 jobs:
-
   lint:
     runs-on: ubuntu-24.04
     steps:
@@ -166,7 +165,6 @@ jobs:
           npm ci && \
           npm run tests"
 
-
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
@@ -187,13 +185,14 @@ jobs:
         with:
           node-version: lts/*
           cache: "npm"
-          registry-url: 'https://registry.npmjs.org'
-      
+          registry-url: "https://registry.npmjs.org"
+
       - name: Import GPG key for signed commits
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          fingerprint: ${{ secrets.GPG_FINGERPRINT }}
           git_config_global: true
           git_user_signingkey: true
           git_commit_gpgsign: true
@@ -210,9 +209,12 @@ jobs:
 
       - name: Version and tag release
         run: |
+          # Fix "gpg: signing failed: Inappropriate ioctl for device"
+          export GPG_TTY=$(tty)
+
           # Bump version and create signed tag
           npm version ${{ github.event.inputs.version }} --message "release: %s"
-          
+
           # Get the new version for later use
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
@@ -226,7 +228,7 @@ jobs:
         run: |
           # Push the version commit and tag
           git push origin main --follow-tags
-          
+
           # Create GitHub release
           gh release create "v$NEW_VERSION" \
             --title "Release v$NEW_VERSION" \
