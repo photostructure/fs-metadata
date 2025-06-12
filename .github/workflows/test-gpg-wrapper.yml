@@ -65,11 +65,29 @@ jobs:
           npm config set sign-git-tag true
 
       # 4. Test the setup
+      - name: Debug GPG and environment before signing
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -x
+          whoami
+          echo GPG_TTY=$GPG_TTY
+          export GPG_TTY=$(tty || true)
+          env | grep GPG
+          ls -l ~/.gnupg
+          ./gpg.sh --list-secret-keys --keyid-format LONG
+          git config --get gpg.program
+          git config --global user.email
+          echo $PATH
+          which gpg
+          ls -l ./gpg.sh
+
       - name: Test GPG wrapper signing
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -x
+          export GPG_TTY=$(tty || true)
           # Show git and gpg config for debugging
           git config --list --show-origin
           gpg --version
