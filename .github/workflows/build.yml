@@ -207,6 +207,11 @@ jobs:
       - run: npm ci
       - run: npm run prepare-release
 
+      - name: Test GPG setup
+        run: |
+          echo "Test GPG setup"
+          echo "test" | gpg --clearsign
+
       - name: Version and tag release
         run: |
           # Fix "gpg: signing failed: Inappropriate ioctl for device"
