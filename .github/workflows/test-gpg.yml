@@ -30,14 +30,22 @@ jobs:
           # Fix "gpg: signing failed: Inappropriate ioctl for device"
           export GPG_TTY=$(tty)
           
+          # Configure GPG for non-interactive mode
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          
+          # Restart gpg-agent to pick up config
+          gpgconf --kill gpg-agent || true
+          gpgconf --launch gpg-agent || true
+          
           # Create unique test directory for this run
           TEST_DIR="test-gpg-$(date +%s)-$$"
           mkdir "$TEST_DIR"
           cd "$TEST_DIR"
           
-          # Test direct GPG signing
+          # Test direct GPG signing with batch mode
           echo "Testing direct GPG signing..."
-          echo "test message $(date)" | gpg --clearsign
+          echo "test message $(date)" | gpg --batch --pinentry-mode loopback --clearsign
           
           # Test git commit signing
           echo "Testing git commit signing..."

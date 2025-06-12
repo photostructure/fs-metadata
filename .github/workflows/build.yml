@@ -216,6 +216,14 @@ jobs:
         run: |
           # Fix "gpg: signing failed: Inappropriate ioctl for device"
           export GPG_TTY=$(tty)
+          
+          # Configure GPG for non-interactive mode
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          
+          # Restart gpg-agent to pick up config
+          gpgconf --kill gpg-agent || true
+          gpgconf --launch gpg-agent || true
 
           # Bump version and create signed tag
           npm version ${{ github.event.inputs.version }} --message "release: %s"
