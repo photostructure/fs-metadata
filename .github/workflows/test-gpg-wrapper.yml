@@ -18,13 +18,12 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }} # Base64-encoded ASCII armoured key
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
           mkdir -p ~/.gnupg
-          # Allow loopback pinentry in both configs
           echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
           echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
           # Restart the agent so it picks up the new settings
           gpgconf --kill gpg-agent
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
           # Set trust for the imported key (trust level 5 = ultimate)
           KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/ {print $5; exit}')
           echo -e "5\ny\n" | gpg --command-fd 0 --edit-key "$KEY_ID" trust
