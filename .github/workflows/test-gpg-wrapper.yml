@@ -2,6 +2,11 @@ name: Test GPG Wrapper Signing
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test-gpg-wrapper.yml"
 
 jobs:
   publish:
@@ -18,16 +23,14 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }} # Base64-encoded ASCII armoured key
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
+          set -x
           mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
           echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
           echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
           # Restart the agent so it picks up the new settings
           gpgconf --kill gpg-agent
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-          # Set trust for the imported key (trust level 5 = ultimate)
-          KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/ {print $5; exit}')
-          echo -e "5\ny\n" | gpg --command-fd 0 --edit-key "$KEY_ID" trust
-          gpg --list-keys --keyid-format LONG
 
       # 2. Create a GPG wrapper script that passes the passphrase
       - name: Install GPG signing script
@@ -38,6 +41,15 @@ jobs:
               --passphrase "$GPG_PASSPHRASE" "$@"
           EOF
           chmod +x ./gpg.sh
+
+      # 2b. Set trust for the imported key (trust level 5 = ultimate)
+      - name: Set GPG key trust
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          KEY_ID=$(./gpg.sh --list-keys --with-colons | awk -F: '/^pub/ {print $5; exit}')
+          echo -e "5\ny\n" | ./gpg.sh --command-fd 0 --edit-key "$KEY_ID" trust
+          ./gpg.sh --list-keys --keyid-format LONG
 
       # 3. Configure Git for GPG signing
       - name: Configure Git for GPG signing
