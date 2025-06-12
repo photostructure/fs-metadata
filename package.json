@@ -57,8 +57,7 @@
     "fmt:ts": "prettier --write \"**/*.(c|m)?ts\"",
     "// precommit": "should be manually run by developers before they run `git commit`",
     "precommit": "tsx scripts/precommit.ts",
-    "prepare-release": "npm run build:dist",
-    "release": "release-it"
+    "prepare-release": "npm run build:dist"
   },
   "gypfile": true,
   "publishConfig": {
@@ -110,7 +109,6 @@
     "prebuildify": "^6.0.1",
     "prettier": "^3.5.3",
     "prettier-plugin-organize-imports": "4.1.0",
-    "release-it": "^19.0.3",
     "snyk": "^1.1297.1",
     "terser": "^5.42.0",
     "ts-jest": "^29.3.4",

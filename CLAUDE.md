@@ -77,6 +77,34 @@ This is @photostructure/fs-metadata - a cross-platform native Node.js module for
 - Debug messages from both JavaScript and native code are sent to `stderr`
 - Uses native Node.js debuglog for determining if logging is enabled
 
+## Release Process
+
+The project uses a vanilla npm/git release workflow with GPG signed commits for security:
+
+### Prerequisites
+- Repository secrets must be configured:
+  - `NPM_TOKEN`: Authentication token for npm publishing
+  - `GPG_PRIVATE_KEY`: ASCII-armored GPG private key for signing commits
+  - `GPG_PASSPHRASE`: Passphrase for the GPG key (if applicable)
+
+### Automated Release
+1. Trigger via GitHub Actions workflow dispatch with version type (patch/minor/major)
+2. Builds all prebuilds for supported platforms
+3. Runs comprehensive test suite across platforms
+4. Uses `npm version` to bump version and create signed git tags
+5. Publishes to npm registry
+6. Creates GitHub release with auto-generated notes
+7. All commits and tags are GPG signed for verification
+
+### Manual Release (if needed)
+```bash
+npm run prepare-release
+git config commit.gpgsign true
+npm version patch|minor|major
+npm publish
+git push origin main --follow-tags
+```
+
 ## Example Usage
 
 ```typescript
