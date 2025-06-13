@@ -1,0 +1,46 @@
+name: Test Simple Push
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test-simple-push.yml"
+
+jobs:
+  test-simple-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Make test change
+        run: |
+          echo "Test push at $(date)" > test-simple-push.txt
+          git add test-simple-push.txt
+          git commit -m "test: simple push without GPG signing - $(date)"
+
+      - name: Push to repository
+        run: |
+          git push origin main
+
+      - name: Verify push succeeded
+        run: |
+          echo "Push completed successfully!"
+          git log --oneline -n 5
+
+      - name: Clean up test file
+        if: always()
+        run: |
+          git rm test-simple-push.txt || true
+          git commit -m "test: cleanup test file" || true
+          git push origin main || true
