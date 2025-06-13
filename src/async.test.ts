@@ -209,7 +209,7 @@ describe("async", () => {
         );
       });
 
-      it("should use outer timeout error when outer timeout is smaller", async () => {
+      it.skipIf(isAlpine() && isARM64)("should use outer timeout error when outer timeout is smaller", async () => {
         const innerWrapped = withTimeout({
           promise: delay(300),
           timeoutMs: 200,

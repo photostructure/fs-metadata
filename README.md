@@ -1,4 +1,4 @@
-# @photostructure/fs-metadata
+![PhotoStructure fs-metadata logo](https://raw.githubusercontent.com/photostructure/fs-metadata/main/doc/logo.svg)
 
 A cross-platform native Node.js module for retrieving filesystem metadata, including mount points, volume information, and space utilization statistics.
 
