@@ -1,0 +1,118 @@
+name: Test GPG Actions
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test-gpg-actions.yml"
+      - ".github/actions/setup-gpg-bot/**"
+      - ".github/actions/cleanup-gpg-bot/**"
+
+jobs:
+  test-gpg-signing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: ./.github/actions/setup-gpg-bot
+        with:
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git-user-name: ${{ secrets.GIT_USER_NAME }}
+          git-user-email: ${{ secrets.GIT_USER_EMAIL }}
+
+      - name: Test GPG setup
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -x
+          echo "=== Testing GPG wrapper functionality ==="
+          
+          # Check if GPG_WRAPPER_PATH is set
+          if [ -z "$GPG_WRAPPER_PATH" ]; then
+            echo "ERROR: GPG_WRAPPER_PATH not set"
+            exit 1
+          fi
+          
+          echo "GPG wrapper path: $GPG_WRAPPER_PATH"
+          ls -l "$GPG_WRAPPER_PATH"
+          
+          # Test direct GPG signing
+          echo "test" | "$GPG_WRAPPER_PATH" --clearsign
+          
+          # Verify git configuration
+          echo -e "\n=== Git configuration ==="
+          git config --get user.name
+          git config --get user.email
+          git config --get user.signingkey
+          git config --get gpg.program
+          git config --get commit.gpgsign
+          git config --get tag.gpgsign
+          
+          # Test git commit signing
+          echo -e "\n=== Testing git commit signing ==="
+          echo "Test file - $(date)" > test-gpg-actions.txt
+          git add test-gpg-actions.txt
+          git commit -m "test: validate GPG actions - $(date)"
+          
+          # Verify the commit was signed
+          echo -e "\n=== Verifying commit signature ==="
+          git log --show-signature -1
+          
+          # Test tag signing
+          echo -e "\n=== Testing git tag signing ==="
+          TEST_TAG="v0.0.1-test-$(date +%s)"
+          git tag -s "$TEST_TAG" -m "test tag using GPG actions"
+          git tag -v "$TEST_TAG"
+          
+          # Test npm version (like in build.yml)
+          echo -e "\n=== Testing npm version with GPG signing ==="
+          
+          # Create a test package.json
+          mkdir -p test-npm-version
+          cat > test-npm-version/package.json << EOF
+          {
+            "name": "test-gpg-actions",
+            "version": "1.0.0"
+          }
+          EOF
+          
+          # Change to test directory and run npm version
+          cd test-npm-version
+          npm version patch --message "test: npm version with GPG actions %s"
+          
+          # Verify the version commit was signed
+          echo -e "\n=== Verifying npm version commit signature ==="
+          git log --show-signature -1
+          
+          # List all tags created during test
+          echo -e "\n=== All test tags ==="
+          git tag --list | grep test || true
+          
+          echo -e "\n=== All tests passed! ✓ ==="
+
+      - uses: ./.github/actions/cleanup-gpg-bot
+        if: always()
+
+      - name: Verify cleanup
+        if: always()
+        run: |
+          echo "=== Verifying GPG cleanup ==="
+          # Should not find any secret keys
+          if gpg --list-secret-keys 2>/dev/null | grep -q "sec"; then
+            echo "WARNING: Secret keys still present after cleanup"
+          else
+            echo "✓ No secret keys found - cleanup successful"
+          fi
+          
+          # Check if wrapper script was removed
+          if [ -n "$GPG_WRAPPER_PATH" ] && [ -f "$GPG_WRAPPER_PATH" ]; then
+            echo "WARNING: GPG wrapper script still exists at $GPG_WRAPPER_PATH"
+          else
+            echo "✓ GPG wrapper script removed"
+          fi
