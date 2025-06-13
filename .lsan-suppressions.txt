@@ -44,6 +44,11 @@ leak:g_thread_pool_new
 leak:uv_
 leak:uv__work_submit
 
+# Third-party Node.js module leaks
+# @unrs/resolver (jest-resolve dependency) - https://github.com/unrs/unrs-resolver
+leak:resolver.linux-x64-gnu.node
+leak:napi_register_module_v1
+
 # Python interpreter leaks - false positives from build process
 leak:PyMem_RawMalloc
 leak:PyObject_Malloc
