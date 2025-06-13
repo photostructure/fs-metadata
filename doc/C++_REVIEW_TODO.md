@@ -5,6 +5,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ## Common Patterns to Review
 
 ### Memory Management
+
 - [x] All `malloc`/`free` pairs are properly matched - No malloc/free used, using RAII throughout
 - [x] RAII patterns are used consistently for resource management - Excellent RAII usage across codebase
 - [x] No raw pointers that could leak on exceptions - All resources properly wrapped
@@ -12,18 +13,21 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - [x] All API-allocated resources are properly freed - RAII ensures cleanup
 
 ### Platform API Usage
+
 - [x] Verify API availability for target OS versions - APIs match stated OS requirements
 - [x] Check for deprecated API usage - No deprecated N-API functions found
 - [x] Ensure error handling follows platform conventions - Platform-specific error handling implemented
 - [x] Validate string encoding conversions - UTF-8/wide conversions properly sized
 
 ### Security and Input Validation
+
 - [x] Comprehensive path validation to prevent directory traversal - Added ".." checks to Windows/Darwin hidden.cpp
 - [ ] Input validation for empty/null mount points across all platforms
 - [x] Buffer size constants defined for platform-specific limits - Fixed Windows buffer sizes
 - [ ] Null byte and special character handling in paths
 
 ### Thread Safety
+
 - [x] Replace volatile with std::atomic for thread synchronization - Fixed in drive_status.h
 - [x] Review N-API threadsafe function patterns - All async workers use proper patterns
 - [ ] Document thread safety requirements
@@ -32,6 +36,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ## File-by-File Review Checklist
 
 ### 1. `src/binding.cpp` ✅
+
 - [x] Review NAPI memory management patterns - No issues found
 - [x] Check for proper cleanup in async worker lifecycles - Properly managed
 - [x] Verify promise deferred resolution/rejection paths - Correct implementation
@@ -42,6 +47,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ### 2. Darwin/macOS Files
 
 #### `src/darwin/volume_metadata.cpp` ✅
+
 - [x] Verify CFRelease for all CoreFoundation objects - Using CFReleaser RAII wrapper
   - DADisk objects properly managed with CFReleaser
   - Disk descriptions properly managed with CFReleaser
@@ -50,13 +56,14 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - [x] Review CFStringToString conversion for memory leaks - No leaks, proper string handling
 - [x] Validate statvfs/statfs error handling - Comprehensive error checking
 - [x] Check overflow protection in size calculations - Excellent overflow protection (lines 91-104)
-- **Platform APIs verified**: 
+- **Platform APIs verified**:
   - DiskArbitration framework APIs (macOS 14+) - Proper RAII usage
   - IOKit framework APIs - Not directly used
   - CoreFoundation string handling - CFReleaser ensures proper cleanup
 - **Notes**: Exemplary code with proper RAII, overflow protection, and error handling
 
 #### `src/darwin/volume_mount_points.cpp` ✅
+
 - [x] Review getmntinfo usage and buffer management - Using getmntinfo_r_np with MountBufferRAII
 - [x] Verify CFURLRef lifecycle management - No CFURLRef used in this file
 - [x] Check DADiskCreateFromBSDName cleanup - Not used in this file
@@ -66,6 +73,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - **Notes**: Good use of RAII, async/future for timeout handling, and faccessat for security
 
 #### `src/darwin/hidden.cpp` ✅
+
 - [x] Review NSURL object lifecycle - No NSURL/CFURLRef used, using stat/chflags
 - [x] Check CFURLRef release patterns - Not applicable
 - [x] Verify resource value key handling - Using UF_HIDDEN flag directly
@@ -77,6 +85,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ### 3. Windows Files
 
 #### `src/windows/volume_metadata.cpp` ✅
+
 - [x] Review WNetConnection RAII wrapper completeness - **FIXED**: Now handles ERROR_MORE_DATA
   - Dynamic buffer resize implemented when ERROR_MORE_DATA is returned
 - [x] Check GetVolumeInformation error handling - **FIXED**: Now uses MAX_PATH+1
@@ -89,6 +98,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - **Notes**: All buffer issues resolved, proper RAII patterns throughout
 
 #### `src/windows/volume_mount_points.cpp` ✅
+
 - [x] Review GetLogicalDrives usage - Proper usage with unique_ptr buffer
 - [x] Check QueryDosDevice buffer allocation - Not used in this file
 - [x] Verify GetVolumePathNamesForVolumeName memory management - Not used in this file
@@ -99,6 +109,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - **Notes**: Good implementation with proper buffer management
 
 #### `src/windows/hidden.cpp` ✅
+
 - [x] Review GetFileAttributes error handling - FileAttributeHandler RAII properly throws on error
 - [x] Check SetFileAttributes validation - Proper error checking with exceptions
 - [x] Verify wide string conversions - PathConverter properly handles UTF-8 to wide
@@ -111,6 +122,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ### 4. Linux Files (Completed)
 
 #### `src/linux/volume_metadata.cpp` ✅
+
 - [x] Review BlkidCache RAII wrapper - Already excellent
 - [x] Check blkid_get_tag_value free() calls - Correctly using free()
 - [x] Verify GIO integration memory management - Proper smart pointers
@@ -122,6 +134,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
   - statvfs behavior
 
 #### `src/linux/blkid_cache.cpp` ✅
+
 - [x] Verify blkid_cache lifecycle - Already has proper RAII
 - [x] Check error handling for cache operations - Good error handling
 - [x] **Improved**: Double-check pattern in destructor for thread safety
@@ -130,6 +143,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
   - libblkid cache APIs - Proper use of blkid_get_cache/blkid_put_cache
 
 #### `src/linux/gio_utils.cpp` (if GIO enabled) ✅
+
 - [x] Review g_object_unref patterns - Already using GioResource RAII
 - [x] Check GError cleanup - Not used in this file (GError-free patterns)
 - [x] Verify GMount/GVolume reference counting - Proper ref/unref pairs
@@ -141,6 +155,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
   - GVfs mount integration
 
 #### `src/linux/gio_mount_points.cpp` (if GIO enabled) ✅
+
 - [x] Review g_volume_monitor lifecycle - Correct usage (singleton pattern)
 - [x] Check GList cleanup patterns - Using g_list_free_full correctly
 - [x] Verify string ownership - Proper GCharPtr smart pointers
@@ -150,6 +165,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
   - Mount enumeration
 
 #### `src/linux/gio_volume_metadata.cpp` (if GIO enabled) ✅
+
 - [x] Review g_drive object management - Using GObjectPtr smart pointers
 - [x] Check g_icon handling - No GIcon usage in this file
 - [x] Verify string ownership - Proper GCharPtr usage
@@ -162,6 +178,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ## Testing Strategy
 
 ### Memory Leak Detection ✅
+
 1. [x] Run valgrind, LeakSanitizer, and AddressSanitizer on Linux builds
    - **Implemented**: Comprehensive memory testing infrastructure
    - Valgrind: `npm run test:valgrind` with suppressions in `.valgrind.supp`
@@ -175,6 +192,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
    - Comprehensive suite: `npm run tests:memory`
 
 ### API Verification
+
 1. [ ] Use Perplexity/WebSearch to verify:
    - Minimum OS version requirements for each API
    - Deprecated API alternatives
@@ -186,6 +204,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
    - Linux man pages and library docs
 
 ### Resource Management
+
 1. [ ] Add stress tests for mount/unmount cycles
 2. [ ] Test with network filesystem timeouts
 3. [ ] Verify cleanup on exception paths
@@ -211,6 +230,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 7. ~~**Medium**: Buffer overflow protection in size calculations~~ ✅ Completed - Darwin has exemplary protection
 
 ### Completed Items
+
 - ✅ Linux memory management review (all files)
 - ✅ Darwin/macOS memory management review (all files)
 - ✅ Windows memory management review (all files including drive_status.h)
@@ -228,13 +248,16 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ## Recent Improvements (Completed)
 
 ### Code Quality
+
 1. **const-correctness**: Added `const` qualifiers to all appropriate local variables across the codebase
+
    - All Napi::Env instances
-   - All GCharPtr, GObjectPtr, GFileInfoPtr instances  
+   - All GCharPtr, GObjectPtr, GFileInfoPtr instances
    - All std::lock_guard instances
    - Improves code safety and enables compiler optimizations
 
 2. **Static Analysis**: Integrated clang-tidy
+
    - Added to CI/CD pipeline
    - Uses bear to generate compile_commands.json
    - Runs only on platform-relevant files
@@ -257,35 +280,22 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ## Platform API Resources
 
 ### macOS/Darwin
+
 - Core Foundation Memory Management: Functions with "Create" or "Copy" require CFRelease
 - DiskArbitration: Follows standard Core Foundation ownership rules
 - Key Documentation: Apple Developer Documentation for DiskArbitration framework
 - **Review Status**: ✅ All files use proper RAII with CFReleaser template
 
 ### Windows
+
 - WNetGetConnection: Start with 256 chars, handle ERROR_MORE_DATA
 - GetVolumeInformation: Fixed buffers of MAX_PATH+1
 - Key Documentation: Microsoft Learn Win32 API Reference
 - **Review Status**: ⚠️ Buffer handling needs fixes, thread safety critical issue
 
 ### Linux
+
 - libblkid: Use free() for blkid_get_tag_value results, blkid_put_cache() for cache
 - GLib/GIO: Use g_object_unref() or g_clear_object(), match allocation functions
 - Key Documentation: libblkid man pages, GNOME Developer Documentation
 - **Review Status**: ✅ All files properly reviewed and use smart pointers
-
-## Critical Windows Thread Safety Issue ✅ FIXED
-
-File: `src/windows/drive_status.h`
-```cpp
-// Fixed code:
-std::atomic<bool> shouldTerminate{false};  // Using atomic with proper memory ordering
-std::atomic<DriveStatus> result{DriveStatus::Unknown};  // Thread-safe result storage
-// Removed TerminateThread - now uses graceful shutdown with 1000ms timeout
-```
-
-This critical issue has been resolved:
-- ✅ Race conditions eliminated with std::atomic
-- ✅ Removed dangerous TerminateThread call
-- ✅ Proper memory ordering with acquire/release semantics
-- ✅ Graceful thread shutdown with increased timeout
