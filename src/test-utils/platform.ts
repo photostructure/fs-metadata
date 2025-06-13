@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { env, platform } from "node:process";
 import { normalizePath } from "../path";
-import { isMacOS, isWindows } from "../platform";
+import { isAlpine, isARM64, isMacOS, isWindows } from "../platform";
 import { toNotBlank } from "../string";
 
 /**
@@ -45,3 +45,14 @@ export function tmpDirNotHidden() {
   mkdirSync(dir, { recursive: true });
   return dir;
 }
+
+/**
+ * Skip timing-sensitive tests on Alpine ARM64 due to emulation timing issues
+ */
+export const itSkipAlpineARM64 = isAlpine() && isARM64 ? it.skip : it;
+
+/**
+ * Skip timing-sensitive describe blocks on Alpine ARM64 due to emulation timing issues
+ */
+export const describeSkipAlpineARM64 =
+  isAlpine() && isARM64 ? describe.skip : describe;

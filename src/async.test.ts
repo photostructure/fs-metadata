@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 import { times } from "./array";
 import { delay, mapConcurrent, TimeoutError, withTimeout } from "./async";
-import { isAlpine, isARM64 } from "./platform";
+import { itSkipAlpineARM64 } from "./test-utils/platform";
 import { DayMs, HourMs } from "./units";
 
 describe("async", () => {
@@ -158,37 +158,39 @@ describe("async", () => {
         clearTimeoutSpy.mockRestore();
       });
 
-      // Skip timing-sensitive test on Alpine ARM64 due to emulation timing issues
-      (isAlpine() && isARM64 ? it.skip : it)("should maintain proper timing with multiple concurrent timeouts", async () => {
-        const promises = [
-          delay(50, "first"),
-          delay(150, "second"),
-          delay(250, "third"),
-        ];
+      itSkipAlpineARM64(
+        "should maintain proper timing with multiple concurrent timeouts",
+        async () => {
+          const promises = [
+            delay(50, "first"),
+            delay(150, "second"),
+            delay(250, "third"),
+          ];
 
-        const results = await Promise.allSettled(
-          promises.map((p) => withTimeout({ promise: p, timeoutMs: 100 })),
-        );
+          const results = await Promise.allSettled(
+            promises.map((p) => withTimeout({ promise: p, timeoutMs: 100 })),
+          );
 
-        expect(results[0]).toEqual(
-          expect.objectContaining({
-            status: "fulfilled",
-            value: "first",
-          }),
-        );
-        expect(results[1]).toEqual(
-          expect.objectContaining({
-            status: "rejected",
-            reason: expect.any(TimeoutError),
-          }),
-        );
-        expect(results[2]).toEqual(
-          expect.objectContaining({
-            status: "rejected",
-            reason: expect.any(TimeoutError),
-          }),
-        );
-      });
+          expect(results[0]).toEqual(
+            expect.objectContaining({
+              status: "fulfilled",
+              value: "first",
+            }),
+          );
+          expect(results[1]).toEqual(
+            expect.objectContaining({
+              status: "rejected",
+              reason: expect.any(TimeoutError),
+            }),
+          );
+          expect(results[2]).toEqual(
+            expect.objectContaining({
+              status: "rejected",
+              reason: expect.any(TimeoutError),
+            }),
+          );
+        },
+      );
     });
 
     describe("Nested timeouts", () => {
@@ -209,22 +211,25 @@ describe("async", () => {
         );
       });
 
-      it.skipIf(isAlpine() && isARM64)("should use outer timeout error when outer timeout is smaller", async () => {
-        const innerWrapped = withTimeout({
-          promise: delay(300),
-          timeoutMs: 200,
-          desc: "inner",
-        });
-        const outerWrapped = withTimeout({
-          promise: innerWrapped,
-          timeoutMs: 100,
-          desc: "outer",
-        });
+      itSkipAlpineARM64(
+        "should use outer timeout error when outer timeout is smaller",
+        async () => {
+          const innerWrapped = withTimeout({
+            promise: delay(300),
+            timeoutMs: 200,
+            desc: "inner",
+          });
+          const outerWrapped = withTimeout({
+            promise: innerWrapped,
+            timeoutMs: 100,
+            desc: "outer",
+          });
 
-        await expect(outerWrapped).rejects.toThrow(
-          /outer: timeout after 100ms/,
-        );
-      });
+          await expect(outerWrapped).rejects.toThrow(
+            /outer: timeout after 100ms/,
+          );
+        },
+      );
 
       it("should handle triple-wrapped timeouts correctly", async () => {
         // Use fixed timeouts for this test since we're testing the timeout logic itself

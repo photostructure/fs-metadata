@@ -4,8 +4,9 @@ import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 import { _dirname } from "./dirname";
 import { getVolumeMetadata, getVolumeMountPoints, isHidden } from "./index";
-import { isAlpine, isARM64, isMacOS, isWindows } from "./platform";
+import { isMacOS, isWindows } from "./platform";
 import { runAdaptiveBenchmark } from "./test-utils/benchmark-harness";
+import { describeSkipAlpineARM64 } from "./test-utils/platform";
 import { getTestTimeout } from "./test-utils/test-timeout-config";
 import type { MountPoint } from "./types/mount_point";
 import type { VolumeMetadata } from "./types/volume_metadata";
@@ -32,11 +33,7 @@ const workerHelperPath = join(
   "worker-thread-helper.cjs",
 );
 
-// Skip process-intensive tests on Alpine ARM64 due to emulation slowness
-const isEmulatedAlpine = isAlpine() && isARM64;
-const describeOrSkip = isEmulatedAlpine ? describe.skip : describe;
-
-describeOrSkip("Worker Threads Support", () => {
+describeSkipAlpineARM64("Worker Threads Support", () => {
   let testDir: string;
   let testFile: string;
 
