@@ -7,9 +7,17 @@ runs:
       shell: bash
       run: |
         echo "Cleaning up GPG key and sensitive files..."
+        # Remove all GPG keys
         gpg --batch --yes --delete-secret-keys || true
         gpg --batch --yes --delete-keys || true
+        # Remove GPG configuration
         rm -rf ~/.gnupg
+        # Remove the GPG wrapper script if it exists
+        if [ -n "$GPG_WRAPPER_PATH" ] && [ -f "$GPG_WRAPPER_PATH" ]; then
+          echo "Removing GPG wrapper script at $GPG_WRAPPER_PATH"
+          rm -f "$GPG_WRAPPER_PATH"
+        fi
+        # Remove any legacy wrapper scripts
         rm -f ./gpg.sh
         rm -rf tmp
         echo "Cleanup complete."

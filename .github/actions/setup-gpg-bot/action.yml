@@ -66,7 +66,9 @@ runs:
           exit 1
         fi
         
-        GPG_EMAIL=$("$GPG_WRAPPER_PATH" --list-secret-keys --with-colons | awk -F: '/^uid/ {print $10; exit}')
+        # Extract email from the UID field - format is "Name <email>"
+        GPG_UID=$("$GPG_WRAPPER_PATH" --list-secret-keys --with-colons | awk -F: '/^uid/ {print $10; exit}')
+        GPG_EMAIL=$(echo "$GPG_UID" | sed -n 's/.*<\(.*\)>/\1/p')
         if [ -z "$GPG_EMAIL" ]; then
           echo "ERROR: Could not extract email from GPG key"
           exit 1
