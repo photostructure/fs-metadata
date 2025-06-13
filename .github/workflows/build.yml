@@ -8,14 +8,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "fs-metadata release: bump version"
+        description: "fs-metadata release: bump version (current = use package.json)"
         required: false
         type: choice
+        default: "current"
         options:
+          - current
           - patch
           - minor
           - major
-        default: "minor"
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || format('Build - {0}', github.event.head_commit.message || github.event.pull_request.title) }}
 jobs:
   lint:
@@ -177,32 +178,41 @@ jobs:
         with:
           # Fetch full history for proper git operations
           fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: ./prebuilds
           merge-multiple: true
+
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
-      - uses: ./.github/actions/setup-gpg-bot
+
+      - uses: ./.github/actions/setup-ssh-bot
         with:
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          ssh-signing-key: ${{ secrets.SSH_SIGNING_KEY }}
           git-user-name: ${{ secrets.GIT_USER_NAME }}
           git-user-email: ${{ secrets.GIT_USER_EMAIL }}
 
       - run: ls -laR ./prebuilds
+
       - run: npm ci
+
       - run: npm run prepare-release
 
       - name: Version and tag release
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          # Bump version and create signed tag
-          npm version ${{ github.event.inputs.version }} --message "release: %s"
+          # Handle version bump based on input
+          if [ "${{ github.event.inputs.version }}" = "current" ]; then
+            # Use the version from package.json, stripping any pre-release suffix
+            RELEASE_VERSION=$(node -p "require('./package.json').version.replace(/-.*$/, '')")
+            npm version $RELEASE_VERSION --message "release: %s"
+          else
+            # Normal version bump (patch, minor, major)
+            npm version ${{ github.event.inputs.version }} --message "release: %s"
+          fi
 
           # Get the new version for later use
           NEW_VERSION=$(node -p "require('./package.json').version")
@@ -227,5 +237,5 @@ jobs:
             --generate-notes \
             --verify-tag
 
-      - uses: ./.github/actions/cleanup-gpg-bot
+      - uses: ./.github/actions/cleanup-ssh-bot
         if: always()
