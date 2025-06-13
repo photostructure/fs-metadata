@@ -2,6 +2,8 @@
 
 This document explains how to set up GPG signing for the GitHub Actions release workflow using modern Ed25519 signing-only keys.
 
+**Note**: For a simpler alternative, see [SSH_RELEASE_HOWTO.md](./SSH_RELEASE_HOWTO.md) for SSH-based commit signing.
+
 ## 0. Create Bot Account (Recommended)
 
 For professional projects, create a dedicated bot account rather than using your personal account:
@@ -134,11 +136,45 @@ This ensures that commits signed by the bot show as "Verified" and are attribute
 After setup, test the workflow:
 
 1. Go to Actions tab in GitHub
-2. Run "Build & Release" workflow manually
-3. Choose a version bump type (patch recommended for testing)
-4. Verify the release is created with verified commits
+2. Run the test workflow first: `gh workflow run test-gpg-actions.yml`
+3. Once test passes, run "Build & Release" workflow manually
+4. Choose a version bump type (patch recommended for testing)
+5. Verify the release is created with verified commits
 
-## 8. Cleanup
+## 8. Pre-Release Checklist
+
+Before triggering a release, verify:
+
+- [ ] **All required secrets are configured** in repository settings:
+  - [ ] `GPG_PRIVATE_KEY` - ASCII-armored GPG private key
+  - [ ] `GPG_PASSPHRASE` - Passphrase for the GPG key
+  - [ ] `GIT_USER_NAME` - Bot's display name (e.g., `fs-metadata-bot`)
+  - [ ] `GIT_USER_EMAIL` - Bot's email (must match GPG key email exactly!)
+  - [ ] `NPM_TOKEN` - Valid npm authentication token with publish permissions
+- [ ] **GPG key email exactly matches `GIT_USER_EMAIL`** - This is critical!
+- [ ] **Bot account has write access** to the repository
+- [ ] **GPG public key is added** to the bot's GitHub account (not your personal account)
+- [ ] **Test workflow passes**: Run `gh workflow run test-gpg-actions.yml` first
+- [ ] **No uncommitted changes** in your local repository
+- [ ] **You're on the main branch** with latest changes pulled
+
+### Quick Validation Commands
+
+```bash
+# Test GPG signing locally (optional)
+echo "test" | gpg --clearsign
+
+# Verify npm token (run locally)
+npm whoami
+
+# Test the GPG actions
+gh workflow run test-gpg-actions.yml
+
+# Do a dry-run of npm publish (optional)
+npm publish --dry-run
+```
+
+## 9. Cleanup
 
 After exporting, securely delete the local key files:
 
@@ -237,6 +273,15 @@ jobs:
 - `npm version` commands
 - Direct `git commit -S` or `git tag -s` commands
 - Any tool that internally uses git signing
+
+**Security Note**: The passphrase is NOT automatically exported to all steps. Each step that needs to sign must explicitly pull `GPG_PASSPHRASE` from secrets:
+
+```yaml
+    env:
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+```
+
+ This follows the principle of least privilege - only steps that actually perform signing operations have access to the passphrase.
 
 Example:
 ```yaml
