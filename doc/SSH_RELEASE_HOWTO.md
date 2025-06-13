@@ -110,7 +110,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - uses: ./.github/actions/setup-ssh-bot
         with:
@@ -196,7 +195,6 @@ mv ~/.ssh/photostructure-bot-signing* ~/secure-backup/
 
 ### Permission denied on push
 - Ensure bot account has write access to the repository
-- Check that `persist-credentials: false` is set in checkout action
 
 ## References
 

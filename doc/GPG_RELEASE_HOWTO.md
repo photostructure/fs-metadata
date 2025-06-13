@@ -240,7 +240,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Important for version bumps
-          persist-credentials: true
 
       # 2. Setup GPG signing
       - uses: ./.github/actions/setup-gpg-bot
