@@ -21,7 +21,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/photostructure/fs-metadata.git"
+    "url": "https://github.com/photostructure/fs-metadata.git"
   },
   "license": "MIT",
   "scripts": {
