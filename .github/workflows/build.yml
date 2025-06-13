@@ -198,6 +198,8 @@ jobs:
       - run: npm run prepare-release
 
       - name: Version and tag release
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           # Bump version and create signed tag
           npm version ${{ github.event.inputs.version }} --message "release: %s"
@@ -208,11 +210,13 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Publish to npm
-        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish
 
       - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Push the version commit and tag
           git push origin main --follow-tags
@@ -222,8 +226,6 @@ jobs:
             --title "Release v$NEW_VERSION" \
             --generate-notes \
             --verify-tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: ./.github/actions/cleanup-gpg-bot
         if: always()
