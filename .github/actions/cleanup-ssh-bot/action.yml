@@ -1,0 +1,35 @@
+name: 'Cleanup SSH Bot'
+description: 'Remove SSH signing key and configuration after workflow completion.'
+runs:
+  using: 'composite'
+  steps:
+    - name: Remove SSH signing key and configuration
+      shell: bash
+      run: |
+        set -x
+        echo "=== Cleaning up SSH signing configuration ==="
+        
+        # Remove SSH keys
+        if [ -n "$SSH_SIGNING_KEY_PATH" ] && [ -f "$SSH_SIGNING_KEY_PATH" ]; then
+          echo "Removing SSH signing key at $SSH_SIGNING_KEY_PATH"
+          rm -f "$SSH_SIGNING_KEY_PATH"
+          rm -f "${SSH_SIGNING_KEY_PATH}.pub"
+        else
+          # Fallback if env var not set
+          rm -f ~/.ssh/signing_key ~/.ssh/signing_key.pub
+        fi
+        
+        # Remove allowed signers file
+        rm -f ~/.ssh/allowed_signers
+        
+        # Clear git signing configuration
+        git config --global --unset user.signingkey || true
+        git config --global --unset gpg.format || true
+        git config --global --unset gpg.ssh.allowedSignersFile || true
+        git config --global --unset commit.gpgsign || true
+        git config --global --unset tag.gpgsign || true
+        
+        # Clear npm signing configuration
+        npm config delete sign-git-tag || true
+        
+        echo "✓ SSH signing configuration cleaned up"
