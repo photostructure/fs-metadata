@@ -31,20 +31,28 @@ runs:
     - name: Install GPG signing script
       shell: bash
       run: |
-        cat << 'EOF' > ./gpg.sh
+        # Use /tmp for the wrapper script - it's guaranteed to exist and be writable
+        GPG_WRAPPER_PATH="/tmp/gpg-wrapper-$$-$RANDOM.sh"
+        echo "GPG_WRAPPER_PATH=$GPG_WRAPPER_PATH" >> $GITHUB_ENV
+        cat << 'EOF' > "$GPG_WRAPPER_PATH"
         #!/usr/bin/env bash
         gpg --batch --yes --pinentry-mode loopback \
             --passphrase "$GPG_PASSPHRASE" "$@"
         EOF
-        chmod +x ./gpg.sh
+        chmod +x "$GPG_WRAPPER_PATH"
     - name: Set GPG key trust
       shell: bash
       env:
         GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
       run: |
-        KEY_ID=$(./gpg.sh --list-keys --with-colons | awk -F: '/^pub/ {print $5; exit}')
-        echo -e "5\ny\n" | ./gpg.sh --command-fd 0 --edit-key "$KEY_ID" trust
-        ./gpg.sh --list-keys --keyid-format LONG
+        KEY_ID=$("$GPG_WRAPPER_PATH" --list-keys --with-colons | awk -F: '/^pub/ {print $5; exit}')
+        if [ -z "$KEY_ID" ]; then
+          echo "ERROR: No public key found after import"
+          exit 1
+        fi
+        echo "Found GPG key ID: $KEY_ID"
+        echo -e "5\ny\n" | "$GPG_WRAPPER_PATH" --command-fd 0 --edit-key "$KEY_ID" trust
+        "$GPG_WRAPPER_PATH" --list-keys --keyid-format LONG
     - name: Configure Git for GPG signing
       shell: bash
       env:
@@ -52,15 +60,35 @@ runs:
         GIT_USER_EMAIL: ${{ inputs.git-user-email }}
         GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
       run: |
-        KEY_ID=$(./gpg.sh --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
-        GPG_EMAIL=$(./gpg.sh --list-secret-keys --with-colons | awk -F: '/^uid/ {print $10; exit}')
+        KEY_ID=$("$GPG_WRAPPER_PATH" --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
+        if [ -z "$KEY_ID" ]; then
+          echo "ERROR: No secret key found after import"
+          exit 1
+        fi
+        
+        GPG_EMAIL=$("$GPG_WRAPPER_PATH" --list-secret-keys --with-colons | awk -F: '/^uid/ {print $10; exit}')
+        if [ -z "$GPG_EMAIL" ]; then
+          echo "ERROR: Could not extract email from GPG key"
+          exit 1
+        fi
+        
         echo "GPG key email: $GPG_EMAIL"
         echo "Git config email: $GIT_USER_EMAIL"
+        
+        # Validate that emails match
+        if [ "$GPG_EMAIL" != "$GIT_USER_EMAIL" ]; then
+          echo "ERROR: GPG key email ($GPG_EMAIL) does not match Git user.email ($GIT_USER_EMAIL)"
+          echo "Please ensure the GPG key was generated with the same email address as GIT_USER_EMAIL"
+          exit 1
+        fi
+        
+        echo "Email validation passed ✓"
         echo "Setting git user.signingkey to $KEY_ID"
+        
         git config --global user.name "$GIT_USER_NAME"
         git config --global user.email "$GIT_USER_EMAIL"
         git config --global user.signingkey "$KEY_ID"
-        git config --global gpg.program "$(pwd)/gpg.sh"
+        git config --global gpg.program "$GPG_WRAPPER_PATH"
         git config --global commit.gpgsign true
         git config --global tag.gpgsign true
         npm config set sign-git-tag true
