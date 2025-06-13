@@ -34,12 +34,12 @@ runs:
         # Use /tmp for the wrapper script - it's guaranteed to exist and be writable
         GPG_WRAPPER_PATH="/tmp/gpg-wrapper-$$-$RANDOM.sh"
         echo "GPG_WRAPPER_PATH=$GPG_WRAPPER_PATH" >> $GITHUB_ENV
-        cat << 'EOF' > "$GPG_WRAPPER_PATH"
+        cat << EOF > "$GPG_WRAPPER_PATH"
         #!/usr/bin/env bash
         gpg --batch --yes --pinentry-mode loopback \
-            --passphrase "$GPG_PASSPHRASE" "$@"
+            --passphrase "$GPG_PASSPHRASE" "\$@"
         EOF
-        chmod +x "$GPG_WRAPPER_PATH"
+        chmod 700 "$GPG_WRAPPER_PATH"
     - name: Set GPG key trust
       shell: bash
       env:
