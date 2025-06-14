@@ -19,6 +19,14 @@
         "NAPI_CPP_EXCEPTIONS",
         "NAPI_VERSION=9"
       ],
+      "configurations": {
+        "Debug": {
+          "defines": [
+            "DEBUG",
+            "_DEBUG"
+          ]
+        }
+      },
       "conditions": [
         [
           "OS=='linux'",
@@ -69,7 +77,8 @@
               "src/windows/hidden.cpp"
             ],
             "libraries": [
-              "-lMpr.lib"
+              "-lMpr.lib",
+              "-lPathcch.lib"
             ],
             "msvs_settings": {
               "VCCLCompilerTool": {
@@ -88,6 +97,35 @@
                   "/DYNAMICBASE",
                   "/CETCOMPAT"
                 ]
+              }
+            },
+            "configurations": {
+              "Debug": {
+                "defines": [
+                  "_CRTDBG_MAP_ALLOC"
+                ],
+                "msvs_settings": {
+                  "VCCLCompilerTool": {
+                    "AdditionalOptions": [
+                      "/MDd",
+                      "/Zi",
+                      "/Od",
+                      "/RTC1",
+                      "/fsanitize=address"
+                    ],
+                    "RuntimeLibrary": "3",
+                    "BasicRuntimeChecks": "3",
+                    "Optimization": "0",
+                    "DebugInformationFormat": "3"
+                  },
+                  "VCLinkerTool": {
+                    "AdditionalOptions": [
+                      "/DEBUG:FULL",
+                      "/INCREMENTAL:NO"
+                    ],
+                    "GenerateDebugInformation": "true"
+                  }
+                }
               }
             }
           }
