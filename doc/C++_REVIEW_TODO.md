@@ -205,8 +205,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 2. [ ] Use Application Verifier on Windows
 3. [ ] Enable address sanitizer for macOS builds
 4. [x] Run existing memory.test.ts with extended iterations
-   - JavaScript memory tests: `npm run test:memory`
-   - Comprehensive suite: `npm run tests:memory`
+   - All memory tests (JavaScript, ASAN, valgrind, etc.): `npm run check:memory`
 
 ### API Verification
 
