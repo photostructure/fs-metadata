@@ -165,8 +165,8 @@ describe("Thread Safety Tests", () => {
       // We should have made at least the minimum number of requests
       expect(totalRequests).toBeGreaterThanOrEqual(20);
     },
-    getTestTimeout(20_000),
-  ); // Base 20s timeout for benchmark test, adjusted for environment
+    getTestTimeout(60_000),
+  ); // Base 60s timeout for benchmark test on Windows
 
   // Memory stress test to detect potential memory leaks from improper thread cleanup
   it(
@@ -239,6 +239,6 @@ describe("Thread Safety Tests", () => {
       // This would catch major leaks from improper thread cleanup
       expect(heapGrowthMB).toBeLessThan(50);
     },
-    getTestTimeout(30_000),
-  ); // Base 30s timeout for memory-intensive test, adjusted for environment
+    getTestTimeout(90_000),
+  ); // Base 90s timeout for memory-intensive test on Windows
 });
