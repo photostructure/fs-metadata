@@ -2,6 +2,8 @@
 #include "hidden.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
+#include <string.h> // for strcmp
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -9,8 +11,8 @@ namespace FSMeta {
 
 GetHiddenWorker::GetHiddenWorker(std::string path,
                                  Napi::Promise::Deferred deferred)
-    : Napi::AsyncWorker(deferred.Env()), path_(path), deferred_(deferred),
-      is_hidden_(false) {
+    : Napi::AsyncWorker(deferred.Env()), path_(std::move(path)),
+      deferred_(deferred), is_hidden_(false) {
   DEBUG_LOG("[GetHiddenWorker] created for path: %s", path_.c_str());
 }
 
@@ -78,8 +80,8 @@ Napi::Promise GetHiddenAttribute(const Napi::CallbackInfo &info) {
 
 SetHiddenWorker::SetHiddenWorker(std::string path, bool hidden,
                                  Napi::Promise::Deferred deferred)
-    : Napi::AsyncWorker(deferred.Env()), path_(path), hidden_(hidden),
-      deferred_(deferred) {
+    : Napi::AsyncWorker(deferred.Env()), path_(std::move(path)),
+      hidden_(hidden), deferred_(deferred) {
   DEBUG_LOG("[SetHiddenWorker] created for path: %s, hidden: %d", path_.c_str(),
             hidden_);
 }
@@ -87,6 +89,10 @@ SetHiddenWorker::SetHiddenWorker(std::string path, bool hidden,
 void SetHiddenWorker::Execute() {
   DEBUG_LOG("[SetHiddenWorker] setting hidden=%d for: %s", hidden_,
             path_.c_str());
+
+  // macOS uses BSD file flags (UF_HIDDEN) to control file visibility.
+  // This is different from the dot-prefix convention used on Unix systems.
+  // The chflags() system call modifies these BSD-specific file flags.
 
   // Add path validation to prevent directory traversal and null byte injection
   if (path_.find("..") != std::string::npos) {
@@ -123,7 +129,24 @@ void SetHiddenWorker::Execute() {
     int error = errno;
     DEBUG_LOG("[SetHiddenWorker] failed to set flags for %s: %s (%d)",
               path_.c_str(), strerror(error), error);
-    SetError(CreatePathErrorMessage("chflags", path_, error));
+
+    // Check if this is an APFS filesystem issue
+    struct statfs fs;
+    bool is_apfs = false;
+    if (statfs(path_.c_str(), &fs) == 0) {
+      is_apfs = (strcmp(fs.f_fstypename, "apfs") == 0);
+      DEBUG_LOG("[SetHiddenWorker] filesystem type: %s", fs.f_fstypename);
+    }
+
+    // Provide more detailed error message for APFS
+    if (is_apfs && (error == EPERM || error == ENOTSUP)) {
+      SetError("Setting hidden attribute failed on APFS filesystem. "
+               "This is a known issue with some APFS volumes. "
+               "Error: " +
+               CreatePathErrorMessage("chflags", path_, error));
+    } else {
+      SetError(CreatePathErrorMessage("chflags", path_, error));
+    }
     return;
   }
   DEBUG_LOG("[SetHiddenWorker] successfully set hidden=%d for: %s", hidden_,
