@@ -77,6 +77,38 @@ This is @photostructure/fs-metadata - a cross-platform native Node.js module for
 - Debug messages from both JavaScript and native code are sent to `stderr`
 - Uses native Node.js debuglog for determining if logging is enabled
 
+## Development in WSL
+
+When developing in WSL (Windows Subsystem for Linux) and needing to run commands on the Windows host:
+
+### Running Windows Commands from WSL
+- **Direct execution**: Use `cmd.exe` or `powershell.exe` to run Windows commands
+  ```bash
+  # Run npm test on Windows side
+  cmd.exe /c "cd C:\\Users\\matth\\src\\fs-metadata && npm test"
+  
+  # Or use PowerShell
+  powershell.exe -Command "cd C:\\Users\\matth\\src\\fs-metadata; npm test"
+  ```
+
+- **Watch mode**: For continuous test watching
+  ```bash
+  cmd.exe /c "cd C:\\Users\\matth\\src\\fs-metadata && npm run test:watch"
+  ```
+
+- **Helper script**: Create a reusable script for convenience
+  ```bash
+  # Create helper script
+  echo 'cmd.exe /c "cd C:\\Users\\matth\\src\\fs-metadata && $@"' > ~/bin/win-run
+  chmod +x ~/bin/win-run
+  
+  # Usage
+  ~/bin/win-run npm test
+  ~/bin/win-run npm run test:watch
+  ```
+
+**Note**: This is particularly useful when testing Windows-specific functionality that requires running on the native Windows environment rather than within WSL.
+
 ## Release Process
 
 The project uses a vanilla npm/git release workflow with GPG signed commits for security:
