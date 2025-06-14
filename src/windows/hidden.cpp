@@ -1,36 +1,14 @@
 // src/windows/hidden.cpp
 #include "hidden.h"
+#include "../common/debug_log.h"
 #include "error_utils.h"
+#include "security_utils.h"
+#include "memory_debug.h"
 #include <windows.h>
 
 namespace FSMeta {
 
 namespace {
-// Utility class for path conversion
-class PathConverter {
-public:
-  static std::wstring ToWString(const std::string &path) {
-    if (path.empty()) {
-      return std::wstring();
-    }
-
-    // Pre-calculate required buffer size
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, path.c_str(),
-                                   static_cast<int>(path.length()), nullptr, 0);
-    if (wlen == 0) {
-      throw FSException("Path conversion", GetLastError());
-    }
-
-    // Reserve exact size needed
-    std::wstring wpath(wlen, 0);
-    if (!MultiByteToWideChar(CP_UTF8, 0, path.c_str(),
-                             static_cast<int>(path.length()), &wpath[0],
-                             wlen)) {
-      throw FSException("Path conversion", GetLastError());
-    }
-    return wpath;
-  }
-};
 
 // RAII wrapper for file attributes
 class FileAttributeHandler {
@@ -61,37 +39,72 @@ public:
 
 class GetHiddenWorker : public Napi::AsyncWorker {
   const std::string path;
-  bool result;
+  bool result = false;
   Napi::Promise::Deferred deferred;
 
 public:
   GetHiddenWorker(Napi::Env env, std::string p, Napi::Promise::Deferred def)
-      : Napi::AsyncWorker(env), path(std::move(p)), deferred(def) {}
+      : Napi::AsyncWorker(env), path(std::move(p)), result(false), deferred(def) {}
 
   void Execute() override {
     try {
-      // Add path validation to prevent directory traversal
-      if (path.find("..") != std::string::npos) {
-        throw FSException("Invalid path containing '..'",
+      MEMORY_CHECKPOINT("GetHiddenWorker::Execute");
+      
+      // Debug: Log the input path
+      DEBUG_LOG("[GetHiddenWorker] Checking path: %s", path.c_str());
+      
+      // Enhanced security validation
+      if (!SecurityUtils::IsPathSecure(path)) {
+        DEBUG_LOG("[GetHiddenWorker] Path failed security check: %s", path.c_str());
+        throw FSException("Security validation failed: invalid path",
                           ERROR_INVALID_PARAMETER);
       }
+      
+      DEBUG_LOG("[GetHiddenWorker] Path passed security check");
 
-      auto wpath = PathConverter::ToWString(path);
-      FileAttributeHandler handler(wpath);
-      result = handler.isHidden();
+      auto wpath = SecurityUtils::SafeStringToWide(path);
+      DEBUG_LOG("[GetHiddenWorker] Converted to wide string");
+      
+      // Check if file exists before checking attributes
+      DWORD attributes = GetFileAttributesW(wpath.c_str());
+      if (attributes == INVALID_FILE_ATTRIBUTES) {
+        DWORD error = GetLastError();
+        if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) {
+          DEBUG_LOG("[GetHiddenWorker] File not found: %s", path.c_str());
+          result = false;  // Non-existent files are not hidden
+          return;
+        }
+        // Other errors should throw
+        throw FSException("GetFileAttributes", error);
+      }
+      
+      // Check if it's a root directory
+      bool isRoot = (wpath.length() == 3 && wpath[1] == L':' && wpath[2] == L'\\');
+      if (isRoot) {
+        DEBUG_LOG("[GetHiddenWorker] Root directory detected: %s, attributes: 0x%X", path.c_str(), attributes);
+        // Windows may report root directories as hidden/system, but we'll report the actual state
+        // The tests will need to be updated to reflect actual Windows behavior
+      }
+      
+      result = (attributes & FILE_ATTRIBUTE_HIDDEN) != 0;
+      DEBUG_LOG("[GetHiddenWorker] Result: %s", result ? "hidden" : "not hidden");
     } catch (const FSException &e) {
+      DEBUG_LOG("[GetHiddenWorker] Caught FSException: %s", e.what());
       SetError(e.what());
     } catch (const std::exception &e) {
+      DEBUG_LOG("[GetHiddenWorker] Caught std::exception: %s", e.what());
       SetError(std::string("Unexpected error: ") + e.what());
     }
   }
 
   void OnOK() override {
+    DEBUG_LOG("[GetHiddenWorker] OnOK called, result=%s", result ? "true" : "false");
     Napi::HandleScope scope(Env());
     deferred.Resolve(Napi::Boolean::New(Env(), result));
   }
 
   void OnError(const Napi::Error &e) override {
+    DEBUG_LOG("[GetHiddenWorker] OnError called with: %s", e.Message().c_str());
     Napi::HandleScope scope(Env());
     deferred.Reject(e.Value());
   }
@@ -109,13 +122,15 @@ public:
 
   void Execute() override {
     try {
-      // Add path validation to prevent directory traversal
-      if (path.find("..") != std::string::npos) {
-        throw FSException("Invalid path containing '..'",
+      MEMORY_CHECKPOINT("SetHiddenWorker::Execute");
+      
+      // Enhanced security validation
+      if (!SecurityUtils::IsPathSecure(path)) {
+        throw FSException("Security validation failed: invalid path",
                           ERROR_INVALID_PARAMETER);
       }
 
-      auto wpath = PathConverter::ToWString(path);
+      auto wpath = SecurityUtils::SafeStringToWide(path);
       FileAttributeHandler handler(wpath);
       handler.setHidden(value);
     } catch (const FSException &e) {

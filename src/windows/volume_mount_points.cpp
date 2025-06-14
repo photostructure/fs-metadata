@@ -6,6 +6,8 @@
 #include "fs_meta.h"
 #include "string.h"
 #include "system_volume.h"
+#include "security_utils.h"
+#include "memory_debug.h"
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -35,6 +37,7 @@ public:
 
   void Execute() override {
     try {
+      MEMORY_CHECKPOINT("GetVolumeMountPointsWorker::Execute");
       DEBUG_LOG("[GetVolumeMountPoints] getting logical drive strings size");
       DWORD size = GetLogicalDriveStringsW(0, nullptr);
       DEBUG_LOG("[GetVolumeMountPoints] logical drive strings size: %lu", size);
@@ -85,7 +88,7 @@ public:
 
         if (statuses[i] == DriveStatus::Healthy) {
           WCHAR fsName[MAX_PATH + 1] = {0};
-          std::wstring widePath(paths[i].begin(), paths[i].end());
+          std::wstring widePath = SecurityUtils::SafeStringToWide(paths[i]);
 
           if (GetVolumeInformationW(widePath.c_str(), nullptr, 0, nullptr,
                                     nullptr, nullptr, fsName, MAX_PATH)) {
@@ -96,7 +99,7 @@ public:
         }
 
         // Convert path to wide string before calling IsSystemVolume
-        std::wstring widePath(paths[i].begin(), paths[i].end());
+        std::wstring widePath = SecurityUtils::SafeStringToWide(paths[i]);
         mp.isSystemVolume = IsSystemVolume(widePath);
         mountPoints_.push_back(std::move(mp));
       }

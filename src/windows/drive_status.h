@@ -1,244 +1,214 @@
 // src/windows/drive_status.h
-
 #pragma once
 #include "../common/debug_log.h"
+#include "thread_pool.h"
+#include "security_utils.h"
 #include <atomic>
-#include <memory>
+#include <chrono>
+#include <condition_variable>
+#include <future>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 #include <windows.h>
 
 namespace FSMeta {
 
 enum class DriveStatus {
-  Healthy,
-  Timeout,
-  Inaccessible,
-  Disconnected,
-  Unknown
+    Healthy,
+    Timeout,
+    Inaccessible,
+    Disconnected,
+    Unknown
 };
 
 inline std::string DriveStatusToString(DriveStatus status) {
-  switch (status) {
-  case DriveStatus::Healthy:
-    return "healthy";
-  case DriveStatus::Timeout:
-    return "timeout";
-  case DriveStatus::Inaccessible:
-    return "inaccessible";
-  case DriveStatus::Disconnected:
-    return "disconnected";
-  default:
-    return "unknown";
-  }
-}
-
-class IOOperation {
-private:
-  HANDLE completionEvent;
-  std::atomic<DriveStatus> result;
-  std::string path;
-  DWORD threadId;
-  std::atomic<bool> shouldTerminate;
-  HANDLE threadHandle; // Store thread handle as member
-
-public:
-  IOOperation()
-      : result{DriveStatus::Unknown}, threadId(0), shouldTerminate{false},
-        threadHandle(NULL) {
-    completionEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-  }
-
-  ~IOOperation() {
-    if (completionEvent) {
-      CloseHandle(completionEvent);
-    }
-    CleanupThread();
-  }
-
-  void CleanupThread() {
-    if (threadHandle) {
-      DEBUG_LOG("[IOOperation] Cleaning up thread %lu", threadId);
-      // Signal termination
-      shouldTerminate.store(true, std::memory_order_release);
-
-      // Wake up thread if it's waiting on something
-      SetEvent(completionEvent);
-
-      // Give thread chance to exit gracefully (increased timeout)
-      DWORD waitResult = WaitForSingleObject(threadHandle, 1000);
-      if (waitResult != WAIT_OBJECT_0) {
-        DEBUG_LOG("[IOOperation] WARNING: Thread %lu did not exit gracefully "
-                  "after 1000ms",
-                  threadId);
-        // NEVER use TerminateThread - it's extremely dangerous
-        // Instead, log the issue and abandon the thread
-        // The thread will eventually exit when the process terminates
-      }
-
-      CloseHandle(threadHandle);
-      threadHandle = NULL;
-      DEBUG_LOG("[IOOperation] Thread cleanup complete");
-    }
-  }
-
-  static DWORD WINAPI WorkerThread(LPVOID param) {
-    IOOperation *self = static_cast<IOOperation *>(param);
-    std::string searchPath = self->path + "*";
-    HANDLE findHandle = INVALID_HANDLE_VALUE;
-    WIN32_FIND_DATAA findData;
-
-    DEBUG_LOG("[WorkerThread] Starting search on path: %s", searchPath.c_str());
-
-    // Check if we should terminate before starting work
-    if (self->shouldTerminate.load(std::memory_order_acquire)) {
-      DEBUG_LOG("[WorkerThread] Thread %lu terminating before work",
-                self->threadId);
-      return 0;
-    }
-
-    findHandle = FindFirstFileExA(
-        searchPath.c_str(), FindExInfoBasic, &findData, FindExSearchNameMatch,
-        NULL, FIND_FIRST_EX_LARGE_FETCH | FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY);
-
-    if (findHandle == INVALID_HANDLE_VALUE) {
-      self->result.store(self->MapErrorToDriveStatus(GetLastError()),
-                         std::memory_order_release);
-      DEBUG_LOG("[WorkerThread] Search failed with error: %lu", GetLastError());
-    } else {
-      self->result.store(DriveStatus::Healthy, std::memory_order_release);
-      FindClose(findHandle);
-      DEBUG_LOG("[WorkerThread] Search completed successfully");
-    }
-
-    SetEvent(self->completionEvent);
-    DEBUG_LOG("[WorkerThread] Thread %lu exiting", self->threadId);
-    return 0;
-  }
-
-  DriveStatus CheckDriveWithTimeout(const std::string &checkPath,
-                                    DWORD timeoutMs) {
-    DEBUG_LOG("[CheckDriveStatus] Starting check for: %s timeout: %lu ms",
-              checkPath.c_str(), timeoutMs);
-
-    // Cleanup any previous thread
-    CleanupThread();
-
-    path = checkPath;
-    ResetEvent(completionEvent);
-    shouldTerminate.store(false, std::memory_order_release);
-
-    threadHandle = CreateThread(NULL, 0, WorkerThread, this, 0, &threadId);
-    if (!threadHandle) {
-      DEBUG_LOG("[CheckDriveStatus] Failed to create thread");
-      return DriveStatus::Unknown;
-    }
-
-    DEBUG_LOG("[CheckDriveStatus] Created thread %lu", threadId);
-    DWORD waitResult = WaitForSingleObject(threadHandle, timeoutMs);
-
-    if (waitResult == WAIT_TIMEOUT) {
-      DEBUG_LOG("[CheckDriveStatus] Thread %lu timed out after %lu ms",
-                threadId, timeoutMs);
-      CleanupThread();
-      return DriveStatus::Timeout;
-    }
-
-    DEBUG_LOG("[CheckDriveStatus] Thread %lu completed normally", threadId);
-    CloseHandle(threadHandle);
-    DEBUG_LOG("[CheckDriveStatus] CloseHandle %lu completed", threadId);
-    threadHandle = NULL;
-    return result.load(std::memory_order_acquire);
-  }
-
-private:
-  DriveStatus MapErrorToDriveStatus(DWORD error) {
-    switch (error) {
-    case ERROR_FILE_NOT_FOUND:
-    case ERROR_PATH_NOT_FOUND:
-    case ERROR_ACCESS_DENIED:
-    case ERROR_LOGON_FAILURE:
-      return DriveStatus::Inaccessible;
-
-    case ERROR_BAD_NET_NAME:
-    case ERROR_NETWORK_UNREACHABLE:
-    case ERROR_NOT_CONNECTED:
-    case ERROR_NETWORK_ACCESS_DENIED:
-    case ERROR_BAD_NETPATH:
-      return DriveStatus::Disconnected;
-
+    switch (status) {
+    case DriveStatus::Healthy:
+        return "healthy";
+    case DriveStatus::Timeout:
+        return "timeout";
+    case DriveStatus::Inaccessible:
+        return "inaccessible";
+    case DriveStatus::Disconnected:
+        return "disconnected";
     default:
-      return DriveStatus::Unknown;
+        return "unknown";
     }
-  }
-};
-
-class ParallelDriveStatus {
-private:
-  struct PendingCheck {
-    std::string path;
-    std::unique_ptr<IOOperation> op;
-    DWORD timeoutMs;
-    DriveStatus status;
-  };
-
-  std::vector<std::unique_ptr<PendingCheck>> pending_;
-
-public:
-  void Submit(const std::string &path, DWORD timeoutMs = 1000) {
-    auto check = std::make_unique<PendingCheck>();
-    check->path = path;
-    check->op = std::make_unique<IOOperation>();
-    check->timeoutMs = timeoutMs;
-    check->status = DriveStatus::Unknown;
-
-    DEBUG_LOG("[ParallelDriveStatus] Submitting check for: %s", path.c_str());
-    pending_.push_back(std::move(check));
-  }
-
-  std::vector<DriveStatus> WaitForResults() {
-    std::vector<DriveStatus> results;
-    results.reserve(pending_.size());
-
-    // Start all operations
-    for (auto &check : pending_) {
-      check->status =
-          check->op->CheckDriveWithTimeout(check->path, check->timeoutMs);
-    }
-
-    // Collect results in original order
-    for (auto &check : pending_) {
-      DEBUG_LOG("[ParallelDriveStatus] Result for %s: %s", check->path.c_str(),
-                DriveStatusToString(check->status).c_str());
-      results.push_back(check->status);
-    }
-
-    pending_.clear();
-    return results;
-  }
-};
-
-// Update CheckDriveStatus to support checking multiple paths
-inline std::vector<DriveStatus>
-CheckDriveStatus(const std::vector<std::string> &paths,
-                 DWORD timeoutMs = 1000) {
-  try {
-    ParallelDriveStatus checker;
-    for (const auto &path : paths) {
-      checker.Submit(path, timeoutMs);
-    }
-    return checker.WaitForResults();
-  } catch (...) {
-    DEBUG_LOG("[CheckDriveStatus] caught unexpected exception");
-    return std::vector<DriveStatus>(paths.size(), DriveStatus::Unknown);
-  }
 }
 
-// Keep single path version for backwards compatibility
-inline DriveStatus CheckDriveStatus(const std::string &path,
-                                    DWORD timeoutMs = 1000) {
-  std::vector<std::string> paths{path};
-  return CheckDriveStatus(paths, timeoutMs)[0];
+class DriveStatusChecker {
+private:
+    static DriveStatus MapErrorToDriveStatus(DWORD error) {
+        switch (error) {
+        case ERROR_SUCCESS:
+            return DriveStatus::Healthy;
+            
+        case ERROR_FILE_NOT_FOUND:
+        case ERROR_PATH_NOT_FOUND:
+        case ERROR_ACCESS_DENIED:
+        case ERROR_LOGON_FAILURE:
+        case ERROR_SHARING_VIOLATION:
+            return DriveStatus::Inaccessible;
+
+        case ERROR_BAD_NET_NAME:
+        case ERROR_NETWORK_UNREACHABLE:
+        case ERROR_NOT_CONNECTED:
+        case ERROR_NETWORK_ACCESS_DENIED:
+        case ERROR_BAD_NETPATH:
+        case ERROR_NO_NET_OR_BAD_PATH:
+            return DriveStatus::Disconnected;
+
+        default:
+            return DriveStatus::Unknown;
+        }
+    }
+    
+    static DriveStatus CheckDriveInternal(const std::string& path) {
+        DEBUG_LOG("[DriveStatusChecker] Checking drive: %s", path.c_str());
+        
+        // Validate path
+        if (!SecurityUtils::IsPathSecure(path)) {
+            DEBUG_LOG("[DriveStatusChecker] Path failed security check: %s", path.c_str());
+            return DriveStatus::Inaccessible;
+        }
+        
+        // Ensure path ends with backslash for FindFirstFileEx
+        std::string searchPath = path;
+        if (!searchPath.empty() && searchPath.back() != '\\') {
+            searchPath += '\\';
+        }
+        searchPath += "*";
+        
+        WIN32_FIND_DATAA findData;
+        HandleGuard findHandle(FindFirstFileExA(
+            searchPath.c_str(),
+            FindExInfoBasic,
+            &findData,
+            FindExSearchNameMatch,
+            nullptr,
+            FIND_FIRST_EX_LARGE_FETCH | FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY
+        ));
+        
+        if (!findHandle) {
+            DWORD error = GetLastError();
+            DEBUG_LOG("[DriveStatusChecker] FindFirstFileEx failed for %s: %lu", 
+                     path.c_str(), error);
+            return MapErrorToDriveStatus(error);
+        }
+        
+        // Successfully opened - drive is healthy
+        FindClose(findHandle.release());
+        DEBUG_LOG("[DriveStatusChecker] Drive %s is healthy", path.c_str());
+        return DriveStatus::Healthy;
+    }
+    
+public:
+    static std::future<DriveStatus> CheckDriveAsync(const std::string& path, 
+                                                   DWORD timeoutMs = 5000) {
+        auto promise = std::make_shared<std::promise<DriveStatus>>();
+        auto future = promise->get_future();
+        
+        // Use a shared state for timeout handling
+        auto state = std::make_shared<std::atomic<bool>>(false);
+        
+        GetGlobalThreadPool().Submit([path, promise, state, timeoutMs]() {
+            // Set up timeout
+            auto startTime = std::chrono::steady_clock::now();
+            
+            // Perform the check
+            DriveStatus status = CheckDriveInternal(path);
+            
+            // Check if we've timed out
+            auto elapsed = std::chrono::steady_clock::now() - startTime;
+            if (elapsed > std::chrono::milliseconds(timeoutMs)) {
+                status = DriveStatus::Timeout;
+            }
+            
+            // Only set the promise if we haven't been cancelled
+            if (!state->load()) {
+                promise->set_value(status);
+            }
+        });
+        
+        // Handle timeout in the caller
+        if (timeoutMs != INFINITE) {
+            std::thread([promise, state, timeoutMs]() {
+                std::this_thread::sleep_for(std::chrono::milliseconds(timeoutMs));
+                if (!state->exchange(true)) {
+                    try {
+                        promise->set_value(DriveStatus::Timeout);
+                    } catch (...) {
+                        // Promise already satisfied
+                    }
+                }
+            }).detach();
+        }
+        
+        return future;
+    }
+    
+    static DriveStatus CheckDrive(const std::string& path, DWORD timeoutMs = 5000) {
+        try {
+            auto future = CheckDriveAsync(path, timeoutMs);
+            
+            if (future.wait_for(std::chrono::milliseconds(timeoutMs)) == 
+                std::future_status::timeout) {
+                return DriveStatus::Timeout;
+            }
+            
+            return future.get();
+        } catch (...) {
+            DEBUG_LOG("[DriveStatusChecker] Exception checking drive %s", path.c_str());
+            return DriveStatus::Unknown;
+        }
+    }
+    
+    static std::vector<DriveStatus> CheckMultipleDrives(
+        const std::vector<std::string>& paths, 
+        DWORD timeoutMs = 5000) {
+        
+        std::vector<std::future<DriveStatus>> futures;
+        futures.reserve(paths.size());
+        
+        // Launch all checks concurrently
+        for (const auto& path : paths) {
+            futures.push_back(CheckDriveAsync(path, timeoutMs));
+        }
+        
+        // Collect results
+        std::vector<DriveStatus> results;
+        results.reserve(paths.size());
+        
+        for (size_t i = 0; i < futures.size(); ++i) {
+            try {
+                if (futures[i].wait_for(std::chrono::milliseconds(timeoutMs)) == 
+                    std::future_status::timeout) {
+                    results.push_back(DriveStatus::Timeout);
+                } else {
+                    results.push_back(futures[i].get());
+                }
+            } catch (...) {
+                DEBUG_LOG("[DriveStatusChecker] Exception getting result for drive %s", 
+                         paths[i].c_str());
+                results.push_back(DriveStatus::Unknown);
+            }
+        }
+        
+        return results;
+    }
+};
+
+// Compatibility wrapper for existing code
+inline std::vector<DriveStatus> CheckDriveStatus(
+    const std::vector<std::string>& paths, 
+    DWORD timeoutMs = 5000) {
+    return DriveStatusChecker::CheckMultipleDrives(paths, timeoutMs);
+}
+
+inline DriveStatus CheckDriveStatus(const std::string& path, DWORD timeoutMs = 5000) {
+    return DriveStatusChecker::CheckDrive(path, timeoutMs);
 }
 
 } // namespace FSMeta

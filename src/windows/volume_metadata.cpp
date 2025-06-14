@@ -6,6 +6,8 @@
 #include "fs_meta.h"
 #include "string.h"
 #include "system_volume.h"
+#include "security_utils.h"
+#include "memory_debug.h"
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -63,17 +65,22 @@ inline std::string FormatVolumeSerialNumber(DWORD serialNumber) {
 
 // Helper for getting volume GUID path
 inline std::string GetVolumeGUID(const std::string &mountPoint) {
-  std::wstring widePath(mountPoint.begin(), mountPoint.end());
+  std::wstring widePath = SecurityUtils::SafeStringToWide(mountPoint);
   if (widePath.back() != L'\\') {
     widePath += L'\\';
   }
 
-  WCHAR volumeGUID[50] = {0}; // Sufficient size for a GUID path
-  if (!GetVolumeNameForVolumeMountPointW(widePath.c_str(), volumeGUID, 50)) {
+  // Volume GUID paths have format: \\?\Volume{GUID}\ 
+  // Maximum length is 49 characters + null terminator
+  constexpr DWORD VOLUME_GUID_PATH_LENGTH = 50;
+  WCHAR volumeGUID[VOLUME_GUID_PATH_LENGTH] = {0};
+  
+  if (!GetVolumeNameForVolumeMountPointW(widePath.c_str(), volumeGUID, 
+                                         VOLUME_GUID_PATH_LENGTH)) {
     throw FSException("GetVolumeNameForVolumeMountPoint", GetLastError());
   }
 
-  // Convert GUID to string and trim the trailing slash
+  // Convert GUID to string
   return WideToUtf8(volumeGUID);
 }
 
@@ -144,6 +151,8 @@ private:
 
   void Execute() override {
     try {
+      MEMORY_CHECKPOINT("GetVolumeMetadataWorker::Execute");
+      
       // Get drive status first
       DriveStatus status = CheckDriveStatus(mountPoint);
       metadata.status = DriveStatusToString(status);
@@ -155,7 +164,7 @@ private:
         return; // Don't try to get additional info for non-healthy drives
       }
 
-      std::wstring widePath = PathConverter::ToWString(mountPoint);
+      std::wstring widePath = SecurityUtils::SafeStringToWide(mountPoint);
       metadata.isSystemVolume = IsSystemVolume(widePath.c_str());
 
       DEBUG_LOG("[GetVolumeMetadata] %s {isSystemVolume: %s}",
