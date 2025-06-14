@@ -1,4 +1,5 @@
 // src/windows/volume_mount_points.cpp
+#include "windows_common.h"
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
@@ -12,7 +13,6 @@
 #include <memory>
 #include <sstream>
 #include <vector>
-#include <windows.h>
 
 namespace FSMeta {
 

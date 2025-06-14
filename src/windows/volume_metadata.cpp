@@ -1,4 +1,5 @@
 // src/windows/volume_metadata.cpp
+#include "windows_common.h"
 #include "../common/debug_log.h"
 #include "../common/metadata_worker.h"
 #include "drive_status.h"

@@ -1,9 +1,9 @@
 // src/windows/fs_meta.h
 
 #pragma once
+#include "windows_common.h"
 #include "../common/volume_metadata.h"
 #include "../common/volume_mount_points.h"
-#include <windows.h> // for MAX_PATH
 
 namespace FSMeta {
 

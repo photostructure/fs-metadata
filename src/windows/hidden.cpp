@@ -1,10 +1,10 @@
 // src/windows/hidden.cpp
+#include "windows_common.h"
 #include "hidden.h"
 #include "../common/debug_log.h"
 #include "error_utils.h"
 #include "memory_debug.h"
 #include "security_utils.h"
-#include <windows.h>
 
 namespace FSMeta {
 
