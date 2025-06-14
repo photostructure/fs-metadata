@@ -39,11 +39,11 @@ describeOrSkip("debuglog integration tests (process spawning)", () => {
     }
 
     const script = join(_dirname(), "test-utils", "debuglog-child.ts");
-    const timeout = getTestTimeout(3000); // Base 3s timeout, adjusted for environment
+    const timeout = getTestTimeout(30000); // Base 30s timeout for Windows process spawning
 
-    // Use npx with --yes flag to avoid prompts
+    // Use tsx CLI directly to avoid Node.js v24 loader issues
     const command = "npx";
-    const args = ["--yes", "tsx", script];
+    const args = ["tsx", script];
 
     // Use spawnSync for better process control
     const result = spawnSync(command, args, {
@@ -51,7 +51,7 @@ describeOrSkip("debuglog integration tests (process spawning)", () => {
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true, // Hide console window on Windows
-      shell: process.platform === "win32", // Windows requires shell for npx to work
+      shell: process.platform === "win32", // Windows needs shell for npx
       timeout,
     });
 
@@ -169,11 +169,11 @@ describe("debug function", () => {
     };
 
     const script = join(_dirname(), "test-utils", "debuglog-enabled-child.ts");
-    const timeout = getTestTimeout(6000); // Base 6s timeout, adjusted for environment
+    const timeout = getTestTimeout(30000); // Base 30s timeout for Windows process spawning
 
-    // Use npx with --yes flag to avoid prompts
+    // Use tsx CLI directly to avoid Node.js v24 loader issues
     const command = "npx";
-    const args = ["--yes", "tsx", script];
+    const args = ["tsx", script];
 
     // Use spawnSync for better process control
     const result = spawnSync(command, args, {
@@ -181,7 +181,7 @@ describe("debug function", () => {
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true, // Hide console window on Windows
-      shell: process.platform === "win32", // Windows requires shell for npx to work
+      shell: process.platform === "win32", // Windows needs shell for npx
       timeout,
     });
 
