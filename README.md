@@ -66,6 +66,35 @@ Notes:
 npm install @photostructure/fs-metadata
 ```
 
+### Building from source with debug support (Windows)
+
+For memory leak detection and enhanced debugging on Windows:
+
+```bash
+# Clone the repository
+git clone https://github.com/photostructure/fs-metadata.git
+cd fs-metadata
+
+# Install dependencies
+npm install
+
+# Build with debug configuration
+node-gyp rebuild --debug
+
+# Set environment variables for memory leak detection
+set _CRTDBG_MAP_ALLOC=1
+set ASAN_OPTIONS=halt_on_error=0:print_stats=1:check_initialization_order=1
+
+# Run tests with debug build
+npm test
+```
+
+The debug build includes:
+- CRT memory leak detection
+- AddressSanitizer support (requires Visual Studio 2019+)
+- Enhanced debug logging
+- Memory checkpoints for tracking allocations
+
 ## Usage
 
 ```ts
