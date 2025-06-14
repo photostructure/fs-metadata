@@ -29,6 +29,8 @@ if (isLinux && isGlibc) {
     "Building native project with portable GLIBC",
   );
 } else {
+  // Clean old native builds to ensure fresh compilation
+  run("npm run clean:native", "Cleaning old native builds");
   run("npm run build:native", "Building native module");
 }
 
@@ -40,6 +42,7 @@ if (isLinux || isMacOS) {
 }
 
 // Run comprehensive memory tests (cross-platform)
+// This includes Windows debug memory check on Windows
 run("npm run check:memory", "Comprehensive memory tests");
 
 console.log("\n✅ All precommit checks passed!");
