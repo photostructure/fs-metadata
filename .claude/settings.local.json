@@ -54,7 +54,8 @@
       "Bash(leaks:*)",
       "Bash(xcrun:*)",
       "Bash(echo:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(cmd.exe:*)"
     ],
     "deny": []
   },
