@@ -2,8 +2,9 @@
 
 import { rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { debug } from "./debuglog";
 import { WrappedError } from "./error";
-import { canStatAsync, statAsync } from "./fs";
+import { statAsync } from "./fs";
 import { isRootDirectory, normalizePath } from "./path";
 import { isWindows } from "./platform";
 import type { HiddenMetadata } from "./types/hidden_metadata";
@@ -47,14 +48,24 @@ export async function isHiddenImpl(
   pathname: string,
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
+  debug("isHiddenImpl called with pathname: %s", pathname);
   const norm = normalizePath(pathname);
   if (norm == null) {
     throw new Error("Invalid pathname: " + JSON.stringify(pathname));
   }
-  return (
-    (LocalSupport.dotPrefix && isPosixHidden(norm)) ||
-    (LocalSupport.systemFlag && isSystemHidden(norm, nativeFn))
+  debug("Normalized path: %s", norm);
+  debug(
+    "LocalSupport: dotPrefix=%s, systemFlag=%s",
+    LocalSupport.dotPrefix,
+    LocalSupport.systemFlag,
   );
+
+  const result =
+    (LocalSupport.dotPrefix && isPosixHidden(norm)) ||
+    (LocalSupport.systemFlag && (await isSystemHidden(norm, nativeFn)));
+
+  debug("isHiddenImpl returning: %s", result);
+  return result;
 }
 
 export async function isHiddenRecursiveImpl(
@@ -108,20 +119,26 @@ async function isSystemHidden(
   pathname: string,
   nativeFn: NativeBindingsFn,
 ): Promise<boolean> {
+  debug("isSystemHidden called with pathname: %s", pathname);
   if (!LocalSupport.systemFlag) {
+    debug("systemFlag not supported on this platform");
     // not supported on this platform
     return false;
   }
-  if (isWindows && isRootDirectory(pathname)) {
-    // windows `attr` thinks all drive letters don't exist.
-    return false;
-  }
 
-  // don't bother the native bindings if the file doesn't exist:
-  return (
-    (await canStatAsync(pathname)) &&
-    (await (await nativeFn()).isHidden(pathname))
-  );
+  // Let the native function handle all validation, including root directories
+  // This ensures security checks are performed before any other checks
+  const native = await nativeFn();
+  debug("Calling native isHidden for: %s", pathname);
+
+  try {
+    const isHidden = await native.isHidden(pathname);
+    debug("Native isHidden returned: %s", isHidden);
+    return isHidden;
+  } catch (error) {
+    debug("Native isHidden threw error: %s", error);
+    throw error;
+  }
 }
 
 /**
