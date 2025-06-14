@@ -1,4 +1,5 @@
 // src/darwin/volume_metadata.cpp
+// Thread-safe implementation with DiskArbitration mutex synchronization
 
 #include "../common/debug_log.h"
 #include "./fs_meta.h"
@@ -6,16 +7,17 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
-#include <IOKit/IOBSD.h>
-#include <IOKit/storage/IOMedia.h>
-#include <IOKit/storage/IOStorageProtocolCharacteristics.h>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/statvfs.h>
 
 namespace FSMeta {
+
+// Global mutex for DiskArbitration operations
+static std::mutex g_diskArbitrationMutex;
 
 // Helper function to convert CFString to std::string
 static std::string CFStringToString(CFStringRef cfString) {
@@ -24,16 +26,37 @@ static std::string CFStringToString(CFStringRef cfString) {
   }
 
   CFIndex length = CFStringGetLength(cfString);
-  CFIndex maxSize =
-      CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
-  std::string result(maxSize, '\0');
-
-  if (!CFStringGetCString(cfString, &result[0], maxSize,
-                          kCFStringEncodingUTF8)) {
+  if (length == 0) {
     return "";
   }
 
-  result.resize(strlen(result.c_str()));
+  // Check for overflow when calculating buffer size
+  CFIndex maxSize =
+      CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8);
+  if (maxSize == kCFNotFound || maxSize > INT_MAX - 1) {
+    return "";
+  }
+  maxSize += 1; // For null terminator
+
+  std::string result(maxSize, '\0');
+
+  Boolean success =
+      CFStringGetCString(cfString, &result[0], maxSize, kCFStringEncodingUTF8);
+  if (!success) {
+    return "";
+  }
+
+  // Find actual string length by looking for null terminator
+  // This is safer than using strlen which could read past buffer
+  size_t actualLength = 0;
+  for (size_t i = 0; i < static_cast<size_t>(maxSize); ++i) {
+    if (result[i] == '\0') {
+      actualLength = i;
+      break;
+    }
+  }
+
+  result.resize(actualLength);
   return result;
 }
 
@@ -48,7 +71,8 @@ public:
     DEBUG_LOG("[GetVolumeMetadataWorker] Executing for mount point: %s",
               mountPoint.c_str());
     try {
-      // Validate mount point to prevent directory traversal and null byte injection
+      // Validate mount point to prevent directory traversal and null byte
+      // injection
       if (mountPoint.find("..") != std::string::npos) {
         SetError("Invalid mount point containing '..'");
         return;
@@ -57,11 +81,11 @@ public:
         SetError("Invalid mount point containing null byte");
         return;
       }
-      
+
       if (!GetBasicVolumeInfo()) {
         return;
       }
-      GetDiskArbitrationInfo();
+      GetDiskArbitrationInfoSafe();
     } catch (const std::exception &e) {
       DEBUG_LOG("[GetVolumeMetadataWorker] Exception: %s", e.what());
       SetError(e.what());
@@ -133,7 +157,7 @@ private:
     return true;
   }
 
-  void GetDiskArbitrationInfo() {
+  void GetDiskArbitrationInfoSafe() {
     DEBUG_LOG("[GetVolumeMetadataWorker] Getting Disk Arbitration info for: %s",
               mountPoint.c_str());
 
@@ -145,7 +169,10 @@ private:
       return;
     }
 
-    // Create session on current thread
+    // Use a global mutex to serialize DiskArbitration access
+    std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
+
+    // Create session without scheduling on run loop
     CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
     if (!session.isValid()) {
       DEBUG_LOG("[GetVolumeMetadataWorker] Failed to create DA session");
@@ -155,28 +182,6 @@ private:
     }
 
     try {
-      // Get thread-local runloop - CFRunLoopGetCurrent() always returns a valid runloop
-      CFRunLoopRef runLoop = CFRunLoopGetCurrent();
-
-      // Schedule session with our runloop
-      DASessionScheduleWithRunLoop(session.get(), runLoop,
-                                   kCFRunLoopDefaultMode);
-
-      // Use RAII to ensure cleanup
-      struct RunLoopCleaner {
-        DASessionRef session;
-        CFRunLoopRef runLoop;
-        RunLoopCleaner(DASessionRef s, CFRunLoopRef l)
-            : session(s), runLoop(l) {}
-        ~RunLoopCleaner() {
-          DASessionUnscheduleFromRunLoop(session, runLoop,
-                                         kCFRunLoopDefaultMode);
-        }
-      } scopeGuard(session.get(), runLoop);
-
-      // Run the run loop briefly to ensure DA is ready
-      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
-
       CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
           kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
 
@@ -187,6 +192,7 @@ private:
         return;
       }
 
+      // Get disk description without scheduling on run loop
       CFReleaser<CFDictionaryRef> description(
           DADiskCopyDescription(disk.get()));
       if (!description.isValid()) {
@@ -196,11 +202,7 @@ private:
         return;
       }
 
-      // Ensure we have a complete description before continuing
-      CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, false);
-
-      // Process description synchronously since we're already on the right
-      // thread
+      // Process description immediately
       ProcessDiskDescription(description.get());
 
       if (metadata.status != "partial") {
@@ -246,7 +248,9 @@ private:
     DEBUG_LOG("[GetVolumeMetadataWorker] Processing network volume");
     CFBooleanRef isNetworkVolume = (CFBooleanRef)CFDictionaryGetValue(
         description, kDADiskDescriptionVolumeNetworkKey);
-    metadata.remote = CFBooleanGetValue(isNetworkVolume);
+    if (isNetworkVolume) {
+      metadata.remote = CFBooleanGetValue(isNetworkVolume);
+    }
 
     CFURLRef url = (CFURLRef)CFDictionaryGetValue(
         description, kDADiskDescriptionVolumePathKey);
