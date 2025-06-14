@@ -94,6 +94,11 @@ export const LinuxMountTablePathsDefault = [
 export const IncludeSystemVolumesDefault = isWindows;
 
 /**
+ * Default value for {@link Options.skipNetworkVolumes}.
+ */
+export const SkipNetworkVolumesDefault = false;
+
+/**
  * Default {@link Options} object.
  *
  * @see {@link optionsWithDefaults} for creating an options object with default values
@@ -105,6 +110,7 @@ export const OptionsDefault: Options = {
   systemFsTypes: [...SystemFsTypesDefault],
   linuxMountTablePaths: [...LinuxMountTablePathsDefault],
   includeSystemVolumes: IncludeSystemVolumesDefault,
+  skipNetworkVolumes: SkipNetworkVolumesDefault,
 } as const;
 
 /**

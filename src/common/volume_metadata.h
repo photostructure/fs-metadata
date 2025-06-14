@@ -8,6 +8,8 @@ struct VolumeMetadataOptions {
   std::string mountPoint;    // Required mount point path
   uint32_t timeoutMs = 5000; // Optional timeout with default
   std::string device;        // Optional device path
+  bool skipNetworkVolumes =
+      false; // Skip detailed info for network volumes to avoid blocking
 
   static VolumeMetadataOptions FromObject(const Napi::Object &obj) {
     VolumeMetadataOptions options;
@@ -24,6 +26,10 @@ struct VolumeMetadataOptions {
     }
     if (obj.Has("device")) {
       options.device = obj.Get("device").As<Napi::String>();
+    }
+    if (obj.Has("skipNetworkVolumes")) {
+      options.skipNetworkVolumes =
+          obj.Get("skipNetworkVolumes").As<Napi::Boolean>().Value();
     }
 
     return options;

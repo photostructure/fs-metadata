@@ -51,4 +51,10 @@ export interface Options {
    * Windows and false elsewhere.
    */
   includeSystemVolumes: boolean;
+
+  /**
+   * Skip detailed info for network volumes to avoid blocking.
+   * Defaults to false.
+   */
+  skipNetworkVolumes: boolean;
 }

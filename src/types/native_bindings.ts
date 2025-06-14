@@ -59,6 +59,6 @@ export interface NativeBindings {
 export type GetVolumeMetadataOptions = {
   mountPoint: string;
   device?: string;
-} & Partial<Pick<Options, "timeoutMs">>;
+} & Partial<Pick<Options, "timeoutMs" | "skipNetworkVolumes">>;
 
 export type NativeBindingsFn = () => NativeBindings | Promise<NativeBindings>;
