@@ -32,12 +32,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run lint
 
-  prebuild-mac-win:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-14, windows-latest]
-    runs-on: ${{ matrix.os }}
+  prebuild-mac-x64:
+    runs-on: macos-13-large  # Intel x64 runner
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,7 +46,58 @@ jobs:
       - run: npm run build:native
       - uses: actions/upload-artifact@v4
         with:
-          name: prebuilds-${{ matrix.os }}
+          name: prebuilds-macos-13-large
+          path: prebuilds/
+
+  prebuild-mac-arm64:
+    runs-on: macos-14  # Apple Silicon ARM64 runner (default for macos-14)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+      # We need to ignore scripts so the `install` script in package.json does
+      # not run node-gyp-build
+      - run: npm ci --ignore-scripts
+      - run: npm run build:native
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-macos-14
+          path: prebuilds/
+
+  prebuild-win-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+      # We need to ignore scripts so the `install` script in package.json does
+      # not run node-gyp-build
+      - run: npm ci --ignore-scripts
+      - run: npm run build:native
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-windows-latest
+          path: prebuilds/
+
+  prebuild-win-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+      # We need to ignore scripts so the `install` script in package.json does
+      # not run node-gyp-build
+      - run: npm ci --ignore-scripts
+      - run: npm run build:native
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-windows-11-arm
           path: prebuilds/
 
   prebuild-linux-glibc:
@@ -95,14 +142,73 @@ jobs:
           name: prebuilds-linux-${{ matrix.arch }}-musl
           path: prebuilds/
 
-  test-mac-win:
-    needs: [prebuild-mac-win]
+  test-mac-x64:
+    needs: [prebuild-mac-x64]
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-latest]
         node-version: [20, 22, 23, 24]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-13-large  # Intel x64 runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./prebuilds
+          merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - run: npm ci
+      - run: npm run tests
+
+  test-mac-arm64:
+    needs: [prebuild-mac-arm64]
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 23, 24]
+    runs-on: macos-14  # Apple Silicon ARM64 runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./prebuilds
+          merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - run: npm ci
+      - run: npm run tests
+
+  test-win-x64:
+    needs: [prebuild-win-x64]
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 23, 24]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./prebuilds
+          merge-multiple: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - run: npm ci
+      - run: npm run tests
+
+  test-win-arm64:
+    needs: [prebuild-win-arm64]
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 23, 24]
+    runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -169,7 +275,7 @@ jobs:
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
-    needs: [test-mac-win, test-ubuntu, test-alpine, lint]
+    needs: [test-mac-x64, test-mac-arm64, test-win-x64, test-win-arm64, test-ubuntu, test-alpine, lint]
     permissions:
       contents: write
       packages: write
