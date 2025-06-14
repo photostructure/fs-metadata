@@ -48,6 +48,16 @@ public:
     DEBUG_LOG("[GetVolumeMetadataWorker] Executing for mount point: %s",
               mountPoint.c_str());
     try {
+      // Validate mount point to prevent directory traversal and null byte injection
+      if (mountPoint.find("..") != std::string::npos) {
+        SetError("Invalid mount point containing '..'");
+        return;
+      }
+      if (mountPoint.find('\0') != std::string::npos) {
+        SetError("Invalid mount point containing null byte");
+        return;
+      }
+      
       if (!GetBasicVolumeInfo()) {
         return;
       }
@@ -145,16 +155,8 @@ private:
     }
 
     try {
-      // Get thread-local runloop or create new one if needed
+      // Get thread-local runloop - CFRunLoopGetCurrent() always returns a valid runloop
       CFRunLoopRef runLoop = CFRunLoopGetCurrent();
-      if (!runLoop) {
-        // If no runloop exists, create a new one for this thread
-        CFRunLoopRun();
-        runLoop = CFRunLoopGetCurrent();
-        if (!runLoop) {
-          throw std::runtime_error("Failed to create thread-local runloop");
-        }
-      }
 
       // Schedule session with our runloop
       DASessionScheduleWithRunLoop(session.get(), runLoop,
@@ -164,17 +166,13 @@ private:
       struct RunLoopCleaner {
         DASessionRef session;
         CFRunLoopRef runLoop;
-        bool shouldStop;
-        RunLoopCleaner(DASessionRef s, CFRunLoopRef l, bool stop = false)
-            : session(s), runLoop(l), shouldStop(stop) {}
+        RunLoopCleaner(DASessionRef s, CFRunLoopRef l)
+            : session(s), runLoop(l) {}
         ~RunLoopCleaner() {
           DASessionUnscheduleFromRunLoop(session, runLoop,
                                          kCFRunLoopDefaultMode);
-          if (shouldStop) {
-            CFRunLoopStop(runLoop);
-          }
         }
-      } scopeGuard(session.get(), runLoop, !CFRunLoopGetCurrent());
+      } scopeGuard(session.get(), runLoop);
 
       // Run the run loop briefly to ensure DA is ready
       CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, true);
