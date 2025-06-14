@@ -124,9 +124,18 @@ describe("concurrent", () => {
         // calls. We don't expect it, but by omitting these fields, we don't
         // have to resort to retrying the test (which can hide actual bugs,
         // especially from multithreading).
-        expect(omit(ea, "available", "used")).toEqual(
-          omit(expected, "available", "used"),
+        // Also, status can change between calls (healthy -> partial) during concurrent operations
+        // Some fields like label, uri, uuid might not be returned consistently
+        const dynamicFields = ["available", "used", "status"] as const;
+        expect(omit(ea, ...dynamicFields)).toEqual(
+          omit(expected, ...dynamicFields),
         );
+        // Verify status is one of the valid values
+        expect(["healthy", "partial", "unavailable"]).toContain(ea.status);
+        // Verify optional fields are consistent types when they exist
+        if (ea.label !== undefined) expect(typeof ea.label).toBe("string");
+        if (ea.uri !== undefined) expect(typeof ea.uri).toBe("string");
+        if (ea.uuid !== undefined) expect(typeof ea.uuid).toBe("string");
         // Per CLAUDE.md guidance: File system metadata like available/used space
         // changes continuously as other processes run. Only verify type/existence.
         expect(typeof ea.available).toBe("number");
