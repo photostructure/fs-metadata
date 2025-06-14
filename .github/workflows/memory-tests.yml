@@ -115,3 +115,81 @@ jobs:
         with:
           name: asan-results
           path: asan-test.log
+
+  # macOS AddressSanitizer - run on latest macOS only
+  macos-asan:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build with AddressSanitizer
+        run: |
+          export CFLAGS="-fsanitize=address -g -O1 -fno-omit-frame-pointer"
+          export CXXFLAGS="-fsanitize=address -g -O1 -fno-omit-frame-pointer"
+          export LDFLAGS="-fsanitize=address"
+          npm run node-gyp-rebuild
+          npm run build:dist
+      
+      - name: Run tests with AddressSanitizer
+        run: |
+          export ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1:strict_init_order=1:print_stats=1:halt_on_error=0"
+          export MallocScribble=1
+          export MallocGuardEdges=1
+          npm test
+      
+      - name: Run leaks tool
+        run: |
+          cat > /tmp/test-leaks.js << 'EOF'
+          const binding = require('./build/Release/fs_metadata.node');
+          
+          async function testVolumeMountPoints() {
+              for (let i = 0; i < 100; i++) {
+                  await binding.getVolumeMountPoints();
+              }
+          }
+          
+          async function testVolumeMetadata() {
+              const mountPoints = await binding.getVolumeMountPoints();
+              if (mountPoints.length > 0) {
+                  for (let i = 0; i < 10; i++) {
+                      await binding.getVolumeMetadata({ mountPoint: mountPoints[0].mountPoint });
+                  }
+              }
+          }
+          
+          async function runTests() {
+              await testVolumeMountPoints();
+              await testVolumeMetadata();
+              
+              if (global.gc) {
+                  global.gc();
+              }
+          }
+          
+          runTests().then(() => {
+              console.log('Tests completed');
+              setTimeout(() => process.exit(0), 1000);
+          }).catch(err => {
+              console.error('Test failed:', err);
+              process.exit(1);
+          });
+          EOF
+          
+          leaks --atExit -- node --expose-gc /tmp/test-leaks.js || true
+      
+      - name: Upload macOS memory test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-memory-results
+          path: |
+            *.log
+            core.*
