@@ -12,6 +12,22 @@ if (platform() === "win32") {
   process.exit(0);
 }
 
+// Check for environment variable to skip
+if (process.env.SKIP_CLANG_TIDY) {
+  console.log("Skipping clang-tidy (SKIP_CLANG_TIDY is set)");
+  process.exit(0);
+}
+
+// On macOS, warn about Homebrew LLVM issues but continue
+if (platform() === "darwin") {
+  console.log(
+    "Note: clang-tidy on macOS with Homebrew LLVM may report false positives",
+  );
+  console.log(
+    "due to header path issues. Set SKIP_CLANG_TIDY=1 to skip this check.",
+  );
+}
+
 // Colors for output
 const colors = {
   reset: "\x1b[0m",
@@ -52,18 +68,7 @@ if (
   hasAllTools = false;
 }
 
-if (
-  !checkCommand(
-    "clang-tidy",
-    isLinux
-      ? "sudo apt-get install clang-tidy"
-      : isMacOS
-        ? "brew install llvm && alias clang-tidy=$(brew --prefix llvm)/bin/clang-tidy"
-        : "see https://clang.llvm.org/extra/clang-tidy/",
-  )
-) {
-  hasAllTools = false;
-}
+// Note: clang-tidy will be searched for in multiple locations later
 
 if (!hasAllTools) {
   process.exit(1);
@@ -90,8 +95,9 @@ if (existsSync(compileCommandsPath)) {
   }
 }
 
-// Find clang-tidy binary (try different versions)
+// Find clang-tidy binary (try different versions and locations)
 function findClangTidy(): string {
+  // Try standard versions first
   const versions = ["", "-18", "-17", "-16", "-15", "-14"];
   for (const version of versions) {
     try {
@@ -101,13 +107,66 @@ function findClangTidy(): string {
       // Continue trying
     }
   }
+
+  // On macOS, check Homebrew locations
+  if (isMacOS) {
+    // Try both Intel and Apple Silicon Homebrew locations
+    const brewPrefixes = ["/opt/homebrew", "/usr/local"];
+
+    for (const prefix of brewPrefixes) {
+      // Try Homebrew clang-tidy formula
+      const brewClangTidy = `${prefix}/opt/clang-tidy/bin/clang-tidy`;
+      if (existsSync(brewClangTidy)) {
+        return brewClangTidy;
+      }
+
+      // Try LLVM formula (most common)
+      const llvmClangTidy = `${prefix}/opt/llvm/bin/clang-tidy`;
+      if (existsSync(llvmClangTidy)) {
+        return llvmClangTidy;
+      }
+
+      // Try versioned LLVM formulas
+      for (let v = 18; v >= 14; v--) {
+        const versionedPath = `${prefix}/opt/llvm@${v}/bin/clang-tidy`;
+        if (existsSync(versionedPath)) {
+          return versionedPath;
+        }
+      }
+    }
+
+    // Also try getting brew prefix dynamically
+    try {
+      const brewPrefix = execSync("brew --prefix", { encoding: "utf8" }).trim();
+      const dynamicPath = `${brewPrefix}/opt/llvm/bin/clang-tidy`;
+      if (existsSync(dynamicPath)) {
+        return dynamicPath;
+      }
+    } catch {
+      // brew not available, continue
+    }
+  }
+
   return "clang-tidy"; // fallback
 }
 
 // Get list of files to check
 async function getSourceFiles(): Promise<string[]> {
+  // Get platform-specific exclusions
+  let excludePattern = "";
+  if (isMacOS) {
+    // On macOS, exclude Windows and Linux specific files
+    excludePattern = "| grep -v -E '(windows|linux)/'";
+  } else if (isLinux) {
+    // On Linux, exclude Windows and macOS specific files
+    excludePattern = "| grep -v -E '(windows|darwin)/'";
+  } else {
+    // On other platforms, exclude all platform-specific files
+    excludePattern = "| grep -v -E '(windows|darwin|linux)/'";
+  }
+
   const { stdout } = await exec(
-    `find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' | grep -v -E '(windows|darwin)/'`,
+    `find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' ${excludePattern}`,
   );
   return stdout
     .trim()
@@ -128,7 +187,25 @@ async function runClangTidyOnFile(
   file: string,
 ): Promise<TidyResult> {
   try {
-    const { stdout, stderr } = await exec(`${clangTidy} -p . "${file}" 2>&1`);
+    // On macOS with Homebrew LLVM, we need to add extra flags
+    let extraArgs = "";
+    if (isMacOS && clangTidy.includes("/opt/")) {
+      // Get the SDK path dynamically
+      const sdkPath = execSync("xcrun --show-sdk-path", {
+        encoding: "utf8",
+      }).trim();
+
+      // Add system header search paths for Homebrew LLVM
+      extraArgs =
+        `--extra-arg=-isysroot${sdkPath} ` +
+        `--extra-arg=-isystem${sdkPath}/usr/include/c++/v1 ` +
+        `--extra-arg=-isystem${sdkPath}/usr/include ` +
+        `--extra-arg=-isystem${sdkPath}/System/Library/Frameworks`;
+    }
+
+    const { stdout, stderr } = await exec(
+      `${clangTidy} -p . ${extraArgs} "${file}" 2>&1`,
+    );
     const output = stdout + stderr;
 
     let errors = 0;
@@ -160,6 +237,20 @@ async function runClangTidyOnFile(
 // Main function
 async function main(): Promise<void> {
   const clangTidy = findClangTidy();
+
+  // Verify clang-tidy was found
+  try {
+    execSync(`${clangTidy} --version`, { stdio: "ignore" });
+  } catch {
+    console.error(`${colors.red}Error: clang-tidy not found${colors.reset}`);
+    console.error("To install on macOS:");
+    console.error("  Option 1: brew install clang-tidy");
+    console.error("  Option 2: brew install llvm");
+    console.error("To install on Linux:");
+    console.error("  sudo apt-get install clang-tidy");
+    process.exit(1);
+  }
+
   console.log(`${colors.blue}=== Running clang-tidy ===${colors.reset}`);
   console.log(`${colors.dim}Using: ${clangTidy}${colors.reset}`);
 
