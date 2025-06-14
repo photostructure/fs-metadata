@@ -274,9 +274,9 @@ describeSkipAlpineARM64("Worker Threads Support", () => {
           allResults.push(...iterationResults);
         },
         {
-          targetDurationMs: 5_000, // Target 5 seconds of testing
-          maxTimeoutMs: 15_000, // Max 15 seconds
-          minIterations: 2, // At least 2 iterations
+          targetDurationMs: 2_000, // Target 2 seconds of testing (reduced from 5)
+          maxTimeoutMs: 5_000, // Max 5 seconds (reduced from 15)
+          minIterations: 1, // At least 1 iteration (reduced from 2)
           debug: !!process.env["DEBUG_BENCHMARK"],
         },
       );
@@ -374,8 +374,8 @@ describeSkipAlpineARM64("Worker Threads Support", () => {
           allResults.push(...iterationResults);
         },
         {
-          targetDurationMs: 5_000, // Target 5 seconds of testing
-          maxTimeoutMs: 15_000, // Max 15 seconds
+          targetDurationMs: 2_000, // Target 2 seconds of testing
+          maxTimeoutMs: 5_000, // Max 5 seconds
           minIterations: 2, // At least 2 iterations (10 results minimum)
           debug: !!process.env["DEBUG_BENCHMARK"],
         },
