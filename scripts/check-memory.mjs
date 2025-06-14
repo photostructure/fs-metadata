@@ -2,8 +2,12 @@
 
 /**
  * Cross-platform memory checking script
- * Runs JavaScript memory tests on all platforms
- * Runs valgrind and ASAN tests only on Linux
+ *
+ * Test order by platform:
+ * - Linux/macOS: JavaScript tests → valgrind → ASAN
+ * - Windows: Debug build → Security tests → Rebuild Release → JavaScript tests
+ *
+ * The Windows flow ensures JavaScript memory tests run with Release build
  */
 
 import { execFileSync, execSync } from "child_process";
@@ -32,42 +36,50 @@ console.log(color(colors.BLUE, "=== Memory Leak Detection Suite ==="));
 
 let exitCode = 0;
 
-// 1. Run JavaScript memory tests (all platforms)
-console.log(color(colors.YELLOW, "\nRunning JavaScript memory tests..."));
-try {
-  // Use node to execute jest.js for cross-platform compatibility
-  const jestPath = path.join("node_modules", "jest", "bin", "jest.js");
-  const nodeExe = process.execPath;
-  const args = [jestPath, "--no-coverage", "src/memory.test.ts"];
+// Function to run JavaScript memory tests
+function runJavaScriptMemoryTests() {
+  console.log(color(colors.YELLOW, "\nRunning JavaScript memory tests..."));
+  try {
+    // Use node to execute jest.js for cross-platform compatibility
+    const jestPath = path.join("node_modules", "jest", "bin", "jest.js");
+    const nodeExe = process.execPath;
+    const args = [jestPath, "--no-coverage", "src/memory.test.ts"];
 
-  // Debug output
-  console.log("Debug: Node executable:", nodeExe);
-  console.log("Debug: Jest path:", jestPath);
-  console.log("Debug: Full command:", nodeExe, args.join(" "));
-  console.log("Debug: Current directory:", process.cwd());
-  console.log("Debug: Platform:", os.platform());
-  console.log("Debug: Node version:", process.version);
+    // Debug output
+    console.log("Debug: Node executable:", nodeExe);
+    console.log("Debug: Jest path:", jestPath);
+    console.log("Debug: Full command:", nodeExe, args.join(" "));
+    console.log("Debug: Current directory:", process.cwd());
+    console.log("Debug: Platform:", os.platform());
+    console.log("Debug: Node version:", process.version);
 
-  execFileSync(nodeExe, args, {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      TEST_MEMORY: "1",
-      TEST_ESM: "1",
-      NODE_OPTIONS: "--expose-gc --experimental-vm-modules --no-warnings",
-    },
-  });
-  console.log(color(colors.GREEN, "✓ JavaScript memory tests passed"));
-} catch (error) {
-  console.log(color(colors.RED, "✗ JavaScript memory tests failed"));
-  console.error("Debug: Error details:", error.message);
-  if (error.code) {
-    console.error("Debug: Error code:", error.code);
+    execFileSync(nodeExe, args, {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        TEST_MEMORY: "1",
+        TEST_ESM: "1",
+        NODE_OPTIONS: "--expose-gc --experimental-vm-modules --no-warnings",
+      },
+    });
+    console.log(color(colors.GREEN, "✓ JavaScript memory tests passed"));
+  } catch (error) {
+    console.log(color(colors.RED, "✗ JavaScript memory tests failed"));
+    console.error("Debug: Error details:", error.message);
+    if (error.code) {
+      console.error("Debug: Error code:", error.code);
+    }
+    if (error.signal) {
+      console.error("Debug: Error signal:", error.signal);
+    }
+    exitCode = 1;
   }
-  if (error.signal) {
-    console.error("Debug: Error signal:", error.signal);
-  }
-  exitCode = 1;
+}
+
+// On Windows, run debug tests first, then rebuild before JavaScript tests
+if (os.platform() !== "win32") {
+  // 1. Run JavaScript memory tests first on non-Windows platforms
+  runJavaScriptMemoryTests();
 }
 
 // 2. Run valgrind if available and on Linux
@@ -108,6 +120,48 @@ if (os.platform() === "linux") {
     );
     exitCode = 1;
   }
+}
+
+// 4. Run Windows debug build and memory tests (Windows only)
+if (os.platform() === "win32") {
+  // Skip if explicitly disabled
+  if (process.env.WINDOWS_DEBUG_CHECK === "skip") {
+    console.log(
+      color(
+        colors.YELLOW,
+        "\nSkipping Windows debug memory check (WINDOWS_DEBUG_CHECK=skip)",
+      ),
+    );
+  } else {
+    console.log(
+      color(colors.YELLOW, "\nRunning Windows debug memory check..."),
+    );
+    console.log("  (Set WINDOWS_DEBUG_CHECK=skip to skip this check)");
+    try {
+      const windowsScript = path.join(__dirname, "windows-debug-check.ps1");
+      execSync(
+        `powershell -ExecutionPolicy Bypass -File "${windowsScript}" -SecurityTestsOnly`,
+        { stdio: "inherit" },
+      );
+      console.log(color(colors.GREEN, "✓ Windows debug memory tests passed"));
+    } catch (error) {
+      console.log(color(colors.RED, "✗ Windows debug memory tests failed"));
+      exitCode = 1;
+    }
+
+    // Rebuild in Release mode after debug tests
+    console.log(color(colors.YELLOW, "\nRebuilding in Release mode..."));
+    try {
+      execSync("npm run build:native", { stdio: "inherit" });
+      console.log(color(colors.GREEN, "✓ Rebuilt in Release mode"));
+    } catch (error) {
+      console.log(color(colors.RED, "✗ Failed to rebuild in Release mode"));
+      exitCode = 1;
+    }
+  }
+
+  // Run JavaScript memory tests after rebuilding in Release mode
+  runJavaScriptMemoryTests();
 }
 
 if (exitCode === 0) {
