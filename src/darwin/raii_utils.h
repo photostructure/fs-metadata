@@ -3,9 +3,15 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <sys/mount.h>
 
+// RAII (Resource Acquisition Is Initialization) utilities for macOS APIs.
+// These wrappers ensure proper cleanup of system resources even in the
+// presence of exceptions, preventing memory leaks and resource exhaustion.
+
 namespace FSMeta {
 
-// Generic RAII wrapper for resources that need free()
+// Generic RAII wrapper for resources that need free().
+// This is used for C-style allocations that must be freed with free().
+// Common usage: buffers returned by system APIs like getmntinfo_r_np().
 template <typename T> class ResourceRAII {
 private:
   T *resource_;
@@ -41,10 +47,48 @@ public:
   ResourceRAII &operator=(const ResourceRAII &) = delete;
 };
 
-// Specialized for mount info
-using MountBufferRAII = ResourceRAII<struct statfs>;
+// Specialized RAII wrapper for mount buffer from getmntinfo_r_np().
+// getmntinfo_r_np() allocates a buffer that the caller must free.
+// This wrapper ensures the buffer is freed even if exceptions occur.
+class MountBufferRAII {
+private:
+  struct statfs *buffer_;
 
-// CoreFoundation RAII wrapper
+public:
+  MountBufferRAII() : buffer_(nullptr) {}
+  ~MountBufferRAII() {
+    if (buffer_) {
+      free(buffer_);
+    }
+  }
+
+  struct statfs **ptr() { return &buffer_; }
+  struct statfs *get() { return buffer_; }
+
+  // Add move operations for better resource management
+  MountBufferRAII(MountBufferRAII &&other) noexcept : buffer_(other.buffer_) {
+    other.buffer_ = nullptr;
+  }
+
+  MountBufferRAII &operator=(MountBufferRAII &&other) noexcept {
+    if (this != &other) {
+      if (buffer_)
+        free(buffer_);
+      buffer_ = other.buffer_;
+      other.buffer_ = nullptr;
+    }
+    return *this;
+  }
+
+  // Prevent copying
+  MountBufferRAII(const MountBufferRAII &) = delete;
+  MountBufferRAII &operator=(const MountBufferRAII &) = delete;
+};
+
+// CoreFoundation RAII wrapper following the Create/Copy/Get rule.
+// Any CF object obtained via Create or Copy functions must be released.
+// This wrapper automatically calls CFRelease() in the destructor,
+// preventing memory leaks from Core Foundation objects.
 template <typename T> class CFReleaser {
 private:
   T ref_;
