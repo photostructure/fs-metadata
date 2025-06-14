@@ -45,7 +45,16 @@
       "Bash(awk:*)",
       "WebFetch(domain:stackoverflow.com)",
       "Bash(gpg:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(brew list:*)",
+      "Bash(otool:*)",
+      "Bash(ulimit:*)",
+      "Bash(bash scripts/macos-asan.sh:*)",
+      "Bash(bash:*)",
+      "Bash(leaks:*)",
+      "Bash(xcrun:*)",
+      "Bash(echo:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   },
