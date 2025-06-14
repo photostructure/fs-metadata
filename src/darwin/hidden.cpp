@@ -17,9 +17,13 @@ GetHiddenWorker::GetHiddenWorker(std::string path,
 void GetHiddenWorker::Execute() {
   DEBUG_LOG("[GetHiddenWorker] checking hidden status for: %s", path_.c_str());
 
-  // Add path validation to prevent directory traversal
+  // Add path validation to prevent directory traversal and null byte injection
   if (path_.find("..") != std::string::npos) {
     SetError("Invalid path containing '..'");
+    return;
+  }
+  if (path_.find('\0') != std::string::npos) {
+    SetError("Invalid path containing null byte");
     return;
   }
 
@@ -84,9 +88,13 @@ void SetHiddenWorker::Execute() {
   DEBUG_LOG("[SetHiddenWorker] setting hidden=%d for: %s", hidden_,
             path_.c_str());
 
-  // Add path validation to prevent directory traversal
+  // Add path validation to prevent directory traversal and null byte injection
   if (path_.find("..") != std::string::npos) {
     SetError("Invalid path containing '..'");
+    return;
+  }
+  if (path_.find('\0') != std::string::npos) {
+    SetError("Invalid path containing null byte");
     return;
   }
 
