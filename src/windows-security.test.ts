@@ -7,7 +7,6 @@ import { describePlatform } from "./test-utils/platform";
 
 // Use describePlatform to properly skip entire test suite on non-Windows platforms
 describePlatform("win32")("Windows Security Tests", () => {
-
   describe("Path Traversal Protection", () => {
     it("should reject paths with ..", async () => {
       // These paths should be rejected either by our security validation
