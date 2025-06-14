@@ -44,7 +44,8 @@
       "Bash(touch:*)",
       "Bash(awk:*)",
       "WebFetch(domain:stackoverflow.com)",
-      "Bash(gpg:*)"
+      "Bash(gpg:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": []
   },
