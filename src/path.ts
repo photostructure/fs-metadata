@@ -9,6 +9,17 @@ export function normalizePath(
 ): string | undefined {
   if (isBlank(mountPoint)) return undefined;
 
+  // Security check: reject paths with directory traversal patterns BEFORE resolving
+  if (mountPoint.includes("..")) {
+    throw new Error("Invalid path: contains directory traversal pattern");
+  }
+
+  // Check for invalid UTF-8 sequences by looking for common invalid patterns
+  // This is a basic check - the native code will do more thorough validation
+  if (mountPoint.includes("\uFFFD") || mountPoint.includes("\0")) {
+    throw new Error("Invalid path: contains invalid characters");
+  }
+
   const result = isWindows
     ? normalizeWindowsPath(mountPoint)
     : normalizePosixPath(mountPoint);
