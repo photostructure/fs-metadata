@@ -137,6 +137,12 @@ async function isSystemHidden(
     return isHidden;
   } catch (error) {
     debug("Native isHidden threw error: %s", error);
+    // Handle non-existent paths by returning false (consistent with Windows behavior)
+    const errorStr = String(error);
+    if (errorStr.includes("Path not found")) {
+      debug("Path not found, returning false");
+      return false;
+    }
     throw error;
   }
 }
