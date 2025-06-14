@@ -109,6 +109,50 @@ When developing in WSL (Windows Subsystem for Linux) and needing to run commands
 
 **Note**: This is particularly useful when testing Windows-specific functionality that requires running on the native Windows environment rather than within WSL.
 
+## Memory Leak Detection
+
+The project includes comprehensive memory leak detection across all platforms:
+
+### Cross-Platform Memory Testing
+```bash
+npm run check:memory
+```
+
+This runs `scripts/check-memory.mjs` which performs:
+
+1. **JavaScript memory tests** (all platforms)
+   - Tests for memory leaks in JavaScript code
+   - Uses garbage collection triggers to detect retained memory
+
+2. **Windows debug build tests** (Windows only)
+   - Builds native module with CRT debug heap enabled
+   - Runs Windows-specific security tests
+   - Rebuilds in Release mode afterward
+   - Set `WINDOWS_DEBUG_CHECK=skip` to skip this step
+
+3. **Valgrind tests** (Linux only, if available)
+   - Comprehensive memory leak detection
+   - Runs via `scripts/valgrind-test.sh`
+
+4. **AddressSanitizer/LeakSanitizer** (Linux only)
+   - Modern sanitizer-based leak detection
+   - Runs via `scripts/sanitizers-test.sh`
+
+### Windows-Specific Debug Testing
+
+For detailed Windows memory debugging:
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/windows-debug-check.ps1
+```
+
+Options:
+- `-SecurityTestsOnly`: Run only security tests (faster)
+
+The debug build includes:
+- CRT memory leak detection (`_CRTDBG_MAP_ALLOC`)
+- AddressSanitizer support (VS2019+)
+- Enhanced debug logging
+
 ## Release Process
 
 The project uses a vanilla npm/git release workflow with GPG signed commits for security:
