@@ -80,25 +80,87 @@
               "-lMpr.lib",
               "-lPathcch.lib"
             ],
-            "msvs_settings": {
-              "VCCLCompilerTool": {
-                "AdditionalOptions": [
-                  "/Qspectre",
-                  "/guard:cf",
-                  "/ZH:SHA_256",
-                  "/sdl"
-                ],
-                "ExceptionHandling": 1,
-                "RuntimeTypeInfo": "true"
-              },
-              "VCLinkerTool": {
-                "AdditionalOptions": [
-                  "/guard:cf",
-                  "/DYNAMICBASE",
-                  "/CETCOMPAT"
-                ]
-              }
-            },
+            "conditions": [
+              [
+                "target_arch=='x64'",
+                {
+                  "defines": [
+                    "_M_X64",
+                    "_WIN64"
+                  ],
+                  "msvs_settings": {
+                    "VCCLCompilerTool": {
+                      "AdditionalOptions": [
+                        "/Qspectre",
+                        "/guard:cf",
+                        "/ZH:SHA_256",
+                        "/sdl"
+                      ],
+                      "ExceptionHandling": 1,
+                      "RuntimeTypeInfo": "true"
+                    },
+                    "VCLinkerTool": {
+                      "AdditionalOptions": [
+                        "/guard:cf",
+                        "/DYNAMICBASE",
+                        "/CETCOMPAT"
+                      ]
+                    }
+                  }
+                }
+              ],
+              [
+                "target_arch=='arm64'",
+                {
+                  "defines": [
+                    "_M_ARM64",
+                    "_WIN64"
+                  ],
+                  "msvs_settings": {
+                    "VCCLCompilerTool": {
+                      "AdditionalOptions": [
+                        "/guard:cf",
+                        "/ZH:SHA_256",
+                        "/sdl"
+                      ],
+                      "ExceptionHandling": 1,
+                      "RuntimeTypeInfo": "true"
+                    },
+                    "VCLinkerTool": {
+                      "AdditionalOptions": [
+                        "/guard:cf",
+                        "/DYNAMICBASE"
+                      ]
+                    }
+                  }
+                }
+              ],
+              [
+                "target_arch=='ia32'",
+                {
+                  "defines": [
+                    "_M_IX86"
+                  ],
+                  "msvs_settings": {
+                    "VCCLCompilerTool": {
+                      "AdditionalOptions": [
+                        "/guard:cf",
+                        "/ZH:SHA_256",
+                        "/sdl"
+                      ],
+                      "ExceptionHandling": 1,
+                      "RuntimeTypeInfo": "true"
+                    },
+                    "VCLinkerTool": {
+                      "AdditionalOptions": [
+                        "/guard:cf",
+                        "/DYNAMICBASE"
+                      ]
+                    }
+                  }
+                }
+              ]
+            ],
             "configurations": {
               "Debug": {
                 "defines": [

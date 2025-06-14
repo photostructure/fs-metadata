@@ -1,5 +1,5 @@
 // src/windows/hidden.cpp
-#include "windows_common.h"
+#include <windows.h>
 #include "hidden.h"
 #include "../common/debug_log.h"
 #include "error_utils.h"

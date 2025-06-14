@@ -1,7 +1,7 @@
 // src/windows/fs_meta.h
 
 #pragma once
-#include "windows_common.h"
+#include <windows.h>
 #include "../common/volume_metadata.h"
 #include "../common/volume_mount_points.h"
 
