@@ -5,6 +5,7 @@ import * as path from "path";
 import { getVolumeMountPoints, isHidden, type MountPoint } from "./index";
 import { describePlatform } from "./test-utils/platform";
 
+// Use describePlatform to properly skip entire test suite on non-Windows platforms
 describePlatform("win32")("Windows Security Tests", () => {
 
   describe("Path Traversal Protection", () => {
