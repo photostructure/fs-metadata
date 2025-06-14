@@ -4,10 +4,10 @@
 #include "drive_status.h"
 #include "error_utils.h"
 #include "fs_meta.h"
+#include "memory_debug.h"
+#include "security_utils.h"
 #include "string.h"
 #include "system_volume.h"
-#include "security_utils.h"
-#include "memory_debug.h"
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -74,8 +74,8 @@ inline std::string GetVolumeGUID(const std::string &mountPoint) {
   // Maximum length is 49 characters + null terminator
   constexpr DWORD VOLUME_GUID_PATH_LENGTH = 50;
   WCHAR volumeGUID[VOLUME_GUID_PATH_LENGTH] = {0};
-  
-  if (!GetVolumeNameForVolumeMountPointW(widePath.c_str(), volumeGUID, 
+
+  if (!GetVolumeNameForVolumeMountPointW(widePath.c_str(), volumeGUID,
                                          VOLUME_GUID_PATH_LENGTH)) {
     throw FSException("GetVolumeNameForVolumeMountPoint", GetLastError());
   }
@@ -152,7 +152,7 @@ private:
   void Execute() override {
     try {
       MEMORY_CHECKPOINT("GetVolumeMetadataWorker::Execute");
-      
+
       // Get drive status first
       DriveStatus status = CheckDriveStatus(mountPoint);
       metadata.status = DriveStatusToString(status);
