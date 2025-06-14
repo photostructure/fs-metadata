@@ -108,7 +108,13 @@ describe("hidden file tests", () => {
       });
 
       it("should handle root directory", async () => {
-        expect(await isHidden(systemDrive())).toBe(false);
+        // On Windows, root directories (C:\) have Hidden and System attributes
+        // This is standard Windows behavior
+        if (isWindows) {
+          expect(await isHidden(systemDrive())).toBe(true);
+        } else {
+          expect(await isHidden(systemDrive())).toBe(false);
+        }
       });
 
       it("should return false on non-existent paths", async () => {
@@ -564,12 +570,20 @@ describe("hidden file tests", () => {
 
     describe("edge cases", () => {
       it("should handle root directory", async () => {
-        expect(await getHiddenMetadata(systemDrive())).toEqual({
-          hidden: false,
-          dotPrefix: false,
-          systemFlag: false,
-          supported: LocalSupport,
-        });
+        // On Windows, root directories (C:\) have Hidden and System attributes
+        if (isWindows) {
+          const metadata = await getHiddenMetadata(systemDrive());
+          expect(metadata.hidden).toBe(true);
+          expect(metadata.systemFlag).toBe(true);
+          expect(metadata.supported).toEqual(LocalSupport);
+        } else {
+          expect(await getHiddenMetadata(systemDrive())).toEqual({
+            hidden: false,
+            dotPrefix: false,
+            systemFlag: false,
+            supported: LocalSupport,
+          });
+        }
       });
 
       it("should handle non-existent paths", async () => {
