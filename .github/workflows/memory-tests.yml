@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  # JavaScript memory tests - run on all platforms and Node versions
-  js-memory:
+  # Cross-platform memory testing using the central orchestrator script
+  memory-tests:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -22,7 +22,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev build-essential
+          sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev build-essential valgrind clang
       
       - uses: actions/setup-node@v4
         with:
@@ -35,161 +35,20 @@ jobs:
       - name: Build native and javascript bundle
         run: npm run build
       
-      - name: Run JavaScript memory tests
-        run: |
-          node --expose-gc --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js --no-coverage src/memory.test.ts
+      - name: Run comprehensive memory tests
+        run: npm run check:memory
         env:
-          TEST_MEMORY: "1"
-          TEST_ESM: "1"
-
-  # Valgrind - Linux only, run on one Node version
-  valgrind:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+          CI: "true"
       
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y valgrind libglib2.0-dev libblkid-dev uuid-dev build-essential
-      
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build native and javascript bundle
-        run: npm run build
-      
-      - name: Run valgrind memory analysis
-        run: bash scripts/valgrind-test.sh
-      
-      - name: Upload valgrind results
+      - name: Upload memory test results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: valgrind-results
-          path: |
-            valgrind-*.log
-            core.*
-
-  asan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev build-essential clang
-      
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run ASAN tests
-        run: bash scripts/sanitizers-test.sh 2>&1 | tee asan-test.log
-      
-      - name: Check ASAN results
-        run: |
-          if grep -q "ERROR: AddressSanitizer.*fs-metadata" asan-test.log 2>/dev/null; then
-            echo "AddressSanitizer found errors in our code"
-            exit 1
-          fi
-          
-          # Report V8/Node.js leaks but don't fail the build
-          if grep -q "ERROR: AddressSanitizer" asan-test.log 2>/dev/null; then
-            echo "NOTICE: AddressSanitizer found leaks in V8/Node.js internals (ignored)"
-          fi
-      
-      - name: Upload ASAN results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: asan-results
-          path: asan-test.log
-
-  # macOS AddressSanitizer - run on latest macOS only
-  macos-asan:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build with AddressSanitizer
-        run: |
-          export CFLAGS="-fsanitize=address -g -O1 -fno-omit-frame-pointer"
-          export CXXFLAGS="-fsanitize=address -g -O1 -fno-omit-frame-pointer"
-          export LDFLAGS="-fsanitize=address"
-          npm run node-gyp-rebuild
-          npm run build:dist
-      
-      - name: Run tests with AddressSanitizer
-        run: |
-          export ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1:strict_init_order=1:print_stats=1:halt_on_error=0"
-          export MallocScribble=1
-          export MallocGuardEdges=1
-          npm test
-      
-      - name: Run leaks tool
-        run: |
-          cat > /tmp/test-leaks.js << 'EOF'
-          const binding = require('./build/Release/fs_metadata.node');
-          
-          async function testVolumeMountPoints() {
-              for (let i = 0; i < 100; i++) {
-                  await binding.getVolumeMountPoints();
-              }
-          }
-          
-          async function testVolumeMetadata() {
-              const mountPoints = await binding.getVolumeMountPoints();
-              if (mountPoints.length > 0) {
-                  for (let i = 0; i < 10; i++) {
-                      await binding.getVolumeMetadata({ mountPoint: mountPoints[0].mountPoint });
-                  }
-              }
-          }
-          
-          async function runTests() {
-              await testVolumeMountPoints();
-              await testVolumeMetadata();
-              
-              if (global.gc) {
-                  global.gc();
-              }
-          }
-          
-          runTests().then(() => {
-              console.log('Tests completed');
-              setTimeout(() => process.exit(0), 1000);
-          }).catch(err => {
-              console.error('Test failed:', err);
-              process.exit(1);
-          });
-          EOF
-          
-          leaks --atExit -- node --expose-gc /tmp/test-leaks.js || true
-      
-      - name: Upload macOS memory test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-memory-results
+          name: memory-test-results-${{ matrix.os }}-node${{ matrix.node-version }}
           path: |
             *.log
+            valgrind-*.log
+            asan-test.log
             core.*
+            test-results/
+          retention-days: 7
