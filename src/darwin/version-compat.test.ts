@@ -73,59 +73,59 @@ describePlatform("darwin")("macOS version compatibility tests", () => {
   });
 
   it("should use appropriate APIs for macOS version", async () => {
-      if (!macOSVersion) return;
+    if (!macOSVersion) return;
 
-      const versionParts = macOSVersion.split(".");
-      const majorVersion = parseInt(versionParts[0] || "0", 10);
+    const versionParts = macOSVersion.split(".");
+    const majorVersion = parseInt(versionParts[0] || "0", 10);
 
-      // getmntinfo_r_np is available since macOS 10.13
-      if (
-        majorVersion >= 10 ||
-        (majorVersion === 10 && parseInt(versionParts[1] || "0", 10) >= 13)
-      ) {
-        // Should successfully get mount points using thread-safe API
-        const mountPoints = await getVolumeMountPoints();
-        expect(Array.isArray(mountPoints)).toBe(true);
-        expect(mountPoints.length).toBeGreaterThan(0);
-      }
+    // getmntinfo_r_np is available since macOS 10.13
+    if (
+      majorVersion >= 10 ||
+      (majorVersion === 10 && parseInt(versionParts[1] || "0", 10) >= 13)
+    ) {
+      // Should successfully get mount points using thread-safe API
+      const mountPoints = await getVolumeMountPoints();
+      expect(Array.isArray(mountPoints)).toBe(true);
+      expect(mountPoints.length).toBeGreaterThan(0);
+    }
   });
 
   it("should handle APFS features based on version", async () => {
-      if (!macOSVersion) return;
+    if (!macOSVersion) return;
 
-      // APFS was introduced in macOS 10.13 (High Sierra)
-      // Full APFS adoption was in macOS 10.14 (Mojave)
-      const metadata = await getVolumeMetadata("/");
+    // APFS was introduced in macOS 10.13 (High Sierra)
+    // Full APFS adoption was in macOS 10.14 (Mojave)
+    const metadata = await getVolumeMetadata("/");
 
-      const versionParts = macOSVersion.split(".");
-      const majorVersion = parseInt(versionParts[0] || "0", 10);
-      const minorVersion =
-        majorVersion === 10 ? parseInt(versionParts[1] || "0", 10) : 0;
+    const versionParts = macOSVersion.split(".");
+    const majorVersion = parseInt(versionParts[0] || "0", 10);
+    const minorVersion =
+      majorVersion === 10 ? parseInt(versionParts[1] || "0", 10) : 0;
 
-      if (majorVersion > 10 || (majorVersion === 10 && minorVersion >= 14)) {
-        // Mojave and later typically use APFS for system volume
-        console.log(`Root filesystem type: ${metadata.fstype}`);
+    if (majorVersion > 10 || (majorVersion === 10 && minorVersion >= 14)) {
+      // Mojave and later typically use APFS for system volume
+      console.log(`Root filesystem type: ${metadata.fstype}`);
 
-        // Note: System volume might still be HFS+ on older upgraded systems
-        if (metadata.fstype?.toLowerCase() === "apfs") {
-          // Test APFS-specific behavior
-          const testFile = path.join(tempDir, "apfs-test.txt");
-          await fs.writeFile(testFile, "test");
+      // Note: System volume might still be HFS+ on older upgraded systems
+      if (metadata.fstype?.toLowerCase() === "apfs") {
+        // Test APFS-specific behavior
+        const testFile = path.join(tempDir, "apfs-test.txt");
+        await fs.writeFile(testFile, "test");
 
-          try {
-            const result = await setHidden(testFile, true, "systemFlag");
-            expect(await isHidden(result.pathname)).toBe(true);
-          } catch (error: unknown) {
-            // APFS may have issues with chflags
-            if (error instanceof Error) {
-              console.log(
-                `APFS chflags error on ${macOSVersion}: ${error.message}`,
-              );
-              expect(error.message).toMatch(/APFS|chflags|not supported/);
-            }
+        try {
+          const result = await setHidden(testFile, true, "systemFlag");
+          expect(await isHidden(result.pathname)).toBe(true);
+        } catch (error: unknown) {
+          // APFS may have issues with chflags
+          if (error instanceof Error) {
+            console.log(
+              `APFS chflags error on ${macOSVersion}: ${error.message}`,
+            );
+            expect(error.message).toMatch(/APFS|chflags|not supported/);
           }
         }
       }
+    }
   });
 
   it("should handle deprecated APIs gracefully", async () => {
@@ -167,48 +167,48 @@ describePlatform("darwin")("macOS version compatibility tests", () => {
   });
 
   it("should handle version-specific mount point filtering", async () => {
-      const mountPoints = await getVolumeMountPoints();
+    const mountPoints = await getVolumeMountPoints();
 
-      // Different macOS versions may have different system mount points
-      const systemMounts = mountPoints.filter(
-        (mp) =>
-          mp.mountPoint.startsWith("/System/") ||
-          mp.mountPoint.startsWith("/private/var/vm"),
-      );
+    // Different macOS versions may have different system mount points
+    const systemMounts = mountPoints.filter(
+      (mp) =>
+        mp.mountPoint.startsWith("/System/") ||
+        mp.mountPoint.startsWith("/private/var/vm"),
+    );
 
-      console.log(
-        `Found ${systemMounts.length} system mount points on macOS ${macOSVersion}`,
-      );
+    console.log(
+      `Found ${systemMounts.length} system mount points on macOS ${macOSVersion}`,
+    );
 
-      // Verify we can get metadata for regular mount points
-      const regularMounts = mountPoints.filter(
-        (mp) =>
-          !mp.mountPoint.startsWith("/System/") &&
-          !mp.mountPoint.startsWith("/private/"),
-      );
+    // Verify we can get metadata for regular mount points
+    const regularMounts = mountPoints.filter(
+      (mp) =>
+        !mp.mountPoint.startsWith("/System/") &&
+        !mp.mountPoint.startsWith("/private/"),
+    );
 
-      if (regularMounts.length > 0) {
-        const firstRegular = regularMounts[0];
-        if (firstRegular) {
-          const metadata = await getVolumeMetadata(firstRegular.mountPoint);
-          expect(metadata).toBeDefined();
-        }
+    if (regularMounts.length > 0) {
+      const firstRegular = regularMounts[0];
+      if (firstRegular) {
+        const metadata = await getVolumeMetadata(firstRegular.mountPoint);
+        expect(metadata).toBeDefined();
       }
+    }
   });
 
   it("should report version-appropriate error messages", async () => {
-      // Test that error messages are appropriate for the macOS version
-      try {
-        // Try to access a non-existent path
-        await getVolumeMetadata("/non/existent/path");
-      } catch (error: unknown) {
-        expect(error).toBeInstanceOf(Error);
-        const errorMessage = (error as Error).message;
-        expect(errorMessage).toBeDefined();
-        expect(errorMessage).not.toMatch(/undefined|null/);
+    // Test that error messages are appropriate for the macOS version
+    try {
+      // Try to access a non-existent path
+      await getVolumeMetadata("/non/existent/path");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(Error);
+      const errorMessage = (error as Error).message;
+      expect(errorMessage).toBeDefined();
+      expect(errorMessage).not.toMatch(/undefined|null/);
 
-        // Should get a proper error message
-        expect(errorMessage).toMatch(/ENOENT|not found|does not exist/i);
-      }
+      // Should get a proper error message
+      expect(errorMessage).toMatch(/ENOENT|not found|does not exist/i);
+    }
   });
 });
