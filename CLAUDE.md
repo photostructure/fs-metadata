@@ -15,6 +15,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `scripts/` - Build and utility scripts
 - `prebuilds/` - Prebuilt native binaries for different platforms
 
+### Script Preferences
+**Always** use TypeScript (`.ts`) scripts executed with `tsx` instead of:
+- `.js` scripts (require compilation or older Node.js syntax)
+- `.mjs` scripts (ESM-only, compatibility issues)
+- `.cjs` scripts (CommonJS-only, less type safety)
+
+TypeScript with tsx provides type safety, modern syntax, and seamless execution.
+
 ## Critical Knowledge
 
 ### Testing File System Metadata
