@@ -77,6 +77,10 @@ This is @photostructure/fs-metadata - a cross-platform native Node.js module for
 - Debug messages from both JavaScript and native code are sent to `stderr`
 - Uses native Node.js debuglog for determining if logging is enabled
 
+## Node.js Version Compatibility
+
+**Important**: This project uses Jest 30 for testing, which does not support Node.js 23 (odd-numbered versions are typically not LTS). The CI/CD workflows are configured to test with Node.js versions 20, 22, and 24. When developing locally, avoid using Node.js 23 to ensure compatibility with the test suite.
+
 ## Development in WSL
 
 When developing in WSL (Windows Subsystem for Linux) and needing to run commands on the Windows host:

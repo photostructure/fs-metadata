@@ -55,7 +55,8 @@
       "Bash(xcrun:*)",
       "Bash(echo:*)",
       "Bash(git add:*)",
-      "Bash(cmd.exe:*)"
+      "Bash(cmd.exe:*)",
+      "WebFetch(domain:drmemory.org)"
     ],
     "deny": []
   },
