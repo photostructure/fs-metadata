@@ -187,7 +187,35 @@
                     ],
                     "GenerateDebugInformation": "true"
                   }
-                }
+                },
+                "conditions": [
+                  [
+                    "target_arch=='x64'",
+                    {
+                      "defines": [
+                        "_M_X64",
+                        "_WIN64"
+                      ]
+                    }
+                  ],
+                  [
+                    "target_arch=='arm64'",
+                    {
+                      "defines": [
+                        "_M_ARM64",
+                        "_WIN64"
+                      ]
+                    }
+                  ],
+                  [
+                    "target_arch=='ia32'",
+                    {
+                      "defines": [
+                        "_M_IX86"
+                      ]
+                    }
+                  ]
+                ]
               }
             }
           }
