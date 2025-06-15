@@ -1,16 +1,11 @@
 #!/usr/bin/env tsx
 import { exec as execCallback, execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { cpus, platform } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 
 const exec = promisify(execCallback);
-
-// Skip clang-tidy on Windows
-if (platform() === "win32") {
-  console.log("Skipping clang-tidy on Windows platform");
-  process.exit(0);
-}
 
 // Check for environment variable to skip
 if (process.env.SKIP_CLANG_TIDY) {
@@ -18,15 +13,10 @@ if (process.env.SKIP_CLANG_TIDY) {
   process.exit(0);
 }
 
-// On macOS, warn about Homebrew LLVM issues but continue
-if (platform() === "darwin") {
-  console.log(
-    "Note: clang-tidy on macOS with Homebrew LLVM may report false positives",
-  );
-  console.log(
-    "due to header path issues. Set SKIP_CLANG_TIDY=1 to skip this check.",
-  );
-}
+// Platform detection
+const isWindows = platform() === "win32";
+const isMacOS = platform() === "darwin";
+const isLinux = platform() === "linux";
 
 // Colors for output
 const colors = {
@@ -38,8 +28,20 @@ const colors = {
   dim: "\x1b[2m",
 } as const;
 
-// Check for required tools
+// Platform-specific warnings
+if (isMacOS) {
+  console.log(
+    "Note: clang-tidy on macOS with Homebrew LLVM may report false positives",
+  );
+  console.log(
+    "due to header path issues. Set SKIP_CLANG_TIDY=1 to skip this check.",
+  );
+}
+
+// Check for required tools (non-Windows only)
 function checkCommand(command: string, installHint: string): boolean {
+  if (isWindows) return true; // Skip on Windows
+
   try {
     execSync(`which ${command}`, { stdio: "ignore" });
     return true;
@@ -50,152 +52,227 @@ function checkCommand(command: string, installHint: string): boolean {
   }
 }
 
-const isMacOS = platform() === "darwin";
-const isLinux = platform() === "linux";
+// Find clang-tidy binary
+function findClangTidy(): string | null {
+  if (isWindows) {
+    // Windows-specific paths
+    const windowsPaths = [
+      "C:\\Program Files\\LLVM\\bin\\clang-tidy.exe",
+      "C:\\Program Files (x86)\\LLVM\\bin\\clang-tidy.exe",
+      // Visual Studio 2022
+      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\Llvm\\x64\\bin\\clang-tidy.exe",
+      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\VC\\Tools\\Llvm\\x64\\bin\\clang-tidy.exe",
+      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\Llvm\\x64\\bin\\clang-tidy.exe",
+      // Visual Studio 2019
+      "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\Llvm\\bin\\clang-tidy.exe",
+      "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Professional\\VC\\Tools\\Llvm\\bin\\clang-tidy.exe",
+      "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC\\Tools\\Llvm\\bin\\clang-tidy.exe",
+    ];
 
-let hasAllTools = true;
-
-if (
-  !checkCommand(
-    "bear",
-    isLinux
-      ? "sudo apt-get install bear"
-      : isMacOS
-        ? "brew install bear"
-        : "see https://github.com/rizsotto/Bear",
-  )
-) {
-  hasAllTools = false;
-}
-
-// Note: clang-tidy will be searched for in multiple locations later
-
-if (!hasAllTools) {
-  process.exit(1);
-}
-
-// Generate compile_commands.json if needed
-const compileCommandsPath = "compile_commands.json";
-if (existsSync(compileCommandsPath)) {
-  console.log("Using existing compile_commands.json");
-} else {
-  console.log("Generating compile_commands.json...");
-
-  // Use bear to generate compile_commands.json
-  // Bear intercepts the build commands and creates the compilation database
-  execSync("npm run setup:native && bear -- npm run node-gyp-rebuild", {
-    stdio: "inherit",
-  });
-
-  // Check if it was created successfully
-  if (!existsSync(compileCommandsPath)) {
-    console.error("Failed to generate compile_commands.json");
-    console.error("Make sure bear is installed: sudo apt-get install bear");
-    process.exit(1);
-  }
-}
-
-// Find clang-tidy binary (try different versions and locations)
-function findClangTidy(): string {
-  // Try standard versions first
-  const versions = ["", "-18", "-17", "-16", "-15", "-14"];
-  for (const version of versions) {
-    try {
-      execSync(`which clang-tidy${version}`, { stdio: "ignore" });
-      return `clang-tidy${version}`;
-    } catch {
-      // Continue trying
+    for (const path of windowsPaths) {
+      if (existsSync(path)) {
+        return path;
+      }
     }
-  }
 
-  // On macOS, check Homebrew locations
-  if (isMacOS) {
-    // Try both Intel and Apple Silicon Homebrew locations
-    const brewPrefixes = ["/opt/homebrew", "/usr/local"];
-
-    for (const prefix of brewPrefixes) {
-      // Try Homebrew clang-tidy formula
-      const brewClangTidy = `${prefix}/opt/clang-tidy/bin/clang-tidy`;
-      if (existsSync(brewClangTidy)) {
-        return brewClangTidy;
+    // Try to find in PATH
+    try {
+      execSync("where clang-tidy", { stdio: "ignore" });
+      return "clang-tidy";
+    } catch {
+      return null;
+    }
+  } else {
+    // Unix-like systems
+    const versions = ["", "-18", "-17", "-16", "-15", "-14"];
+    for (const version of versions) {
+      try {
+        execSync(`which clang-tidy${version}`, { stdio: "ignore" });
+        return `clang-tidy${version}`;
+      } catch {
+        // Continue trying
       }
+    }
 
-      // Try LLVM formula (most common)
-      const llvmClangTidy = `${prefix}/opt/llvm/bin/clang-tidy`;
-      if (existsSync(llvmClangTidy)) {
-        return llvmClangTidy;
-      }
+    // On macOS, check Homebrew locations
+    if (isMacOS) {
+      const brewPrefixes = ["/opt/homebrew", "/usr/local"];
+      for (const prefix of brewPrefixes) {
+        const paths = [
+          `${prefix}/opt/clang-tidy/bin/clang-tidy`,
+          `${prefix}/opt/llvm/bin/clang-tidy`,
+        ];
 
-      // Try versioned LLVM formulas
-      for (let v = 18; v >= 14; v--) {
-        const versionedPath = `${prefix}/opt/llvm@${v}/bin/clang-tidy`;
-        if (existsSync(versionedPath)) {
-          return versionedPath;
+        for (const path of paths) {
+          if (existsSync(path)) {
+            return path;
+          }
+        }
+
+        // Try versioned LLVM formulas
+        for (let v = 18; v >= 14; v--) {
+          const versionedPath = `${prefix}/opt/llvm@${v}/bin/clang-tidy`;
+          if (existsSync(versionedPath)) {
+            return versionedPath;
+          }
         }
       }
     }
 
-    // Also try getting brew prefix dynamically
-    try {
-      const brewPrefix = execSync("brew --prefix", { encoding: "utf8" }).trim();
-      const dynamicPath = `${brewPrefix}/opt/llvm/bin/clang-tidy`;
-      if (existsSync(dynamicPath)) {
-        return dynamicPath;
-      }
-    } catch {
-      // brew not available, continue
+    return "clang-tidy"; // fallback
+  }
+}
+
+// Generate compile_commands.json for Windows
+async function generateWindowsCompileCommands(): Promise<boolean> {
+  console.log("Generating compile_commands.json for Windows...");
+
+  try {
+    execSync("npm run setup:native", { stdio: "inherit" });
+
+    const nodeVersion = process.version.slice(1);
+    const nodeGyp = `${process.env.USERPROFILE}\\.node-gyp\\${nodeVersion}`;
+
+    // Ensure node-gyp headers are installed
+    if (!existsSync(nodeGyp)) {
+      console.log("Installing Node.js headers...");
+      execSync("npx node-gyp install", { stdio: "inherit" });
     }
-  }
 
-  return "clang-tidy"; // fallback
+    const bindingGyp = JSON.parse(
+      readFileSync("binding.gyp", "utf8").replace(/^#.*$/gm, ""),
+    );
+    const target = bindingGyp.targets[0];
+
+    const sources = target.sources.filter(
+      (src: string) => src.includes("windows/") || src === "src/binding.cpp",
+    );
+
+    // Simplified compile commands - let clang-tidy figure out the rest
+    const commands = sources.map((source: string) => ({
+      directory: process.cwd(),
+      file: source,
+      command: [
+        "clang++",
+        "-c",
+        source,
+        "-Inode_modules/node-addon-api",
+        `-I${nodeGyp}/include/node`,
+        "-DWIN32",
+        "-D_WINDOWS",
+        "-D_WIN64",
+        "-D_M_X64=1",
+        "-D_AMD64_=1",
+        "-DNAPI_VERSION=8",
+        "-std=c++17",
+        "-fms-compatibility",
+        "-fms-extensions",
+      ].join(" "),
+    }));
+
+    writeFileSync("compile_commands.json", JSON.stringify(commands, null, 2));
+    console.log(
+      `Created compile_commands.json with ${commands.length} entries`,
+    );
+    return true;
+  } catch (error) {
+    console.error("Failed to generate compile_commands.json:", error);
+    return false;
+  }
 }
 
-// Get list of files to check
+// Generate compile_commands.json for Unix-like systems
+async function generateUnixCompileCommands(): Promise<void> {
+  console.log("Generating compile_commands.json...");
+
+  if (
+    !checkCommand(
+      "bear",
+      isLinux
+        ? "sudo apt-get install bear"
+        : isMacOS
+          ? "brew install bear"
+          : "see https://github.com/rizsotto/Bear",
+    )
+  ) {
+    process.exit(1);
+  }
+
+  execSync("npm run setup:native && bear -- npm run node-gyp-rebuild", {
+    stdio: "inherit",
+  });
+
+  if (!existsSync("compile_commands.json")) {
+    console.error("Failed to generate compile_commands.json");
+    process.exit(1);
+  }
+}
+
+// Get source files to check
 async function getSourceFiles(): Promise<string[]> {
-  // Get platform-specific exclusions
-  let excludePattern = "";
-  if (isMacOS) {
-    // On macOS, exclude Windows and Linux specific files
-    excludePattern = "| grep -v -E '(windows|linux)/'";
-  } else if (isLinux) {
-    // On Linux, exclude Windows and macOS specific files
-    excludePattern = "| grep -v -E '(windows|darwin)/'";
+  if (isWindows) {
+    // Windows-specific files
+    const files: string[] = [];
+    const windowsDir = join("src", "windows");
+
+    if (existsSync(windowsDir)) {
+      const entries = require("fs").readdirSync(windowsDir);
+      for (const entry of entries) {
+        if (entry.endsWith(".cpp") || entry.endsWith(".h")) {
+          files.push(join(windowsDir, entry));
+        }
+      }
+    }
+
+    // Also include binding.cpp
+    files.push(join("src", "binding.cpp"));
+    return files;
   } else {
-    // On other platforms, exclude all platform-specific files
-    excludePattern = "| grep -v -E '(windows|darwin|linux)/'";
+    // Platform-specific exclusions for Unix-like systems
+    let excludePattern = "";
+    if (isMacOS) {
+      excludePattern = "| grep -v -E '(windows|linux)/'";
+    } else if (isLinux) {
+      excludePattern = "| grep -v -E '(windows|darwin)/'";
+    } else {
+      excludePattern = "| grep -v -E '(windows|darwin|linux)/'";
+    }
+
+    const { stdout } = await exec(
+      `find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' ${excludePattern}`,
+    );
+    return stdout
+      .trim()
+      .split("\n")
+      .filter((f) => f);
   }
-
-  const { stdout } = await exec(
-    `find src -name '*.cpp' -o -name '*.h' | grep -E '\\.(cpp|h)$' ${excludePattern}`,
-  );
-  return stdout
-    .trim()
-    .split("\n")
-    .filter((f) => f);
-}
-
-interface TidyResult {
-  file: string;
-  output: string;
-  errors: number;
-  warnings: number;
 }
 
 // Run clang-tidy on a single file
 async function runClangTidyOnFile(
   clangTidy: string,
   file: string,
-): Promise<TidyResult> {
+): Promise<{
+  file: string;
+  output: string;
+  errors: number;
+  warnings: number;
+}> {
   try {
-    // On macOS with Homebrew LLVM, we need to add extra flags
     let extraArgs = "";
-    if (isMacOS && clangTidy.includes("/opt/")) {
-      // Get the SDK path dynamically
+
+    // Platform-specific config and arguments
+    if (isWindows) {
+      const configPath = join("src", "windows", ".clang-tidy");
+      if (existsSync(configPath)) {
+        extraArgs = `--config-file=${configPath}`;
+      }
+    } else if (isMacOS && clangTidy.includes("/opt/")) {
+      // macOS with Homebrew LLVM needs extra paths
       const sdkPath = execSync("xcrun --show-sdk-path", {
         encoding: "utf8",
       }).trim();
 
-      // Add system header search paths for Homebrew LLVM
       extraArgs =
         `--extra-arg=-isysroot${sdkPath} ` +
         `--extra-arg=-isystem${sdkPath}/usr/include/c++/v1 ` +
@@ -204,7 +281,7 @@ async function runClangTidyOnFile(
     }
 
     const { stdout, stderr } = await exec(
-      `${clangTidy} -p . ${extraArgs} "${file}" 2>&1`,
+      `${isWindows ? `"${clangTidy}"` : clangTidy} -p . ${extraArgs} "${file}" 2>&1`,
     );
     const output = stdout + stderr;
 
@@ -219,7 +296,6 @@ async function runClangTidyOnFile(
 
     return { file, output, errors, warnings };
   } catch (error: any) {
-    // clang-tidy returns non-zero on errors, capture output
     const output = error.stdout || error.stderr || error.message;
     let errors = 0;
     let warnings = 0;
@@ -238,23 +314,43 @@ async function runClangTidyOnFile(
 async function main(): Promise<void> {
   const clangTidy = findClangTidy();
 
-  // Verify clang-tidy was found
-  try {
-    execSync(`${clangTidy} --version`, { stdio: "ignore" });
-  } catch {
+  if (!clangTidy) {
     console.error(`${colors.red}Error: clang-tidy not found${colors.reset}`);
-    console.error("To install on macOS:");
-    console.error("  Option 1: brew install clang-tidy");
-    console.error("  Option 2: brew install llvm");
-    console.error("To install on Linux:");
-    console.error("  sudo apt-get install clang-tidy");
+    if (isWindows) {
+      console.error("\nTo install clang-tidy on Windows:");
+      console.error(
+        "1. Install LLVM: https://github.com/llvm/llvm-project/releases",
+      );
+      console.error("2. Or install Visual Studio 2019/2022 with C++ tools");
+    } else if (isMacOS) {
+      console.error("\nTo install on macOS:");
+      console.error("  Option 1: brew install clang-tidy");
+      console.error("  Option 2: brew install llvm");
+    } else {
+      console.error("\nTo install on Linux:");
+      console.error("  sudo apt-get install clang-tidy");
+    }
     process.exit(1);
   }
 
   console.log(`${colors.blue}=== Running clang-tidy ===${colors.reset}`);
   console.log(`${colors.dim}Using: ${clangTidy}${colors.reset}`);
+  console.log(`${colors.dim}Platform: ${platform()}${colors.reset}`);
 
-  // Get files
+  // Generate or check compile_commands.json
+  if (!existsSync("compile_commands.json")) {
+    if (isWindows) {
+      if (!(await generateWindowsCompileCommands())) {
+        process.exit(1);
+      }
+    } else {
+      await generateUnixCompileCommands();
+    }
+  } else {
+    console.log("Using existing compile_commands.json");
+  }
+
+  // Get files to check
   const files = await getSourceFiles();
   if (files.length === 0) {
     console.log(
@@ -267,40 +363,87 @@ async function main(): Promise<void> {
     `${colors.dim}Checking ${files.length} files...${colors.reset}\n`,
   );
 
-  // Run clang-tidy on files in parallel
-  const parallelism = Math.min(cpus().length, 8);
-  const results: TidyResult[] = [];
+  // Run clang-tidy on files
+  const parallelism = isWindows ? 1 : Math.min(cpus().length, 8);
+  const results: Array<{
+    file: string;
+    output: string;
+    errors: number;
+    warnings: number;
+  }> = [];
 
-  // Process files in chunks
-  for (let i = 0; i < files.length; i += parallelism) {
-    const chunk = files.slice(i, i + parallelism);
-    const chunkResults = await Promise.all(
-      chunk.map((file) => runClangTidyOnFile(clangTidy, file)),
-    );
-    results.push(...chunkResults);
+  // Process files
+  if (isWindows) {
+    // Sequential on Windows to avoid issues
+    for (const file of files) {
+      const result = await runClangTidyOnFile(clangTidy, file);
+      results.push(result);
 
-    // Show progress
-    for (const result of chunkResults) {
-      const relPath = result.file.replace(process.cwd() + "/", "");
+      // Show progress
+      const relPath = file.replace(
+        process.cwd() + (isWindows ? "\\" : "/"),
+        "",
+      );
       if (result.errors > 0) {
         console.log(
           `${colors.red}✗${colors.reset} ${relPath} (${result.errors} errors, ${result.warnings} warnings)`,
         );
-        // Show actual errors
+        // Show first few errors
         const errorLines = result.output
           .split("\n")
           .filter(
             (line) => line.includes(" error:") || line.includes(" warning:"),
           );
-        errorLines.forEach((line) =>
-          console.log(`  ${colors.dim}${line}${colors.reset}`),
-        );
+        errorLines
+          .slice(0, 5)
+          .forEach((line) =>
+            console.log(`  ${colors.dim}${line}${colors.reset}`),
+          );
+        if (errorLines.length > 5) {
+          console.log(
+            `  ${colors.dim}... and ${errorLines.length - 5} more${colors.reset}`,
+          );
+        }
       } else if (result.warnings > 0) {
         console.log(
           `${colors.yellow}⚠${colors.reset} ${relPath} (${result.warnings} warnings)`,
         );
       } else {
         console.log(`${colors.green}✓${colors.reset} ${relPath}`);
+      }
+    }
+  } else {
+    // Parallel on Unix-like systems
+    for (let i = 0; i < files.length; i += parallelism) {
+      const chunk = files.slice(i, i + parallelism);
+      const chunkResults = await Promise.all(
+        chunk.map((file) => runClangTidyOnFile(clangTidy, file)),
+      );
+      results.push(...chunkResults);
+
+      // Show progress
+      for (const result of chunkResults) {
+        const relPath = result.file.replace(process.cwd() + "/", "");
+        if (result.errors > 0) {
+          console.log(
+            `${colors.red}✗${colors.reset} ${relPath} (${result.errors} errors, ${result.warnings} warnings)`,
+          );
+          // Show actual errors
+          const errorLines = result.output
+            .split("\n")
+            .filter(
+              (line) => line.includes(" error:") || line.includes(" warning:"),
+            );
+          errorLines.forEach((line) =>
+            console.log(`  ${colors.dim}${line}${colors.reset}`),
+          );
+        } else if (result.warnings > 0) {
+          console.log(
+            `${colors.yellow}⚠${colors.reset} ${relPath} (${result.warnings} warnings)`,
+          );
+        } else {
+          console.log(`${colors.green}✓${colors.reset} ${relPath}`);
+        }
       }
     }
   }
@@ -320,6 +463,12 @@ async function main(): Promise<void> {
   }
   if (totalErrors === 0 && totalWarnings === 0) {
     console.log(`${colors.green}✓ No issues found${colors.reset}`);
+  }
+
+  if (isWindows) {
+    console.log(
+      `\n${colors.dim}Windows-specific checks applied from src/windows/.clang-tidy${colors.reset}`,
+    );
   }
 
   process.exit(totalErrors > 0 ? 1 : 0);
