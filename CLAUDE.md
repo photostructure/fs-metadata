@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is @photostructure/fs-metadata - a cross-platform native Node.js module for retrieving filesystem metadata, including mount points, volume information, and space utilization statistics.
 
+### Directory Structure
+
+- `src/` - Source code (TypeScript and C++)
+- `dist/` - Compiled JavaScript output (gitignored)
+- `doc/` - Static documentation (manually written, checked into git)
+- `build/` - All build artifacts (gitignored)
+  - `build/docs/` - Generated API documentation from TypeDoc (deployed to GitHub Pages)
+- `scripts/` - Build and utility scripts
+- `prebuilds/` - Prebuilt native binaries for different platforms
+
 ### Key Features
 - Cross-platform support: Windows 10+ (x64), macOS 14+, Ubuntu 22+ (x64, arm64)
 - Lists all mounted volumes/drives
@@ -80,6 +90,14 @@ This is @photostructure/fs-metadata - a cross-platform native Node.js module for
 ## Node.js Version Compatibility
 
 **Important**: This project uses Jest 30 for testing, which does not support Node.js 23 (odd-numbered versions are typically not LTS). The CI/CD workflows are configured to test with Node.js versions 20, 22, and 24. When developing locally, avoid using Node.js 23 to ensure compatibility with the test suite.
+
+## Windows Build Architecture Issue
+
+**Known Issue**: When building on Windows with node-gyp/prebuildify, the target architecture macros (`_M_X64`, `_WIN64`, etc.) may not be properly set by the build system, resulting in a "No Target Architecture" error from the Windows SDK headers.
+
+**Workaround**: The Windows source files (`.cpp`) include architecture defines at the top of each file before any other includes. This ensures the Windows SDK headers receive the required macros. The `windows_headers.h` wrapper also attempts to detect and set these macros, but direct definition in the source files provides the most reliable solution.
+
+This issue appears to be related to how node-gyp passes architecture information during the prebuildify build process.
 
 ## Development in WSL
 

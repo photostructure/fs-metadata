@@ -1,6 +1,6 @@
 {
   "entryPoints": ["src/index.ts"],
-  "out": "docs",
+  "out": "build/docs",
   "name": "@photostructure/fs-metadata",
   "includeVersion": false,
   "excludePrivate": true,

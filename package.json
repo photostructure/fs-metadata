@@ -36,7 +36,7 @@
     "build:native": "npm run setup:native && prebuildify --napi --tag-libc --strip",
     "build:linux-glibc": "bash scripts/prebuild-linux-glibc.sh",
     "build:dist": "tsup && node scripts/post-build.mjs",
-    "docs": "typedoc --tsconfig tsconfig.base.json --out docs src/index.ts",
+    "docs": "typedoc",
     "// test": "support `npm t name_of_file` (and don't fail due to missing coverage)",
     "test": "npm run test:cjs -- --no-coverage",
     "tests": "run-s test:*",
