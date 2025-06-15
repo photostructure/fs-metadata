@@ -34,11 +34,11 @@ const colors = {
   YELLOW: "\x1b[33m",
   BLUE: "\x1b[34m",
   RESET: "\x1b[0m",
-};
+} as const;
 
 // Use colors only if not on Windows
 const isWindows = os.platform() === "win32";
-const color = (colorCode, text) =>
+const color = (colorCode: string, text: string): string =>
   isWindows ? text : `${colorCode}${text}${colors.RESET}`;
 
 console.log(color(colors.BLUE, "=== Memory Leak Detection Suite ==="));
@@ -46,7 +46,7 @@ console.log(color(colors.BLUE, "=== Memory Leak Detection Suite ==="));
 let exitCode = 0;
 
 // Function to run JavaScript memory tests
-function runJavaScriptMemoryTests() {
+function runJavaScriptMemoryTests(): void {
   console.log(color(colors.YELLOW, "\nRunning JavaScript memory tests..."));
   try {
     // Use node to execute jest.js for cross-platform compatibility
@@ -77,7 +77,7 @@ function runJavaScriptMemoryTests() {
       },
     });
     console.log(color(colors.GREEN, "✓ JavaScript memory tests passed"));
-  } catch (error) {
+  } catch (error: any) {
     console.log(color(colors.RED, "✗ JavaScript memory tests failed"));
     console.error("Debug: Error details:", error.message);
     if (error.code) {
