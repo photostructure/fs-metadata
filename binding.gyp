@@ -19,14 +19,6 @@
         "NAPI_CPP_EXCEPTIONS",
         "NAPI_VERSION=9"
       ],
-      "configurations": {
-        "Debug": {
-          "defines": [
-            "DEBUG",
-            "_DEBUG"
-          ]
-        }
-      },
       "conditions": [
         [
           "OS=='linux'",
@@ -80,12 +72,16 @@
               "-lMpr.lib",
               "-lPathcch.lib"
             ],
+            "defines": [
+              "WIN32",
+              "_WINDOWS"
+            ],
             "conditions": [
               [
                 "target_arch=='x64'",
                 {
                   "defines": [
-                    "_M_X64",
+                    "_M_X64", 
                     "_WIN64"
                   ],
                   "msvs_settings": {
@@ -160,64 +156,7 @@
                   }
                 }
               ]
-            ],
-            "configurations": {
-              "Debug": {
-                "defines": [
-                  "_CRTDBG_MAP_ALLOC"
-                ],
-                "msvs_settings": {
-                  "VCCLCompilerTool": {
-                    "AdditionalOptions": [
-                      "/MDd",
-                      "/Zi",
-                      "/Od",
-                      "/RTC1",
-                      "/fsanitize=address"
-                    ],
-                    "RuntimeLibrary": "3",
-                    "BasicRuntimeChecks": "3",
-                    "Optimization": "0",
-                    "DebugInformationFormat": "3"
-                  },
-                  "VCLinkerTool": {
-                    "AdditionalOptions": [
-                      "/DEBUG:FULL",
-                      "/INCREMENTAL:NO"
-                    ],
-                    "GenerateDebugInformation": "true"
-                  }
-                },
-                "conditions": [
-                  [
-                    "target_arch=='x64'",
-                    {
-                      "defines": [
-                        "_M_X64",
-                        "_WIN64"
-                      ]
-                    }
-                  ],
-                  [
-                    "target_arch=='arm64'",
-                    {
-                      "defines": [
-                        "_M_ARM64",
-                        "_WIN64"
-                      ]
-                    }
-                  ],
-                  [
-                    "target_arch=='ia32'",
-                    {
-                      "defines": [
-                        "_M_IX86"
-                      ]
-                    }
-                  ]
-                ]
-              }
-            }
+            ]
           }
         ],
         [

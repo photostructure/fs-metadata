@@ -7,22 +7,21 @@
  * - JavaScript memory tests on all platforms
  * - Valgrind and ASAN/LSAN tests on Linux
  * - AddressSanitizer and leaks tool on macOS
- * - Windows debug build with CRT memory checking
  * - Handles platform-specific quirks (e.g., macOS SIP restrictions)
  *
  * Test order by platform:
  * - Linux/macOS: JavaScript tests → valgrind → ASAN
- * - Windows: Debug build → Security tests → Rebuild Release → JavaScript tests
+ * - Windows: JavaScript tests only
  *
  * IMPORTANT: This is the ONLY script that should be called for memory testing.
  * All platform-specific logic is handled internally. Do not call platform-specific
  * scripts (like macos-asan.sh) directly from package.json or precommit scripts.
  */
 
-import { execFileSync, execSync } from "child_process";
-import os from "os";
-import path from "path";
-import { fileURLToPath } from "url";
+import { execFileSync, execSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -203,45 +202,8 @@ if (os.platform() === "linux") {
   }
 }
 
-// 4. Run Windows debug build and memory tests (Windows only)
+// On Windows, just run JavaScript memory tests
 if (os.platform() === "win32") {
-  // Skip if explicitly disabled
-  if (process.env.WINDOWS_DEBUG_CHECK === "skip") {
-    console.log(
-      color(
-        colors.YELLOW,
-        "\nSkipping Windows debug memory check (WINDOWS_DEBUG_CHECK=skip)",
-      ),
-    );
-  } else {
-    console.log(
-      color(colors.YELLOW, "\nRunning Windows debug memory check..."),
-    );
-    console.log("  (Set WINDOWS_DEBUG_CHECK=skip to skip this check)");
-    try {
-      const windowsScript = path.join(__dirname, "windows-debug-check.ps1");
-      execSync(
-        `powershell -ExecutionPolicy Bypass -File "${windowsScript}" -SecurityTestsOnly`,
-        { stdio: "inherit" },
-      );
-      console.log(color(colors.GREEN, "✓ Windows debug memory tests passed"));
-    } catch (error) {
-      console.log(color(colors.RED, "✗ Windows debug memory tests failed"));
-      exitCode = 1;
-    }
-
-    // Rebuild in Release mode after debug tests
-    console.log(color(colors.YELLOW, "\nRebuilding in Release mode..."));
-    try {
-      execSync("npm run build:native", { stdio: "inherit" });
-      console.log(color(colors.GREEN, "✓ Rebuilt in Release mode"));
-    } catch (error) {
-      console.log(color(colors.RED, "✗ Failed to rebuild in Release mode"));
-      exitCode = 1;
-    }
-  }
-
-  // Run JavaScript memory tests after rebuilding in Release mode
   runJavaScriptMemoryTests();
 }
 

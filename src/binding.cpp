@@ -6,7 +6,6 @@
 #if defined(_WIN32)
 #include "windows/fs_meta.h"
 #include "windows/hidden.h"
-#include "windows/memory_debug.h"
 #elif defined(__APPLE__)
 #include "darwin/fs_meta.h"
 #include "darwin/hidden.h"
@@ -72,12 +71,6 @@ Napi::Value SetHiddenAttribute(const Napi::CallbackInfo &info) {
 #endif
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
-#if defined(_WIN32) && defined(_DEBUG)
-  // Initialize memory debugging for Windows debug builds
-  INIT_MEMORY_DEBUG();
-  DEBUG_LOG("[Init] Memory debugging initialized for Windows debug build");
-#endif
-
   exports.Set("setDebugLogging", Napi::Function::New(env, SetDebugLogging));
   exports.Set("setDebugPrefix", Napi::Function::New(env, SetDebugPrefix));
 

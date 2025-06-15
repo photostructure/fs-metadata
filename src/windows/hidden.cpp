@@ -2,9 +2,8 @@
 #include "hidden.h"
 #include "../common/debug_log.h"
 #include "error_utils.h"
-#include "memory_debug.h"
 #include "security_utils.h"
-#include <windows.h>
+#include "windows_compat.h"
 
 namespace FSMeta {
 
@@ -26,8 +25,8 @@ public:
   bool isHidden() const { return (attributes & FILE_ATTRIBUTE_HIDDEN) != 0; }
 
   void setHidden(bool value) {
-    DWORD newAttrs = value ? (attributes | FILE_ATTRIBUTE_HIDDEN)
-                           : (attributes & ~FILE_ATTRIBUTE_HIDDEN);
+    DWORD newAttrs = value ? (attributes | static_cast<DWORD>(FILE_ATTRIBUTE_HIDDEN))
+                           : (attributes & ~static_cast<DWORD>(FILE_ATTRIBUTE_HIDDEN));
 
     if (!SetFileAttributesW(path.c_str(), newAttrs)) {
       throw FSException("SetFileAttributes", GetLastError());
@@ -44,13 +43,10 @@ class GetHiddenWorker : public Napi::AsyncWorker {
 
 public:
   GetHiddenWorker(Napi::Env env, std::string p, Napi::Promise::Deferred def)
-      : Napi::AsyncWorker(env), path(std::move(p)), result(false),
-        deferred(def) {}
+      : Napi::AsyncWorker(env), path(std::move(p)), deferred(def) {}
 
   void Execute() override {
     try {
-      MEMORY_CHECKPOINT("GetHiddenWorker::Execute");
-
       // Debug: Log the input path
       DEBUG_LOG("[GetHiddenWorker] Checking path: %s", path.c_str());
 
@@ -130,8 +126,6 @@ public:
 
   void Execute() override {
     try {
-      MEMORY_CHECKPOINT("SetHiddenWorker::Execute");
-
       // Enhanced security validation
       if (!SecurityUtils::IsPathSecure(path)) {
         throw FSException("Security validation failed: invalid path",
@@ -168,8 +162,7 @@ Napi::Promise GetHiddenAttribute(const Napi::CallbackInfo &info) {
       throw Napi::TypeError::New(env, "String path expected");
     }
 
-    std::string path = info[0].As<Napi::String>();
-    auto *worker = new GetHiddenWorker(env, std::move(path), deferred);
+    auto *worker = new GetHiddenWorker(env, info[0].As<Napi::String>().Utf8Value(), deferred);
     worker->Queue();
 
     return deferred.Promise();
@@ -188,10 +181,9 @@ Napi::Promise SetHiddenAttribute(const Napi::CallbackInfo &info) {
       throw Napi::TypeError::New(env, "String path and boolean value expected");
     }
 
-    std::string path = info[0].As<Napi::String>();
     bool value = info[1].As<Napi::Boolean>();
 
-    auto *worker = new SetHiddenWorker(env, std::move(path), value, deferred);
+    auto *worker = new SetHiddenWorker(env, info[0].As<Napi::String>().Utf8Value(), value, deferred);
     worker->Queue();
 
     return deferred.Promise();

@@ -40,8 +40,22 @@ Jest 30 doesn't support Node.js 23. Use Node.js 20, 22, or 24.
 ## Windows-Specific Issues
 
 ### Build Architecture Issue
-**Problem**: "No Target Architecture" error from Windows SDK headers.
-**Workaround**: Windows source files include architecture defines at the top before any includes.
+**Problem**: "No Target Architecture" error from Windows SDK headers when building with node-gyp/prebuildify.
+
+**Solution**: Use `scripts/prebuildify-wrapper.ts` which sets the `CL` environment variable with architecture defines:
+- For x64: `CL=/D_M_X64 /D_WIN64 /D_AMD64_`
+- For ARM64: `CL=/D_M_ARM64 /D_WIN64`
+
+**Why This is Necessary**:
+- Prebuildify doesn't properly pass architecture defines from binding.gyp conditions
+- The Windows SDK requires these macros before including `<windows.h>`
+- Projects like node-sqlite avoid this by not using Windows headers directly
+
+**Why Other Approaches Failed**:
+- **Source file defines**: Would hardcode x64 defines, breaking ARM64 builds
+- **windows_compat.h wrapper**: Can't distinguish x64 from ARM64 at compile time
+- **binding.gyp conditions**: Not evaluated properly by prebuildify
+- **msvs_settings defines**: Not passed through to the compiler
 
 ### Memory Testing Limitations
 Traditional Windows tools **do not work** with Node.js native modules:

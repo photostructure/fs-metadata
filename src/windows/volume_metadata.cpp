@@ -4,14 +4,13 @@
 #include "drive_status.h"
 #include "error_utils.h"
 #include "fs_meta.h"
-#include "memory_debug.h"
 #include "security_utils.h"
 #include "string.h"
 #include "system_volume.h"
 #include <iomanip>
 #include <memory>
 #include <sstream>
-#include <windows.h>
+#include "windows_compat.h"
 #include <winnetwk.h>
 
 namespace FSMeta {
@@ -151,8 +150,6 @@ private:
 
   void Execute() override {
     try {
-      MEMORY_CHECKPOINT("GetVolumeMetadataWorker::Execute");
-
       // Get drive status first
       DriveStatus status = CheckDriveStatus(mountPoint);
       metadata.status = DriveStatusToString(status);
