@@ -85,11 +85,6 @@ if ($SecurityTestsOnly) {
         Invoke-Command "node --expose-gc node_modules/jest/bin/jest.js --no-coverage --runInBand src/windows-resource-security.test.ts" "Running security tests"
         
         Write-Host "`nSecurity tests completed successfully." -ForegroundColor Green
-        Write-Host "Note: JavaScript memory tests are handled by check-memory.mjs" -ForegroundColor Yellow
-        Write-Host "For CRT-based leak detection, consider using:" -ForegroundColor Yellow
-        Write-Host "  - Visual Leak Detector (VLD)" -ForegroundColor Yellow
-        Write-Host "  - Application Verifier" -ForegroundColor Yellow
-        Write-Host "  - Dr. Memory" -ForegroundColor Yellow
     }
     catch {
         Write-Host "Error running security tests: $_" -ForegroundColor Red
