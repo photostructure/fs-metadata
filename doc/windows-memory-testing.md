@@ -42,31 +42,22 @@ JavaScript-based memory monitoring that works with Release builds:
 
 ## Alternative Windows Memory Leak Detection Tools
 
-For deeper memory analysis, consider these Windows-specific tools:
+**Note: Traditional Windows memory debugging tools have significant compatibility issues with Node.js native modules.**
 
-### Visual Leak Detector (VLD)
-- Free, open-source memory leak detector
-- Integrates with Visual Studio
-- Provides complete stack traces for leaks
-- Add to project: `#include <vld.h>` in C++ code
+### Why These Tools Don't Work Well with Node.js
 
-### Dr. Memory
-- Cross-platform memory monitoring tool
-- Detects uninitialized memory access, buffer overflows, leaks
-- Works with release builds
-- Command line: `drmemory -- your_app.exe`
+1. **Dr. Memory**: Known incompatibility with Node.js - fails with "Unable to load client library: ucrtbase.dll" error (GitHub issue #2531)
+2. **Visual Leak Detector (VLD)**: Requires debug builds which have loading issues with Node.js native modules
+3. **Application Verifier**: Cannot properly hook into Node.js's memory management system
+4. **Windows CRT Debug Heap**: Requires debug builds that face the UNC path loading issue
 
-### Application Verifier
-- Built into Windows SDK
-- Detects heap corruption, handle leaks, critical section issues
-- UI and command-line interfaces
-- Enable via: `appverif -enable Heaps -for your_app.exe`
+### Our Approach
 
-### Windows CRT Debug Heap (when it works)
-When debug builds can be loaded, the CRT provides:
-- `_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF)`
-- Memory leak reports on process exit
-- Allocation tracking with file/line information
+Instead of these traditional tools, we use:
+- JavaScript-based memory monitoring with forced garbage collection
+- Process handle tracking via Node.js's built-in `process.report`
+- Heap usage patterns analysis over multiple iterations
+- This approach provides adequate memory leak detection without the compatibility issues
 
 ## Running Memory Tests
 
@@ -98,12 +89,13 @@ npm run check:memory
    - Use manifest embedding for dependency resolution
    - Investigate short path alternatives to avoid UNC paths
 
-2. Integration with external tools:
-   - Automated VLD integration for CI
-   - Dr. Memory in GitHub Actions
-   - Performance counters monitoring
-
-3. Enhanced JavaScript monitoring:
+2. Enhanced JavaScript monitoring:
    - Native memory tracking via N-API
    - V8 heap snapshots comparison
    - Event loop lag correlation
+   - Windows performance counters integration
+
+3. Native-level monitoring:
+   - Custom memory allocator wrappers
+   - Direct Windows API handle tracking
+   - Integration with Node.js's built-in diagnostics
