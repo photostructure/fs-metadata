@@ -34,6 +34,7 @@ export function omit<T extends object, K extends keyof T>(
   // OH THE TYPING HUGEMANATEE
   for (const key of Object.keys(obj) as Array<keyof Omit<T, K>>) {
     if (!keysSet.has(key as unknown as K)) {
+      // eslint-disable-next-line security/detect-object-injection -- safe object property copy in generic utility
       result[key] = obj[key];
     }
   }

@@ -20,19 +20,20 @@ export function getCallerDirname(): string {
 const patterns = isWindows
   ? [
       // Standard: "at functionName (C:\path\file.js:1:1)"
-      /\bat\s.+?\((?<path>[A-Z]:\\.+):\d+:\d+\)$/,
+      /\bat\s[^(]*\((?<path>[A-Z]:\\.+?):\d+:\d+\)$/,
       // direct: "at C:\path\file.js:1:1"
-      /\bat\s(?<path>[A-Z]:\\.+):\d+:\d+$/,
+      /\bat\s(?<path>[A-Z]:\\.+?):\d+:\d+$/,
       // UNC: "at functionName (\\server\share\path\file.js:1:1)"
-      /\bat\s.+?\((?<path>\\\\.+):\d+:\d+\)$/,
+      /\bat\s[^(]*\((?<path>\\\\.+?):\d+:\d+\)$/,
       // direct: "at \\server\share\path\file.js:1:1"
-      /\bat\s(?<path>\\\\.+):\d+:\d+$/,
+      /\bat\s(?<path>\\\\.+?):\d+:\d+$/,
     ]
   : [
       // Standard: "at functionName (/path/file.js:1:1)"
-      /\bat\s.+?\((?<path>\/.+?):\d+:\d+\)$/,
+      /\bat\s[^(]*\((?<path>\/.*?):\d+:\d+\)$/,
       // Anonymous or direct: "at /path/file.js:1:1"
-      /\bat\s(.+[^/]\s)?(?<path>\/.+?):\d+:\d+$/,
+      // eslint-disable-next-line security/detect-unsafe-regex -- parsing trusted Node.js stack traces, bounded by line anchors
+      /\bat\s(?:[^/\s]+\s+)?(?<path>\/.*?):\d+:\d+$/,
     ];
 
 const MaybeUrlRE = /^[a-z]{2,5}:\/\//i;
@@ -49,6 +50,7 @@ export function extractCallerPath(stack: string): string {
     throw new Error("Invalid stack trace format: missing caller frame");
   }
   for (let i = callerFrame + 1; i < frames.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection -- accessing array element by index in trusted array
     const frame = frames[i];
     for (const pattern of patterns) {
       const g = toS(frame).trim().match(pattern)?.groups;

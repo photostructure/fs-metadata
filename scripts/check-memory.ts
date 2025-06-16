@@ -132,7 +132,14 @@ if (os.platform() === "linux") {
     console.log(color(colors.YELLOW, "\nRunning valgrind memory analysis..."));
     try {
       const valgrindScript = path.join(__dirname, "valgrind-test.sh");
-      execSync(valgrindScript, { stdio: "inherit" });
+      // Validate script exists before execution (security: prevent path traversal)
+      if (
+        !existsSync(valgrindScript) ||
+        !valgrindScript.startsWith(__dirname)
+      ) {
+        throw new Error(`Invalid script path: ${valgrindScript}`);
+      }
+      execFileSync(valgrindScript, [], { stdio: "inherit", shell: false });
       console.log(color(colors.GREEN, "✓ Valgrind tests passed"));
     } catch {
       console.log(color(colors.RED, "✗ Valgrind tests failed"));
@@ -153,6 +160,10 @@ if (os.platform() === "linux") {
   );
   try {
     const asanScript = path.join(__dirname, "sanitizers-test.sh");
+    // Validate script exists before execution (security: prevent path traversal)
+    if (!existsSync(asanScript) || !asanScript.startsWith(__dirname)) {
+      throw new Error(`Invalid script path: ${asanScript}`);
+    }
     execSync(asanScript, { stdio: "inherit" });
     console.log(
       color(colors.GREEN, "✓ AddressSanitizer and LeakSanitizer tests passed"),
@@ -170,6 +181,13 @@ if (os.platform() === "linux") {
   );
   try {
     const macosAsanScript = path.join(__dirname, "macos-asan.sh");
+    // Validate script exists before execution (security: prevent path traversal)
+    if (
+      !existsSync(macosAsanScript) ||
+      !macosAsanScript.startsWith(__dirname)
+    ) {
+      throw new Error(`Invalid script path: ${macosAsanScript}`);
+    }
     // Run in a clean environment to avoid ASAN contamination
     execSync(macosAsanScript, {
       stdio: "inherit",
