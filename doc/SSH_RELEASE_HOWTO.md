@@ -83,18 +83,16 @@ cat ~/.ssh/photostructure-bot-signing | clip
 
 ## 4. How SSH Signing Works in Actions
 
-The SSH signing setup uses two composite actions:
+The SSH signing setup uses the [photostructure/git-ssh-signing-action](https://github.com/marketplace/actions/git-ssh-signing-action):
 
-### setup-ssh-bot
+### Features
 - Installs the SSH private key
 - Configures Git to use SSH signing format
 - Sets up commit and tag signing
 - Creates allowed signers file for verification
-
-### cleanup-ssh-bot
-- Removes SSH keys from the runner
-- Clears Git signing configuration
-- Ensures no secrets remain after workflow
+- Automatically cleans up keys and configuration after workflow
+- Supports Linux and macOS runners
+- Requires Git 2.34.0+
 
 ## 5. Using SSH Signing in Workflows
 
@@ -111,7 +109,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-ssh-bot
+      - uses: photostructure/git-ssh-signing-action@v1
         with:
           ssh-signing-key: ${{ secrets.SSH_SIGNING_KEY }}
           git-user-name: ${{ secrets.GIT_USER_NAME }}
@@ -122,8 +120,7 @@ jobs:
       - run: npm version patch
       - run: git push origin main --follow-tags
 
-      - uses: ./.github/actions/cleanup-ssh-bot
-        if: always()
+      # Note: Cleanup is handled automatically by the action
 ```
 
 ## 6. Testing SSH Signing
