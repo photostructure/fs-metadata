@@ -1,8 +1,8 @@
 // src/windows/string.h
 
 #pragma once
+#include "windows_arch.h"
 #include <string>
-#include <windows.h>
 
 namespace FSMeta {
 

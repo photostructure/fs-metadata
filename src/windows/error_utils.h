@@ -1,9 +1,9 @@
 // src/windows/error_utils.h
 #pragma once
+#include "windows_arch.h"
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <windows.h>
 
 namespace FSMeta {
 

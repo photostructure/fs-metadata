@@ -3,6 +3,7 @@
 #include "../common/debug_log.h"
 #include "security_utils.h"
 #include "thread_pool.h"
+#include "windows_arch.h"
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -11,7 +12,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <windows.h>
 
 namespace FSMeta {
 

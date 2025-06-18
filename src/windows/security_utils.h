@@ -1,5 +1,6 @@
 // src/windows/security_utils.h
 #pragma once
+#include "windows_arch.h"
 #include <algorithm>
 #include <cctype>
 #include <pathcch.h>
@@ -8,7 +9,6 @@
 #include <string>
 #include <strsafe.h>
 #include <vector>
-#include <windows.h>
 
 #pragma comment(lib, "Pathcch.lib")
 

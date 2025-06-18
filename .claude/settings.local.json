@@ -59,7 +59,8 @@
       "WebFetch(domain:drmemory.org)",
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:clang.llvm.org)",
-      "Bash(/dev/null)"
+      "Bash(/dev/null)",
+      "Bash(gh api:*)"
     ],
     "deny": []
   },

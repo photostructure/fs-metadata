@@ -1,13 +1,13 @@
 // src/windows/thread_pool.h
 #pragma once
 #include "../common/debug_log.h"
+#include "windows_arch.h"
 #include <atomic>
 #include <functional>
 #include <memory>
 #include <queue>
 #include <thread>
 #include <vector>
-#include <windows.h>
 
 namespace FSMeta {
 

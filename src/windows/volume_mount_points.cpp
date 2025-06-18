@@ -7,11 +7,11 @@
 #include "security_utils.h"
 #include "string.h"
 #include "system_volume.h"
+#include "windows_arch.h"
 #include <iostream>
 #include <memory>
 #include <sstream>
 #include <vector>
-#include <windows.h>
 
 namespace FSMeta {
 

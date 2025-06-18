@@ -2,10 +2,10 @@
 #pragma once
 #include "../common/debug_log.h"
 #include "string.h"
+#include "windows_arch.h"
 #include <PathCch.h>
 #include <shlobj.h> // For SHGetFolderPathW and CSIDL constants
 #include <string>
-#include <windows.h>
 
 // If FILE_SUPPORTS_SYSTEM_PATHS is not defined (older SDK)
 #ifndef FILE_SUPPORTS_SYSTEM_PATHS

@@ -3,7 +3,7 @@
 #pragma once
 #include "../common/volume_metadata.h"
 #include "../common/volume_mount_points.h"
-#include <windows.h>
+#include "windows_arch.h"
 
 namespace FSMeta {
 
