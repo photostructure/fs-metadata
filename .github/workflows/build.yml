@@ -337,7 +337,7 @@ jobs:
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: ./.github/actions/setup-ssh-bot
+      - uses: photostructure/git-ssh-signing-action@v0.1.0
         with:
           ssh-signing-key: ${{ secrets.SSH_SIGNING_KEY }}
           git-user-name: ${{ secrets.GIT_USER_NAME }}
@@ -384,5 +384,3 @@ jobs:
             --generate-notes \
             --verify-tag
 
-      - uses: ./.github/actions/cleanup-ssh-bot
-        if: always()

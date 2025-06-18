@@ -97,17 +97,19 @@ export function extractRemoteInfo(
     {
       // CIFS/SMB pattern: //hostname/share or //user@host/share
       regex:
-        /^\/\/(?:(?<remoteUser>[^/@]+)@)?(?<remoteHost>[^/@]+)\/(?<remoteShare>.+)$/,
+        // eslint-disable-next-line security/detect-unsafe-regex -- parsing trusted mount paths from OS, bounded by line anchors
+        /^\/\/(?:(?<remoteUser>[^/@]+)@)?(?<remoteHost>[^/@]+)\/(?<remoteShare>.*)$/,
     },
     {
       // sshfs pattern: sshfs#USER@HOST:REMOTE_PATH
       regex:
-        /^(?:(?<protocol>\w+)#)?(?<remoteUser>[^@]+)@(?<remoteHost>[^:]+):(?<remoteShare>.+)$/,
+        // eslint-disable-next-line security/detect-unsafe-regex -- parsing trusted mount paths from OS, bounded by line anchors
+        /^(?:(?<protocol>\w+)#)?(?<remoteUser>[^@]+)@(?<remoteHost>[^:]+):(?<remoteShare>.*)$/,
     },
     {
       // NFS pattern: hostname:/share
       protocol: "nfs",
-      regex: /^(?<remoteHost>[^:]+):\/(?!\/)(?<remoteShare>.+)$/,
+      regex: /^(?<remoteHost>[^:]+):\/(?!\/)(?<remoteShare>.*)$/,
     },
   ];
 

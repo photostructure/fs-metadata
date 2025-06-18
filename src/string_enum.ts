@@ -28,6 +28,7 @@ export function stringEnum<T extends string>(...o: T[]): StringEnum<T> {
 
   const dict: StringEnumType<T> = {} as StringEnumType<T>;
   for (const key of o) {
+    // eslint-disable-next-line security/detect-object-injection -- building dictionary from trusted input array
     dict[key] = key;
   }
 
