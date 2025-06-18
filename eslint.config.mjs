@@ -49,7 +49,7 @@ export default [
     },
   },
   {
-    files: ["scripts/*.mjs", "scripts/*.ts"],
+    files: ["scripts/*.ts", "scripts/*.*js"],
     rules: {
       "@typescript-eslint/no-unused-vars": [
         "error",
