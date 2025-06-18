@@ -9,6 +9,13 @@
   "githubPages": true,
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "**/test/**"],
   "tsconfig": "tsconfig.base.json",
+  "projectDocuments": [
+    "doc/examples.md",
+    "doc/gotchas.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "LICENSE.txt"
+  ],
   "navigationLinks": {
     "GitHub": "https://github.com/photostructure/fs-metadata",
     "NPM": "https://www.npmjs.com/package/@photostructure/fs-metadata"
@@ -19,9 +26,12 @@
     "c++",
     "cpp",
     "c",
+    "docker",
+    "dockerfile",
     "json",
     "bash",
     "shell",
-    "powershell"
+    "powershell",
+    "yaml"
   ]
 }
