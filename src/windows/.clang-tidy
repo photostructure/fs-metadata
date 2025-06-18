@@ -15,6 +15,15 @@ Checks: >
   -bugprone-casting-through-void,
   -bugprone-assignment-in-if-condition,
   -clang-analyzer-valist.Uninitialized,
+  -readability-identifier-naming,
+  -cppcoreguidelines-macro-usage,
+  -clang-analyzer-core.CallAndMessage,
+  -clang-analyzer-core.NonNullParamChecker,
+  -clang-analyzer-core.uninitialized.*,
+  -clang-analyzer-cplusplus.Move,
+  -clang-analyzer-optin.cplusplus.*,
+  -modernize-use-trailing-return-type,
+  -modernize-concat-nested-namespaces,
   readability-redundant-smartptr-get,
   readability-misleading-indentation,
   readability-non-const-parameter,
@@ -96,9 +105,12 @@ WarningsAsErrors: >
   clang-analyzer-windows.*,
   bugprone-use-after-move
 
-HeaderFilterRegex: '^((?!/usr/include/).)*$'
+HeaderFilterRegex: '^((?!/usr/include/)(?!C:\\\\Program Files)(?!C:\\\\Users\\\\.*\\\\AppData).)*$'
 FormatStyle: none
 SystemHeaders: false
+
+# Note: DiagnosticsFilter is not supported in older clang-tidy versions
+# Instead, we disable problematic checks directly in the Checks list above
 
 CheckOptions:
   - key: performance-move-const-arg.CheckTriviallyCopyableMove

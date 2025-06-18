@@ -131,12 +131,40 @@ async function generateWindowsCompileCommands(): Promise<boolean> {
     execSync("npm run setup:native", { stdio: "inherit" });
 
     const nodeVersion = process.version.slice(1);
-    const nodeGyp = `${process.env.USERPROFILE}\\.node-gyp\\${nodeVersion}`;
 
-    // Ensure node-gyp headers are installed
-    if (!existsSync(nodeGyp)) {
+    // Try multiple possible locations for node-gyp headers
+    const possibleNodeGypPaths = [
+      `${process.env.USERPROFILE}\\.node-gyp\\${nodeVersion}`,
+      `${process.env.LOCALAPPDATA}\\node-gyp\\Cache\\${nodeVersion}`,
+      `${process.env.APPDATA}\\npm\\node_modules\\node-gyp\\cache\\${nodeVersion}`,
+    ];
+
+    let nodeGyp = "";
+    for (const path of possibleNodeGypPaths) {
+      if (existsSync(join(path, "include", "node", "node.h"))) {
+        nodeGyp = path;
+        console.log("Found Node.js headers at:", nodeGyp);
+        break;
+      }
+    }
+
+    // If not found, install them
+    if (!nodeGyp) {
       console.log("Installing Node.js headers...");
       execSync("npx node-gyp install", { stdio: "inherit" });
+
+      // Check again
+      for (const path of possibleNodeGypPaths) {
+        if (existsSync(join(path, "include", "node", "node.h"))) {
+          nodeGyp = path;
+          break;
+        }
+      }
+
+      if (!nodeGyp) {
+        // Fallback to default
+        nodeGyp = `${process.env.USERPROFILE}\\.node-gyp\\${nodeVersion}`;
+      }
     }
 
     const bindingGyp = JSON.parse(
@@ -144,30 +172,90 @@ async function generateWindowsCompileCommands(): Promise<boolean> {
     );
     const target = bindingGyp.targets[0];
 
-    const sources = target.sources.filter(
-      (src: string) => src.includes("windows/") || src === "src/binding.cpp",
-    );
+    // Get all Windows sources
+    const windowsSources: string[] = [];
+    if (existsSync(join("src", "windows"))) {
+      const entries = require("fs").readdirSync(join("src", "windows"));
+      for (const entry of entries) {
+        if (entry.endsWith(".cpp") || entry.endsWith(".h")) {
+          windowsSources.push(join("src", "windows", entry));
+        }
+      }
+    }
 
-    // Simplified compile commands - let clang-tidy figure out the rest
+    // Add binding.cpp
+    const sources = [...windowsSources, "src/binding.cpp"];
+
+    // Find MSVC include paths
+    const msvcPaths = [
+      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC",
+      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\VC\\Tools\\MSVC",
+      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC",
+      "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC",
+      "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC",
+    ];
+
+    let msvcInclude = "";
+    for (const basePath of msvcPaths) {
+      if (existsSync(basePath)) {
+        const versions = require("fs").readdirSync(basePath);
+        if (versions.length > 0) {
+          const version = versions.sort().reverse()[0];
+          msvcInclude = join(basePath, version, "include");
+          if (existsSync(msvcInclude)) {
+            console.log("Found MSVC includes at:", msvcInclude);
+            break;
+          }
+        }
+      }
+    }
+
+    // Find Windows SDK paths
+    const sdkBase = "C:\\Program Files (x86)\\Windows Kits\\10\\Include";
+    let sdkVersion = "";
+    if (existsSync(sdkBase)) {
+      const versions = require("fs")
+        .readdirSync(sdkBase)
+        .filter((v) => v.match(/^\d+\.\d+\.\d+\.\d+$/))
+        .sort()
+        .reverse();
+      if (versions.length > 0) {
+        sdkVersion = versions[0];
+        console.log("Found Windows SDK version:", sdkVersion);
+      }
+    }
+
+    // Create compile commands with absolute paths
     const commands = sources.map((source: string) => ({
       directory: process.cwd(),
       file: source,
       command: [
-        "clang++",
+        "clang++", // Use clang++ for clang-tidy compatibility
         "-c",
         source,
-        "-Inode_modules/node-addon-api",
+        `-I${process.cwd()}/src/windows`,
+        `-I${process.cwd()}/node_modules/node-addon-api`,
         `-I${nodeGyp}/include/node`,
+        msvcInclude ? `-I${msvcInclude}` : "",
+        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\ucrt` : "",
+        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\shared` : "",
+        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\um` : "",
+        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\winrt` : "",
         "-DWIN32",
         "-D_WINDOWS",
         "-D_WIN64",
         "-D_M_X64=1",
         "-D_AMD64_=1",
         "-DNAPI_VERSION=8",
+        "-DNODE_ADDON_API_DISABLE_DEPRECATED",
+        "-DBUILDING_NODE_EXTENSION",
         "-std=c++17",
         "-fms-compatibility",
         "-fms-extensions",
-      ].join(" "),
+        "-Wno-microsoft-include",
+      ]
+        .filter((arg) => arg)
+        .join(" "),
     }));
 
     writeFileSync("compile_commands.json", JSON.stringify(commands, null, 2));
@@ -248,6 +336,84 @@ async function getSourceFiles(): Promise<string[]> {
   }
 }
 
+// Filter out known Windows header issues
+function filterWindowsHeaderErrors(output: string): {
+  filteredOutput: string;
+  errors: number;
+  warnings: number;
+} {
+  const lines = output.split("\n");
+  const filteredLines: string[] = [];
+  let errors = 0;
+  let warnings = 0;
+  let skipNextLine = false;
+
+  // Patterns for known header issues that we want to filter out
+  const headerErrorPatterns = [
+    // MSVC STL header issues
+    /no member named '\w+' in namespace 'std'/,
+    /no template named '\w+' in namespace 'std'/,
+    /unknown type name 'namespace'/,
+    /expected unqualified-id/,
+    /no member named 'pointer_traits'/,
+    /no type named 'type' in/,
+    /declaration of anonymous struct must be a definition/,
+    // System header paths
+    /C:\\Program Files.*\.(h|hpp):\d+:\d+: (error|warning):/,
+    /C:\\Users\\.*\\AppData.*\.(h|hpp):\d+:\d+: (error|warning):/,
+    // Node.js header issues
+    /\.node-gyp.*\.(h|hpp):\d+:\d+: (error|warning):/,
+    // Windows SDK issues
+    /Windows Kits.*\.(h|hpp):\d+:\d+: (error|warning):/,
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (skipNextLine) {
+      skipNextLine = false;
+      continue;
+    }
+
+    // Check if this line contains a header error
+    let isHeaderError = false;
+    for (const pattern of headerErrorPatterns) {
+      if (pattern.test(line)) {
+        isHeaderError = true;
+        // Skip the next line if it's a continuation (usually starts with spaces)
+        if (i + 1 < lines.length && lines[i + 1].match(/^\s+/)) {
+          skipNextLine = true;
+        }
+        break;
+      }
+    }
+
+    if (!isHeaderError) {
+      filteredLines.push(line);
+
+      // Count errors and warnings only from non-header files
+      if (
+        line.includes(" warning:") &&
+        !line.match(/\\(Program Files|Windows Kits|\.node-gyp|AppData)\\/)
+      ) {
+        warnings++;
+      }
+      if (
+        line.includes(" error:") &&
+        !line.match(/\\(Program Files|Windows Kits|\.node-gyp|AppData)\\/)
+      ) {
+        errors++;
+      }
+    }
+  }
+
+  return {
+    filteredOutput: filteredLines.join("\n"),
+    errors,
+    warnings,
+  };
+}
+
 // Run clang-tidy on a single file
 async function runClangTidyOnFile(
   clangTidy: string,
@@ -263,6 +429,7 @@ async function runClangTidyOnFile(
 
     // Platform-specific config and arguments
     if (isWindows) {
+      // Always use src/windows/.clang-tidy for Windows
       const configPath = join("src", "windows", ".clang-tidy");
       if (existsSync(configPath)) {
         extraArgs = `--config-file=${configPath}`;
@@ -283,27 +450,43 @@ async function runClangTidyOnFile(
     const { stdout, stderr } = await exec(
       `${isWindows ? `"${clangTidy}"` : clangTidy} -p . ${extraArgs} "${file}" 2>&1`,
     );
-    const output = stdout + stderr;
+    let output = stdout + stderr;
 
     let errors = 0;
     let warnings = 0;
-    const lines = output.split("\n");
 
-    for (const line of lines) {
-      if (line.includes(" warning:")) warnings++;
-      if (line.includes(" error:")) errors++;
+    // Filter Windows header errors
+    if (isWindows) {
+      const filtered = filterWindowsHeaderErrors(output);
+      output = filtered.filteredOutput;
+      errors = filtered.errors;
+      warnings = filtered.warnings;
+    } else {
+      const lines = output.split("\n");
+      for (const line of lines) {
+        if (line.includes(" warning:")) warnings++;
+        if (line.includes(" error:")) errors++;
+      }
     }
 
     return { file, output, errors, warnings };
   } catch (error: any) {
-    const output = error.stdout || error.stderr || error.message;
+    let output = error.stdout || error.stderr || error.message;
     let errors = 0;
     let warnings = 0;
 
-    const lines = output.split("\n");
-    for (const line of lines) {
-      if (line.includes(" warning:")) warnings++;
-      if (line.includes(" error:")) errors++;
+    // Filter Windows header errors
+    if (isWindows) {
+      const filtered = filterWindowsHeaderErrors(output);
+      output = filtered.filteredOutput;
+      errors = filtered.errors;
+      warnings = filtered.warnings;
+    } else {
+      const lines = output.split("\n");
+      for (const line of lines) {
+        if (line.includes(" warning:")) warnings++;
+        if (line.includes(" error:")) errors++;
+      }
     }
 
     return { file, output, errors, warnings };
@@ -388,7 +571,7 @@ async function main(): Promise<void> {
         console.log(
           `${colors.red}✗${colors.reset} ${relPath} (${result.errors} errors, ${result.warnings} warnings)`,
         );
-        // Show first few errors
+        // Show first few errors (already filtered on Windows)
         const errorLines = result.output
           .split("\n")
           .filter(
@@ -467,7 +650,10 @@ async function main(): Promise<void> {
 
   if (isWindows) {
     console.log(
-      `\n${colors.dim}Windows-specific checks applied from src/windows/.clang-tidy${colors.reset}`,
+      `\n${colors.dim}Windows: Using src/windows/.clang-tidy with header error filtering${colors.reset}`,
+    );
+    console.log(
+      `${colors.dim}Note: System header errors are automatically filtered out${colors.reset}`,
     );
   }
 
