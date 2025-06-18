@@ -3,7 +3,6 @@
 #include "../common/debug_log.h"
 #include "error_utils.h"
 #include "security_utils.h"
-#include "windows_compat.h"
 
 namespace FSMeta {
 

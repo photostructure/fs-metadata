@@ -7,7 +7,6 @@
 #include "security_utils.h"
 #include "string.h"
 #include "system_volume.h"
-#include "windows_compat.h"
 #include <iomanip>
 #include <memory>
 #include <sstream>
