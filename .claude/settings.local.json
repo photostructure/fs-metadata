@@ -57,7 +57,8 @@
       "Bash(git add:*)",
       "Bash(cmd.exe:*)",
       "WebFetch(domain:drmemory.org)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:clang.llvm.org)"
     ],
     "deny": []
   },
