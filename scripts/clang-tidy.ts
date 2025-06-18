@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { exec as execCallback, execSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { cpus, platform } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -166,11 +166,6 @@ async function generateWindowsCompileCommands(): Promise<boolean> {
         nodeGyp = `${process.env.USERPROFILE}\\.node-gyp\\${nodeVersion}`;
       }
     }
-
-    const bindingGyp = JSON.parse(
-      readFileSync("binding.gyp", "utf8").replace(/^#.*$/gm, ""),
-    );
-    const target = bindingGyp.targets[0];
 
     // Get all Windows sources
     const windowsSources: string[] = [];
