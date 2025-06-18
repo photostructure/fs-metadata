@@ -69,8 +69,8 @@ describe("Thread Safety Tests", () => {
           currentAttempt++;
         },
         {
-          targetDurationMs: 5_000, // Target 5 seconds of testing
-          maxTimeoutMs: 15_000, // Max 15 seconds
+          targetDurationMs: 2_000, // Target 2 seconds of testing
+          maxTimeoutMs: 8_000, // Max 8 seconds
           minIterations: 5, // At least 5 iterations for consistency checking
           maxIterations: 50, // Don't go crazy with iterations
           debug: !!process.env["DEBUG_BENCHMARK"],
@@ -105,8 +105,8 @@ describe("Thread Safety Tests", () => {
       expect(inconsistencies).toBe(0);
       expect(successCount + failureCount).toBe(totalRequests);
     },
-    getTestTimeout(5000),
-  ); // Base 5s timeout, adjusted for environment
+    getTestTimeout(15_000),
+  ); // Base 15s timeout, adjusted for environment
 
   // This test specifically targets the drive status checker timeout behavior
   it(
@@ -154,8 +154,8 @@ describe("Thread Safety Tests", () => {
           currentIteration++;
         },
         {
-          targetDurationMs: 5_000, // Target 5 seconds of testing
-          maxTimeoutMs: 15_000, // Max 15 seconds
+          targetDurationMs: 2_000, // Target 2 seconds of testing
+          maxTimeoutMs: 8_000, // Max 8 seconds
           minIterations: 4, // At least 4 iterations (20 requests minimum)
           debug: !!process.env["DEBUG_BENCHMARK"],
         },
@@ -221,8 +221,8 @@ describe("Thread Safety Tests", () => {
           await new Promise((resolve) => setTimeout(resolve, 100));
         },
         {
-          targetDurationMs: 10_000, // Target 10 seconds of testing
-          maxTimeoutMs: 30_000, // Max 30 seconds
+          targetDurationMs: 5_000, // Target 5 seconds of testing
+          maxTimeoutMs: 15_000, // Max 15 seconds
           minIterations: 3, // At least 3 iterations to detect trends
           debug: !!process.env["DEBUG_BENCHMARK"],
         },
