@@ -4,6 +4,7 @@
 #include <cctype>
 #include <pathcch.h>
 #include <sddl.h>
+#include <stdexcept>
 #include <string>
 #include <strsafe.h>
 #include <vector>
