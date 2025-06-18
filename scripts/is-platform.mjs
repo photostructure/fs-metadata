@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { platform } from "os";
+import { platform } from "node:os";
 
 const targetPlatform = process.argv[2];
 if (!targetPlatform) {
