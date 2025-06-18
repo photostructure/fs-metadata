@@ -87,8 +87,9 @@ public:
         if (statuses[i] == DriveStatus::Healthy) {
           WCHAR fsName[MAX_PATH + 1] = {0};
 
-          if (GetVolumeInformationW(SecurityUtils::SafeStringToWide(paths[i]).c_str(), nullptr, 0, nullptr,
-                                    nullptr, nullptr, fsName, MAX_PATH)) {
+          if (GetVolumeInformationW(
+                  SecurityUtils::SafeStringToWide(paths[i]).c_str(), nullptr, 0,
+                  nullptr, nullptr, nullptr, fsName, MAX_PATH)) {
             mp.fstype = WideToUtf8(fsName);
             DEBUG_LOG("[GetVolumeMountPoints] drive %s filesystem: %s",
                       paths[i].c_str(), mp.fstype.c_str());
@@ -96,7 +97,8 @@ public:
         }
 
         // Check if this is a system volume
-        mp.isSystemVolume = IsSystemVolume(SecurityUtils::SafeStringToWide(paths[i]));
+        mp.isSystemVolume =
+            IsSystemVolume(SecurityUtils::SafeStringToWide(paths[i]));
         mountPoints_.push_back(std::move(mp));
       }
 

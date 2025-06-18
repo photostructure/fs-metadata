@@ -25,8 +25,9 @@ public:
   bool isHidden() const { return (attributes & FILE_ATTRIBUTE_HIDDEN) != 0; }
 
   void setHidden(bool value) {
-    DWORD newAttrs = value ? (attributes | static_cast<DWORD>(FILE_ATTRIBUTE_HIDDEN))
-                           : (attributes & ~static_cast<DWORD>(FILE_ATTRIBUTE_HIDDEN));
+    DWORD newAttrs =
+        value ? (attributes | static_cast<DWORD>(FILE_ATTRIBUTE_HIDDEN))
+              : (attributes & ~static_cast<DWORD>(FILE_ATTRIBUTE_HIDDEN));
 
     if (!SetFileAttributesW(path.c_str(), newAttrs)) {
       throw FSException("SetFileAttributes", GetLastError());
@@ -162,7 +163,8 @@ Napi::Promise GetHiddenAttribute(const Napi::CallbackInfo &info) {
       throw Napi::TypeError::New(env, "String path expected");
     }
 
-    auto *worker = new GetHiddenWorker(env, info[0].As<Napi::String>().Utf8Value(), deferred);
+    auto *worker = new GetHiddenWorker(
+        env, info[0].As<Napi::String>().Utf8Value(), deferred);
     worker->Queue();
 
     return deferred.Promise();
@@ -183,7 +185,8 @@ Napi::Promise SetHiddenAttribute(const Napi::CallbackInfo &info) {
 
     bool value = info[1].As<Napi::Boolean>();
 
-    auto *worker = new SetHiddenWorker(env, info[0].As<Napi::String>().Utf8Value(), value, deferred);
+    auto *worker = new SetHiddenWorker(
+        env, info[0].As<Napi::String>().Utf8Value(), value, deferred);
     worker->Queue();
 
     return deferred.Promise();
