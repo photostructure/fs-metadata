@@ -177,24 +177,6 @@ for (let i = 0; i < mountPoints.length; i += BATCH_SIZE) {
 }
 ```
 
-### Native Memory
-
-The native addon manages its own memory. Node's garbage collector doesn't track it:
-
-```typescript
-// Process many files in batches to avoid memory buildup
-const files = getLargeFileList();
-const BATCH_SIZE = 1000;
-
-for (let i = 0; i < files.length; i += BATCH_SIZE) {
-  const batch = files.slice(i, i + BATCH_SIZE);
-  await Promise.all(batch.map((f) => isHidden(f)));
-
-  // Give GC a chance to run
-  await new Promise((resolve) => setImmediate(resolve));
-}
-```
-
 ## Testing Gotchas
 
 ### File System State
