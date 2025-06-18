@@ -372,6 +372,7 @@ function filterWindowsHeaderErrors(output: string): {
   ];
 
   for (let i = 0; i < lines.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection
     const line = lines[i];
 
     if (skipNextLine) {
