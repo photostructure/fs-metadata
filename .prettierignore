@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+build/
+dist/
+prebuilds/
+
+
+# Other
+*.min.*js
