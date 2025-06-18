@@ -21,6 +21,8 @@
     "mqueue",
     "napi",
     "passno",
+    "photostructure",
+    "prebuilds",
     "preprebuildify",
     "rootfs",
     "securityfs",

@@ -19,6 +19,7 @@
  */
 
 import { execFileSync, execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -139,10 +140,16 @@ if (os.platform() === "linux") {
       ) {
         throw new Error(`Invalid script path: ${valgrindScript}`);
       }
-      execFileSync(valgrindScript, [], { stdio: "inherit", shell: false });
+      execFileSync("bash", [valgrindScript], {
+        stdio: "inherit",
+        shell: false,
+      });
       console.log(color(colors.GREEN, "✓ Valgrind tests passed"));
-    } catch {
+    } catch (error) {
       console.log(color(colors.RED, "✗ Valgrind tests failed"));
+      if (error instanceof Error) {
+        console.log(color(colors.RED, `  Error: ${error.message}`));
+      }
       exitCode = 1;
     }
   } catch {
@@ -164,14 +171,17 @@ if (os.platform() === "linux") {
     if (!existsSync(asanScript) || !asanScript.startsWith(__dirname)) {
       throw new Error(`Invalid script path: ${asanScript}`);
     }
-    execSync(asanScript, { stdio: "inherit" });
+    execFileSync("bash", [asanScript], { stdio: "inherit", shell: false });
     console.log(
       color(colors.GREEN, "✓ AddressSanitizer and LeakSanitizer tests passed"),
     );
-  } catch {
+  } catch (error) {
     console.log(
       color(colors.RED, "✗ AddressSanitizer or LeakSanitizer tests failed"),
     );
+    if (error instanceof Error) {
+      console.log(color(colors.RED, `  Error: ${error.message}`));
+    }
     exitCode = 1;
   }
 } else if (os.platform() === "darwin") {
@@ -189,7 +199,7 @@ if (os.platform() === "linux") {
       throw new Error(`Invalid script path: ${macosAsanScript}`);
     }
     // Run in a clean environment to avoid ASAN contamination
-    execSync(macosAsanScript, {
+    execFileSync("bash", [macosAsanScript], {
       stdio: "inherit",
       env: {
         ...process.env,

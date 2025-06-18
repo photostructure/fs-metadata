@@ -337,7 +337,7 @@ jobs:
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: photostructure/git-ssh-signing-action@v0.1.0
+      - uses: photostructure/git-ssh-signing-action@v0.2.0
         with:
           ssh-signing-key: ${{ secrets.SSH_SIGNING_KEY }}
           git-user-name: ${{ secrets.GIT_USER_NAME }}
