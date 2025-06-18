@@ -66,6 +66,14 @@ Traditional Windows tools **do not work** with Node.js native modules:
 
 Use JavaScript-based memory testing (`src/windows-memory-check.test.ts`) instead.
 
+### Static Analysis (clang-tidy) Limitations
+**clang-tidy on Windows** has limited effectiveness due to MSVC header incompatibility:
+
+- Generates many false errors about missing std namespace members
+- Still provides valuable warnings about your code
+- See `doc/windows-clang-tidy.md` for details
+- Consider using Visual Studio Code Analysis as an alternative
+
 ### WSL Development
 Run Windows commands from WSL:
 ```bash
