@@ -20,6 +20,7 @@ function run(command: string, description: string) {
 run("npm run install", "Installing dependencies");
 run("npm run clean", "Start fresh");
 run("npm run fmt", "Formatting code");
+run("npm run docs", "TypeDoc generation");
 run("npm run lint", "Running linting checks");
 run("npm run build:dist", "Building distribution files");
 
