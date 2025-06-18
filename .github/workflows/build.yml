@@ -27,13 +27,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      
+
       # Linux-specific dependencies
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-tidy bear build-essential libglib2.0-dev libblkid-dev uuid-dev
-      
+
       # Windows clang-tidy installation
       - if: runner.os == 'Windows'
         run: |
@@ -43,7 +43,7 @@ jobs:
             "C:\Program Files\LLVM\bin\clang-tidy.exe",
             "C:\Program Files (x86)\LLVM\bin\clang-tidy.exe"
           )
-          
+
           foreach ($path in $paths) {
             if (Test-Path $path) {
               Write-Host "Found clang-tidy at: $path"
@@ -51,7 +51,7 @@ jobs:
               break
             }
           }
-          
+
           if (-not $found) {
             Write-Host "Installing LLVM/clang-tidy..."
             # Install via Chocolatey (available on GitHub runners)
@@ -59,22 +59,22 @@ jobs:
             # Refresh PATH
             $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
           }
-          
+
           # Verify installation
           clang-tidy --version
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
-      
+
       - run: npm ci --ignore-scripts
-      
+
       # Run linting - the scripts handle platform differences
       - run: npm run lint
 
   prebuild-mac-x64:
-    runs-on: macos-13-large  # Intel x64 runner
+    runs-on: macos-13-large # Intel x64 runner
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,7 +91,7 @@ jobs:
           path: prebuilds/
 
   prebuild-mac-arm64:
-    runs-on: macos-14  # Apple Silicon ARM64 runner (default for macos-14)
+    runs-on: macos-14 # Apple Silicon ARM64 runner (default for macos-14)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -189,7 +189,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [20, 22, 24]
-    runs-on: macos-13-large  # Intel x64 runner
+    runs-on: macos-13-large # Intel x64 runner
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -209,7 +209,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [20, 22, 24]
-    runs-on: macos-14  # Apple Silicon ARM64 runner
+    runs-on: macos-14 # Apple Silicon ARM64 runner
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -316,7 +316,16 @@ jobs:
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
-    needs: [test-mac-x64, test-mac-arm64, test-win-x64, test-win-arm64, test-ubuntu, test-alpine, lint]
+    needs:
+      [
+        test-mac-x64,
+        test-mac-arm64,
+        test-win-x64,
+        test-win-arm64,
+        test-ubuntu,
+        test-alpine,
+        lint,
+      ]
     permissions:
       contents: write
       packages: write
@@ -383,4 +392,3 @@ jobs:
             --title "Release v$NEW_VERSION" \
             --generate-notes \
             --verify-tag
-

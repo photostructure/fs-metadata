@@ -1,13 +1,13 @@
-name: 'Setup QEMU'
-description: 'Setup QEMU for arm64 architecture'
+name: "Setup QEMU"
+description: "Setup QEMU for arm64 architecture"
 inputs:
   arch:
-    description: 'Architecture to set up QEMU for'
+    description: "Architecture to set up QEMU for"
     required: true
-    default: 'x64'
+    default: "x64"
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Setup QEMU
       if: ${{ inputs.arch == 'arm64' }}
