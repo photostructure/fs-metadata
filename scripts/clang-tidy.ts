@@ -342,24 +342,33 @@ function filterWindowsHeaderErrors(output: string): {
   let errors = 0;
   let warnings = 0;
   let skipNextLine = false;
+  let inSystemHeader = false;
 
   // Patterns for known header issues that we want to filter out
-  const headerErrorPatterns = [
-    // MSVC STL header issues
+  const systemHeaderPatterns = [
+    // System header paths - match the entire error line
+    /C:\\Program Files.*:\d+:\d+: (error|warning):/,
+    /C:\\Users\\.*\\AppData.*:\d+:\d+: (error|warning):/,
+    /\.node-gyp.*:\d+:\d+: (error|warning):/,
+    /Windows Kits.*:\d+:\d+: (error|warning):/,
+  ];
+
+  // Known system header error messages that appear in user files
+  const systemHeaderErrors = [
+    /no member named '\w+' in the global namespace/,
     /no member named '\w+' in namespace 'std'/,
     /no template named '\w+' in namespace 'std'/,
+    /no template named 'pointer_traits'/,
+    /unknown type name 'stream(pos|off)'/,
+    /no type named 'string' in namespace 'std'/,
+    /use of undeclared identifier '_Elem'/,
+    /use of undeclared identifier 'tuple'/,
+    /cannot initialize return object of type 'int' with an lvalue of type 'const char/,
+    /expected ';' after expression/,
     /unknown type name 'namespace'/,
     /expected unqualified-id/,
-    /no member named 'pointer_traits'/,
     /no type named 'type' in/,
     /declaration of anonymous struct must be a definition/,
-    // System header paths
-    /C:\\Program Files.*\.(h|hpp):\d+:\d+: (error|warning):/,
-    /C:\\Users\\.*\\AppData.*\.(h|hpp):\d+:\d+: (error|warning):/,
-    // Node.js header issues
-    /\.node-gyp.*\.(h|hpp):\d+:\d+: (error|warning):/,
-    // Windows SDK issues
-    /Windows Kits.*\.(h|hpp):\d+:\d+: (error|warning):/,
   ];
 
   for (let i = 0; i < lines.length; i++) {
@@ -370,34 +379,47 @@ function filterWindowsHeaderErrors(output: string): {
       continue;
     }
 
-    // Check if this line contains a header error
-    let isHeaderError = false;
-    for (const pattern of headerErrorPatterns) {
+    // Check if this is a system header location
+    let isSystemHeader = false;
+    for (const pattern of systemHeaderPatterns) {
       if (pattern.test(line)) {
-        isHeaderError = true;
-        // Skip the next line if it's a continuation (usually starts with spaces)
-        if (i + 1 < lines.length && lines[i + 1].match(/^\s+/)) {
-          skipNextLine = true;
-        }
+        isSystemHeader = true;
+        inSystemHeader = true;
         break;
       }
     }
 
-    if (!isHeaderError) {
+    // Check if this is a known system header error in a user file
+    if (!isSystemHeader && line.includes(" error:")) {
+      for (const pattern of systemHeaderErrors) {
+        if (pattern.test(line)) {
+          isSystemHeader = true;
+          break;
+        }
+      }
+    }
+
+    // Reset inSystemHeader flag when we see a new file
+    if (line.match(/^[^:]+\.(cpp|h|hpp):\d+:\d+: (error|warning):/)) {
+      inSystemHeader = false;
+      for (const pattern of systemHeaderPatterns) {
+        if (pattern.test(line)) {
+          inSystemHeader = true;
+          break;
+        }
+      }
+    }
+
+    if (!isSystemHeader && !inSystemHeader) {
+      // Only add non-header errors to output
       filteredLines.push(line);
 
-      // Count errors and warnings only from non-header files
-      if (
-        line.includes(" warning:") &&
-        !line.match(/\\(Program Files|Windows Kits|\.node-gyp|AppData)\\/)
-      ) {
-        warnings++;
-      }
-      if (
-        line.includes(" error:") &&
-        !line.match(/\\(Program Files|Windows Kits|\.node-gyp|AppData)\\/)
-      ) {
+      // Count errors and warnings
+      if (line.includes(" error:")) {
         errors++;
+      }
+      if (line.includes(" warning:")) {
+        warnings++;
       }
     }
   }
