@@ -20,16 +20,57 @@ on:
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || format('Build - {0}', github.event.head_commit.message || github.event.pull_request.title) }}
 jobs:
   lint:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y clang-tidy bear build-essential libglib2.0-dev libblkid-dev uuid-dev
+      
+      # Linux-specific dependencies
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy bear build-essential libglib2.0-dev libblkid-dev uuid-dev
+      
+      # Windows clang-tidy installation
+      - if: runner.os == 'Windows'
+        run: |
+          # Check if clang-tidy is available in common locations
+          $found = $false
+          $paths = @(
+            "C:\Program Files\LLVM\bin\clang-tidy.exe",
+            "C:\Program Files (x86)\LLVM\bin\clang-tidy.exe"
+          )
+          
+          foreach ($path in $paths) {
+            if (Test-Path $path) {
+              Write-Host "Found clang-tidy at: $path"
+              $found = $true
+              break
+            }
+          }
+          
+          if (-not $found) {
+            Write-Host "Installing LLVM/clang-tidy..."
+            # Install via Chocolatey (available on GitHub runners)
+            choco install llvm -y
+            # Refresh PATH
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          }
+          
+          # Verify installation
+          clang-tidy --version
+      
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "npm"
+      
       - run: npm ci --ignore-scripts
+      
+      # Run linting - the scripts handle platform differences
       - run: npm run lint
 
   prebuild-mac-x64:
