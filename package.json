@@ -25,7 +25,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "install": "node-gyp-build",
+    "install": "node scripts/install.js",
     "clean": "run-p clean:*",
     "clean:dist": "del-cli coverage dist docs \"*.tsbuildinfo\"",
     "clean:gyp-cache": "del-cli --force build %USERPROFILE%/.node-gyp ~/.node-gyp",
