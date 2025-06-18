@@ -608,6 +608,13 @@ async function main(): Promise<void> {
         console.log(
           `${colors.yellow}⚠${colors.reset} ${relPath} (${result.warnings} warnings)`,
         );
+        // Show warnings (already filtered on Windows)
+        const warningLines = result.output
+          .split("\n")
+          .filter((line) => line.includes(" warning:"));
+        warningLines.forEach((line) =>
+          console.log(`  ${colors.dim}${line}${colors.reset}`),
+        );
       } else {
         console.log(`${colors.green}✓${colors.reset} ${relPath}`);
       }
@@ -640,6 +647,13 @@ async function main(): Promise<void> {
         } else if (result.warnings > 0) {
           console.log(
             `${colors.yellow}⚠${colors.reset} ${relPath} (${result.warnings} warnings)`,
+          );
+          // Show warnings
+          const warningLines = result.output
+            .split("\n")
+            .filter((line) => line.includes(" warning:"));
+          warningLines.forEach((line) =>
+            console.log(`  ${colors.dim}${line}${colors.reset}`),
           );
         } else {
           console.log(`${colors.green}✓${colors.reset} ${relPath}`);
