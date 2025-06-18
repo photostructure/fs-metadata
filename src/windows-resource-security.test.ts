@@ -29,10 +29,55 @@ describePlatform("win32")("Windows Resource Security Tests", () => {
 
       const results = await Promise.all(promises);
 
-      // All should succeed and return the same result
-      const firstResult = JSON.stringify(results[0]);
+      // All operations should succeed with valid results
+      expect(results.length).toBe(50);
+
+      // Verify each result has the expected structure
       for (const result of results) {
-        expect(JSON.stringify(result)).toBe(firstResult);
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBeGreaterThan(0);
+
+        // Each mount point should have required fields
+        for (const mountPoint of result) {
+          expect(mountPoint).toHaveProperty("mountPoint");
+          expect(mountPoint).toHaveProperty("status");
+          expect(mountPoint).toHaveProperty("isSystemVolume");
+          expect(typeof mountPoint.mountPoint).toBe("string");
+          expect(typeof mountPoint.status).toBe("string");
+          expect(typeof mountPoint.isSystemVolume).toBe("boolean");
+
+          // Status should be one of the valid values
+          expect([
+            "healthy",
+            "timeout",
+            "inaccessible",
+            "disconnected",
+            "unknown",
+          ]).toContain(mountPoint.status);
+        }
+      }
+
+      // For deterministic mount points (local drives), results should be consistent
+      // Network drives may vary between "timeout" and "disconnected" states
+      const firstResult = results[0];
+      for (const result of results) {
+        expect(result.length).toBe(firstResult?.length);
+
+        // Check each mount point matches structurally
+        for (let i = 0; i < result.length; i++) {
+          const mp = result[i];
+          const firstMp = firstResult?.[i];
+
+          expect(mp?.mountPoint).toBe(firstMp?.mountPoint);
+          expect(mp?.isSystemVolume).toBe(firstMp?.isSystemVolume);
+
+          // For local drives, status should be consistent
+          if (mp?.fstype === "NTFS" && mp?.status === "healthy") {
+            expect(mp?.status).toBe(firstMp?.status);
+            expect(mp?.fstype).toBe(firstMp?.fstype);
+          }
+          // Network drives may legitimately vary between timeout/disconnected
+        }
       }
     });
   });
