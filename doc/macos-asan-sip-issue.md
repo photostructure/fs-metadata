@@ -16,6 +16,7 @@ macOS System Integrity Protection (SIP) strips `DYLD_*` environment variables (i
 ## Verification
 
 The native module works correctly with ASAN when called directly:
+
 ```bash
 export DYLD_INSERT_LIBRARIES="/Library/Developer/CommandLineTools/usr/lib/clang/17/lib/darwin/libclang_rt.asan_osx_dynamic.dylib"
 node -e "require('./build/Release/fs_metadata.node').getVolumeMountPoints().then(console.log)"
@@ -48,6 +49,7 @@ The Linux ASAN tests in CI don't have this limitation and can catch most memory 
 ## Current Implementation
 
 The `scripts/macos-asan.sh` script now:
+
 1. Builds with ASAN flags
 2. Runs tests with `--runInBand` to avoid worker processes
 3. Detects the "interceptors not installed" error and treats it as expected behavior
@@ -55,6 +57,7 @@ The `scripts/macos-asan.sh` script now:
 5. Provides clear messaging about the SIP limitation
 
 The `scripts/check-memory.mjs` script:
+
 1. Ensures a clean build before running JavaScript memory tests to avoid ASAN contamination
 2. Clears ASAN environment variables when running tests
 3. Treats macOS ASAN failures due to SIP as warnings, not errors

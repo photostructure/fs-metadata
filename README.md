@@ -14,7 +14,10 @@ npm install @photostructure/fs-metadata
 ```
 
 ```typescript
-import { getVolumeMountPoints, getVolumeMetadata } from "@photostructure/fs-metadata";
+import {
+  getVolumeMountPoints,
+  getVolumeMetadata,
+} from "@photostructure/fs-metadata";
 
 // List all mounted volumes
 const mountPoints = await getVolumeMountPoints();
@@ -34,12 +37,12 @@ console.log(metadata);
 
 ## Supported Platforms
 
-| Platform | Architecture | Node.js | OS Version |
-|----------|--------------|---------|------------|
-| Windows | x64, arm64 | 20+ | Windows 10+ |
-| macOS | x64, arm64 | 20+ | macOS 14+ |
-| Linux (glibc) | x64, arm64 | 20+ | Debian 11+, Ubuntu 20.04+ |
-| Linux (musl) | x64, arm64 | 20+ | Alpine 3.21+ |
+| Platform      | Architecture | Node.js | OS Version                |
+| ------------- | ------------ | ------- | ------------------------- |
+| Windows       | x64, arm64   | 20+     | Windows 10+               |
+| macOS         | x64, arm64   | 20+     | macOS 14+                 |
+| Linux (glibc) | x64, arm64   | 20+     | Debian 11+, Ubuntu 20.04+ |
+| Linux (musl)  | x64, arm64   | 20+     | Alpine 3.21+              |
 
 > **Note**: Linux binaries require GLIBC 2.31+. The `node:20` Docker image is not supported.
 
@@ -47,7 +50,7 @@ console.log(metadata);
 
 - 📖 [API Reference](https://photostructure.github.io/fs-metadata/modules.html)
 - 💡 [Examples](./doc/examples.md) - Common usage patterns and recipes
-- ⚠️  [Gotchas](./doc/gotchas.md) - Platform quirks, timeouts, and troubleshooting
+- ⚠️ [Gotchas](./doc/gotchas.md) - Platform quirks, timeouts, and troubleshooting
 - 🔧 [Contributing](./CONTRIBUTING.md) - Build instructions and development guide
 
 ### Options

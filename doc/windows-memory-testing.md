@@ -16,7 +16,9 @@ When building with `node-gyp build --debug`, the debug build cannot be loaded by
 We've split Windows security testing into three categories:
 
 ### 1. Input Security Tests (`windows-input-security.test.ts`)
+
 Tests for handling malicious inputs:
+
 - Path traversal protection
 - Buffer overflow protection
 - Invalid UTF-8 handling
@@ -26,7 +28,9 @@ Tests for handling malicious inputs:
 These tests run with regular Release builds and don't require debug memory detection.
 
 ### 2. Resource Security Tests (`windows-resource-security.test.ts`)
+
 Tests for resource/handle leaks during operations:
+
 - Concurrent operations safety
 - Handle cleanup on timeout
 - Basic memory pattern monitoring
@@ -34,7 +38,9 @@ Tests for resource/handle leaks during operations:
 These tests validate functionality with Release builds.
 
 ### 3. Memory Leak Detection (`windows-memory-check.test.ts`)
+
 JavaScript-based memory monitoring that works with Release builds:
+
 - Heap memory usage tracking with forced garbage collection
 - Memory growth pattern analysis
 - Handle count monitoring (via `process.report`)
@@ -54,6 +60,7 @@ JavaScript-based memory monitoring that works with Release builds:
 ### Our Approach
 
 Instead of these traditional tools, we use:
+
 - JavaScript-based memory monitoring with forced garbage collection
 - Process handle tracking via Node.js's built-in `process.report`
 - Heap usage patterns analysis over multiple iterations
@@ -85,11 +92,13 @@ npm run check:memory
 ## Future Improvements
 
 1. Investigate fixing debug build loading:
+
    - Ship debug CRT dependencies
    - Use manifest embedding for dependency resolution
    - Investigate short path alternatives to avoid UNC paths
 
 2. Enhanced JavaScript monitoring:
+
    - Native memory tracking via N-API
    - V8 heap snapshots comparison
    - Event loop lag correlation

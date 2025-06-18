@@ -7,6 +7,7 @@ This document explains how to set up SSH commit signing for the GitHub Actions r
 For professional projects, create a dedicated bot account rather than using your personal account:
 
 ### Create the Bot Account
+
 1. Sign out of your personal GitHub account
 2. Go to https://github.com/join
 3. Create account with username like `photostructure-bot`
@@ -14,6 +15,7 @@ For professional projects, create a dedicated bot account rather than using your
 5. Verify the email address
 
 ### Add Bot as Repository Collaborator
+
 1. Go to your repo: `https://github.com/photostructure/fs-metadata`
 2. Click **Settings** tab
 3. Click **Collaborators** in the left sidebar
@@ -23,6 +25,7 @@ For professional projects, create a dedicated bot account rather than using your
 7. Send invitation
 
 ### Bot Accepts Invitation
+
 1. Sign in as the bot account
 2. Check notifications or email for repository invitation
 3. Accept the invitation
@@ -74,18 +77,19 @@ cat ~/.ssh/photostructure-bot-signing | clip
 2. Navigate to Settings → Secrets and variables → Actions
 3. Add these secrets:
 
-| Secret Name | Value |
-|-------------|-------|
+| Secret Name       | Value                         |
+| ----------------- | ----------------------------- |
 | `SSH_SIGNING_KEY` | Paste the private key content |
-| `GIT_USER_NAME` | `photostructure-bot` |
-| `GIT_USER_EMAIL` | `bot@photostructure.com` |
-| `NPM_TOKEN` | Your npm authentication token |
+| `GIT_USER_NAME`   | `photostructure-bot`          |
+| `GIT_USER_EMAIL`  | `bot@photostructure.com`      |
+| `NPM_TOKEN`       | Your npm authentication token |
 
 ## 4. How SSH Signing Works in Actions
 
 The SSH signing setup uses the [photostructure/git-ssh-signing-action](https://github.com/marketplace/actions/git-ssh-signing-action):
 
 ### Features
+
 - Installs the SSH private key
 - Configures Git to use SSH signing format
 - Sets up commit and tag signing
@@ -149,14 +153,14 @@ Before triggering a release:
 
 ## 8. Advantages of SSH Signing
 
-| Feature | SSH Signing | GPG Signing |
-|---------|-------------|-------------|
-| Setup complexity | Simple | Complex |
-| Key generation | One command | Multiple steps |
-| Passphrase handling | Not required | Required |
-| Wrapper scripts | Not needed | Required |
-| GitHub verification | ✓ Supported | ✓ Supported |
-| Maintenance | Minimal | Higher |
+| Feature             | SSH Signing  | GPG Signing    |
+| ------------------- | ------------ | -------------- |
+| Setup complexity    | Simple       | Complex        |
+| Key generation      | One command  | Multiple steps |
+| Passphrase handling | Not required | Required       |
+| Wrapper scripts     | Not needed   | Required       |
+| GitHub verification | ✓ Supported  | ✓ Supported    |
+| Maintenance         | Minimal      | Higher         |
 
 ## 9. Security Best Practices
 
@@ -182,15 +186,18 @@ mv ~/.ssh/photostructure-bot-signing* ~/secure-backup/
 ## 11. Troubleshooting
 
 ### Commits show as "Unverified"
+
 - Ensure the SSH key is added as a **Signing Key** (not Authentication Key)
 - Verify the email in Git config matches the GitHub account email
 - Check that the bot account owns the key
 
 ### "error: Load key failed"
+
 - Verify SSH_SIGNING_KEY secret contains the complete private key
 - Check for extra newlines or spaces in the secret
 
 ### Permission denied on push
+
 - Ensure bot account has write access to the repository
 
 ## References

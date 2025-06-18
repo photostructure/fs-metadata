@@ -53,6 +53,7 @@
     "fmt:cpp": "clang-format --style=LLVM -i src/*.cpp src/*/*.cpp src/*/*.h || echo \"\"",
     "fmt:js": "prettier --write \"scripts/**/*.?js\" \"*.?js\"",
     "fmt:json": "prettier --write \"**/*.json\"",
+    "fmt:md": "prettier --write \"**/*.md\"",
     "fmt:pkg": "npm pkg fix",
     "fmt:ts": "prettier --write \"**/*.(c|m)?ts\"",
     "// precommit": "should be manually run by developers before they run `git commit`",

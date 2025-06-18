@@ -56,7 +56,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - [x] Review CFStringToString conversion for memory leaks - No leaks, proper string handling
 - [x] Validate statvfs/statfs error handling - Comprehensive error checking
 - [x] Check overflow protection in size calculations - Excellent overflow protection (lines 91-104)
-- **Platform APIs verified**: 
+- **Platform APIs verified**:
   - DiskArbitration framework APIs (macOS 14+) - Proper RAII usage, follows Create/Copy rule
   - IOKit framework APIs - Headers included but not directly used
   - CoreFoundation string handling - CFReleaser ensures proper cleanup
@@ -305,6 +305,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ### Darwin/macOS API Verification Summary (2025-05-31)
 
 #### Core Foundation APIs ✅
+
 - **Memory Management**: Correctly follows the Create/Copy rule
   - Functions with "Create" or "Copy" return objects caller must CFRelease
   - "Get" functions don't transfer ownership
@@ -314,6 +315,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - **No Deprecated APIs Found**: All Core Foundation APIs used are current and supported
 
 #### DiskArbitration Framework ✅
+
 - **DASessionCreate**: Properly released with CFRelease via RAII
 - **DADiskCreateFromBSDName**: Correctly managed with CFReleaser
 - **DADiskCopyDescription**: Follows Copy rule, properly released
@@ -321,6 +323,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - **No Deprecated APIs Found**: All DiskArbitration APIs are current
 
 #### BSD/POSIX APIs ✅
+
 - **getmntinfo_r_np**: Thread-safe variant used (available since macOS 10.13)
   - Consider using getfsstat() directly for maximum thread safety
   - MNT_NOWAIT properly used to avoid blocking
@@ -331,17 +334,20 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - **No Deprecated APIs Found**: All BSD APIs are current
 
 #### Security Considerations
+
 - ✅ Path validation for ".." implemented in hidden.cpp and volume_metadata.cpp
 - ✅ Null byte validation added to all path/mount point inputs
 - ✅ Using faccessat with AT_EACCESS for proper permission checks
 - ✅ Overflow protection in volume size calculations
 
 #### Minor Issues Found (Fixed 2025-05-31)
+
 1. ✅ **volume_metadata.cpp:150**: Removed unnecessary NULL check for CFRunLoopGetCurrent()
 2. ✅ **All files**: Added null byte path validation to prevent injection attacks
 3. ✅ **volume_mount_points.cpp**: Already using thread-safe getmntinfo_r_np() (no change needed)
 
 #### Overall Assessment
+
 The Darwin/macOS implementation demonstrates excellent resource management with consistent RAII patterns, proper API usage following Apple's guidelines, and no use of deprecated APIs. The code is thread-safe and follows best practices for Core Foundation and BSD APIs. All minor issues have been addressed.
 
 ### Windows

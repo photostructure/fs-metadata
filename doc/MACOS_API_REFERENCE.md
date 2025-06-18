@@ -19,14 +19,15 @@ This document provides comprehensive documentation for all macOS APIs used in th
 **Purpose**: String handling for Core Foundation framework interactions.
 
 **Usage in Project**:
+
 ```cpp
 // From src/darwin/volume_metadata.cpp
 std::string CFStringToString(CFStringRef cfString) {
   if (!cfString) return "";
-  
+
   CFIndex length = CFStringGetLength(cfString);
   CFIndex maxSize = CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8) + 1;
-  
+
   std::string result(maxSize, '\0');
   if (CFStringGetCString(cfString, &result[0], maxSize, kCFStringEncodingUTF8)) {
     result.resize(strlen(result.c_str()));
@@ -39,6 +40,7 @@ std::string CFStringToString(CFStringRef cfString) {
 **Apple Documentation**: [CFString Reference](https://developer.apple.com/documentation/corefoundation/cfstring)
 
 **Best Practices**:
+
 - Always check for null before using
 - Use `kCFStringEncodingUTF8` for UTF-8 compatibility
 - Pre-allocate buffer using `CFStringGetMaximumSizeForEncoding`
@@ -48,6 +50,7 @@ std::string CFStringToString(CFStringRef cfString) {
 **Purpose**: Key-value storage for disk properties.
 
 **Usage in Project**:
+
 ```cpp
 // Getting disk description
 CFReleaser<CFDictionaryRef> diskInfo(DADiskCopyDescription(disk.get()));
@@ -62,6 +65,7 @@ if (diskInfo.get()) {
 **Apple Documentation**: [CFDictionary Reference](https://developer.apple.com/documentation/corefoundation/cfdictionary)
 
 **Common Keys Used**:
+
 - `kDADiskDescriptionVolumeNameKey` - Volume display name
 - `kDADiskDescriptionVolumeMountableKey` - Whether volume can be mounted
 - `kDADiskDescriptionMediaWholeKey` - Whether this is a whole disk
@@ -72,21 +76,22 @@ if (diskInfo.get()) {
 **Purpose**: Automatic memory management for Core Foundation objects.
 
 **Implementation**:
+
 ```cpp
 template <typename T>
 class CFReleaser {
 private:
   T obj_;
-  
+
 public:
   explicit CFReleaser(T obj = nullptr) : obj_(obj) {}
   ~CFReleaser() { if (obj_) CFRelease(obj_); }
-  
+
   // Move semantics
   CFReleaser(CFReleaser&& other) noexcept : obj_(other.obj_) {
     other.obj_ = nullptr;
   }
-  
+
   CFReleaser& operator=(CFReleaser&& other) noexcept {
     if (this != &other) {
       if (obj_) CFRelease(obj_);
@@ -95,11 +100,11 @@ public:
     }
     return *this;
   }
-  
+
   // Delete copy operations
   CFReleaser(const CFReleaser&) = delete;
   CFReleaser& operator=(const CFReleaser&) = delete;
-  
+
   T get() const { return obj_; }
   explicit operator bool() const { return obj_ != nullptr; }
 };
@@ -112,6 +117,7 @@ public:
 **Purpose**: Communication channel with DiskArbitration daemon.
 
 **Usage in Project**:
+
 ```cpp
 // Thread-safe session creation
 std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
@@ -124,6 +130,7 @@ if (!session.get()) {
 **Apple Documentation**: [DiskArbitration Framework](https://developer.apple.com/documentation/diskarbitration)
 
 **Important Notes**:
+
 - Must be protected by mutex for thread safety
 - Session should be short-lived
 - No need for run loop scheduling in synchronous operations
@@ -133,6 +140,7 @@ if (!session.get()) {
 **Purpose**: Represents a disk or volume for querying properties.
 
 **Usage in Project**:
+
 ```cpp
 CFReleaser<DADiskRef> disk(
   DADiskCreateFromBSDName(kCFAllocatorDefault, session.get(), bsdName.c_str())
@@ -143,6 +151,7 @@ if (!disk.get()) {
 ```
 
 **Key Functions**:
+
 - `DADiskCreateFromBSDName` - Create from BSD name (e.g., "disk1s1")
 - `DADiskCopyDescription` - Get disk properties dictionary
 - `DADiskGetBSDName` - Get BSD name from DADisk
@@ -150,6 +159,7 @@ if (!disk.get()) {
 ### Thread Safety
 
 **Critical**: All DiskArbitration operations must be serialized:
+
 ```cpp
 // Global mutex for all DA operations
 std::mutex g_diskArbitrationMutex;
@@ -165,6 +175,7 @@ std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
 **Purpose**: Thread-safe enumeration of mounted file systems.
 
 **Usage in Project**:
+
 ```cpp
 class MountBufferRAII {
 private:
@@ -186,6 +197,7 @@ if (count <= 0) {
 **Apple Documentation**: [getmntinfo(3)](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/getmntinfo.3.html)
 
 **Key Points**:
+
 - `_r` suffix indicates reentrant (thread-safe)
 - `_np` suffix indicates non-portable (Apple-specific)
 - Allocates buffer that must be freed
@@ -196,17 +208,19 @@ if (count <= 0) {
 **Purpose**: Get file system statistics for a path.
 
 **Usage in Project**:
+
 ```cpp
 struct statfs64 buf;
 if (statfs64(path.c_str(), &buf) == 0) {
   volumeInfo.size = static_cast<uint64_t>(buf.f_blocks) * buf.f_bsize;
   volumeInfo.available = static_cast<uint64_t>(buf.f_bavail) * buf.f_bsize;
-  volumeInfo.used = volumeInfo.size - 
+  volumeInfo.used = volumeInfo.size -
     (static_cast<uint64_t>(buf.f_bfree) * buf.f_bsize);
 }
 ```
 
 **Important Fields**:
+
 - `f_blocks` - Total blocks in filesystem
 - `f_bfree` - Free blocks
 - `f_bavail` - Free blocks available to non-superuser
@@ -218,6 +232,7 @@ if (statfs64(path.c_str(), &buf) == 0) {
 **Purpose**: Set file flags (including hidden attribute).
 
 **Usage in Project**:
+
 ```cpp
 // Get current flags
 struct stat st;
@@ -243,6 +258,7 @@ if (chflags(path_.c_str(), flags) != 0) {
 **Apple Documentation**: [chflags(2)](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/chflags.2.html)
 
 **Common Flags**:
+
 - `UF_HIDDEN` - Hidden file flag
 - `UF_IMMUTABLE` - File cannot be changed
 - `SF_ARCHIVED` - File has been archived
@@ -254,6 +270,7 @@ if (chflags(path_.c_str(), flags) != 0) {
 **Purpose**: Check file accessibility with proper security.
 
 **Usage in Project**:
+
 ```cpp
 bool accessible = faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
 ```
@@ -261,6 +278,7 @@ bool accessible = faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
 **Apple Documentation**: [faccessat(2)](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/faccessat.2.html)
 
 **Security Benefits**:
+
 - `AT_FDCWD` - Use current working directory
 - `AT_EACCESS` - Check using effective user/group IDs
 - Prevents TOCTOU (Time-of-Check-Time-of-Use) attacks
@@ -271,6 +289,7 @@ bool accessible = faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
 **Purpose**: Prevent directory traversal and null byte injection attacks.
 
 **Implementation**:
+
 ```cpp
 // Check for directory traversal
 if (path.find("..") != std::string::npos) {
@@ -295,17 +314,17 @@ class ResourceRAII {
 private:
   T resource_;
   std::function<void(T)> deleter_;
-  
+
 public:
   ResourceRAII(T resource, std::function<void(T)> deleter)
     : resource_(resource), deleter_(deleter) {}
-  
+
   ~ResourceRAII() {
     if (resource_ && deleter_) {
       deleter_(resource_);
     }
   }
-  
+
   // Move semantics...
   T get() const { return resource_; }
 };
@@ -314,11 +333,13 @@ public:
 ### Memory Management Rules
 
 1. **Core Foundation Create/Copy/Get Rule**:
+
    - Functions with "Create" or "Copy" return owned objects (must release)
    - Functions with "Get" return borrowed references (don't release)
    - Always use CFReleaser for owned objects
 
 2. **Buffer Management**:
+
    - Use RAII wrappers for malloc'd buffers
    - Prefer stack allocation when size is known
    - Use std::vector for dynamic arrays
@@ -333,6 +354,7 @@ public:
 ### DiskArbitration Serialization
 
 All DiskArbitration operations must be serialized:
+
 ```cpp
 // In header file
 extern std::mutex g_diskArbitrationMutex;
@@ -350,6 +372,7 @@ std::mutex g_diskArbitrationMutex;
 ### Async Operations
 
 For concurrent file system checks:
+
 ```cpp
 // Limit concurrent operations
 const size_t maxConcurrentChecks = 4;
@@ -357,12 +380,12 @@ const size_t maxConcurrentChecks = 4;
 // Process in batches
 for (size_t i = 0; i < count; i += maxConcurrentChecks) {
   std::vector<std::future<Result>> futures;
-  
+
   // Launch batch
   for (size_t j = i; j < count && j < i + maxConcurrentChecks; j++) {
     futures.push_back(std::async(std::launch::async, checkFunction));
   }
-  
+
   // Collect results with timeout
   for (auto& future : futures) {
     auto status = future.wait_for(std::chrono::milliseconds(timeout));
@@ -379,7 +402,7 @@ for (size_t i = 0; i < count; i += maxConcurrentChecks) {
 std::string CreateDetailedErrorMessage(const std::string& operation, int error_code) {
   std::ostringstream oss;
   oss << operation << " failed";
-  
+
   if (error_code != 0) {
     char error_buffer[256];
     if (strerror_r(error_code, error_buffer, sizeof(error_buffer)) == 0) {
@@ -388,7 +411,7 @@ std::string CreateDetailedErrorMessage(const std::string& operation, int error_c
       oss << ": Unknown error (errno " << error_code << ")";
     }
   }
-  
+
   return oss.str();
 }
 ```
@@ -406,11 +429,13 @@ public:
 ### Error Recovery Strategies
 
 1. **Network Volume Timeouts**:
+
    - Use timeouts for all volume operations
    - Mark as "disconnected" on timeout
    - Continue processing other volumes
 
 2. **Permission Errors**:
+
    - Check with faccessat before operations
    - Provide clear error messages
    - Don't expose sensitive paths in errors

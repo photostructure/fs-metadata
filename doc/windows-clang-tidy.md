@@ -14,12 +14,14 @@ clang-tidy has limited support on Windows due to fundamental incompatibilities b
 ## Known Issues
 
 ### Header Compatibility
+
 - clang-tidy cannot fully parse MSVC STL headers, resulting in errors like:
   - `no member named 'max' in namespace 'std'`
   - `unknown type name 'namespace'`
   - `no template named 'pointer_traits'`
 
 ### Root Cause
+
 - MSVC headers use Microsoft-specific extensions that clang doesn't fully support
 - Node.js native addon headers add additional complexity
 - Even with clang-cl mode, full compatibility isn't achieved
@@ -30,6 +32,7 @@ clang-tidy has limited support on Windows due to fundamental incompatibilities b
 
 1. **Use Visual Studio Code Analysis**: The built-in Code Analysis in Visual Studio provides better Windows-specific checking
 2. **Focus on Warnings**: Despite header errors, clang-tidy still catches many issues:
+
    - Uninitialized variables
    - RAII violations
    - Member initialization issues
@@ -43,6 +46,7 @@ clang-tidy has limited support on Windows due to fundamental incompatibilities b
 ### For CI/CD
 
 Consider skipping clang-tidy on Windows in CI to avoid noise:
+
 ```bash
 # In CI scripts
 if [ "$OS" != "Windows_NT" ]; then
@@ -59,6 +63,7 @@ fi
 ## What Still Works
 
 Despite the header issues, clang-tidy on Windows can still detect:
+
 - Uninitialized variables
 - Missing RAII usage
 - Resource leaks in your code (not system headers)

@@ -41,7 +41,6 @@ const metadata = await getVolumeMetadata("/");
 //   size: 500107862016,
 //   used: 234567890123,
 //   available: 239539971893,
-//   pctUsed: 46.9,
 //   status: 'healthy'
 // }
 ```
@@ -55,7 +54,7 @@ import { getAllVolumeMetadata } from "@photostructure/fs-metadata";
 const allVolumes = await getAllVolumeMetadata({ includeSystemVolumes: true });
 
 // Filter healthy volumes only
-const healthyVolumes = allVolumes.filter(v => v.status === "healthy");
+const healthyVolumes = allVolumes.filter((v) => v.status === "healthy");
 
 // Calculate total storage
 const totalStorage = healthyVolumes.reduce((sum, v) => sum + v.size, 0);
@@ -73,7 +72,9 @@ import { isHidden } from "@photostructure/fs-metadata";
 const hidden = await isHidden("/path/to/file.txt");
 
 // Check with timeout
-const hidden2 = await isHidden("/mnt/slow-network/file.txt", { timeoutMs: 5000 });
+const hidden2 = await isHidden("/mnt/slow-network/file.txt", {
+  timeoutMs: 5000,
+});
 ```
 
 ### Set Hidden Attribute
@@ -127,13 +128,13 @@ const {
   getVolumeMountPoints,
   getVolumeMetadata,
   isHidden,
-  setHidden
+  setHidden,
 } = require("@photostructure/fs-metadata");
 
 async function main() {
   const mountPoints = await getVolumeMountPoints();
   console.log("Mount points:", mountPoints);
-  
+
   const metadata = await getVolumeMetadata(mountPoints[0].mountPoint);
   console.log("Volume metadata:", metadata);
 }
@@ -144,15 +145,15 @@ main().catch(console.error);
 ## Error Handling
 
 ```typescript
-import { 
-  getVolumeMetadata, 
+import {
+  getVolumeMetadata,
   VolumeMountPointNotAccessibleError,
-  TimeoutError 
+  TimeoutError,
 } from "@photostructure/fs-metadata";
 
 try {
   const metadata = await getVolumeMetadata("/mnt/network-drive", {
-    timeoutMs: 10000  // 10 second timeout
+    timeoutMs: 10000, // 10 second timeout
   });
 } catch (error) {
   if (error instanceof TimeoutError) {
@@ -168,23 +169,31 @@ try {
 ## Working with Network Volumes
 
 ```typescript
-import { getVolumeMountPoints, getVolumeMetadata } from "@photostructure/fs-metadata";
+import {
+  getVolumeMountPoints,
+  getVolumeMetadata,
+} from "@photostructure/fs-metadata";
 
 // Network volumes may timeout or be unavailable
 const mountPoints = await getVolumeMountPoints({ timeoutMs: 30000 });
 
 // Filter out unhealthy volumes
-const availableVolumes = mountPoints.filter(mp => mp.status === "healthy");
+const availableVolumes = mountPoints.filter((mp) => mp.status === "healthy");
 
 // Get metadata with extended timeout for network drives
 for (const mp of availableVolumes) {
   try {
     const metadata = await getVolumeMetadata(mp.mountPoint, {
-      timeoutMs: 20000  // 20 seconds for network volumes
+      timeoutMs: 20000, // 20 seconds for network volumes
     });
-    console.log(`${mp.mountPoint}: ${metadata.pctUsed.toFixed(1)}% used`);
+    console.log(
+      `${mp.mountPoint}: ${metadata.used} of ${metadata.size} bytes used`,
+    );
   } catch (error) {
-    console.error(`Failed to get metadata for ${mp.mountPoint}:`, error.message);
+    console.error(
+      `Failed to get metadata for ${mp.mountPoint}:`,
+      error.message,
+    );
   }
 }
 ```
@@ -198,9 +207,9 @@ import { getVolumeMountPoints } from "@photostructure/fs-metadata";
 
 const volumes = await getVolumeMountPoints();
 const driveLetters = volumes
-  .filter(v => v.status === "healthy")
-  .map(v => v.mountPoint)
-  .filter(mp => /^[A-Z]:\\$/.test(mp))
+  .filter((v) => v.status === "healthy")
+  .map((v) => v.mountPoint)
+  .filter((mp) => /^[A-Z]:\\$/.test(mp))
   .sort();
 
 console.log("Available drives:", driveLetters);
@@ -213,13 +222,13 @@ console.log("Available drives:", driveLetters);
 import { getAllVolumeMetadata } from "@photostructure/fs-metadata";
 
 // Get only user-accessible volumes (excludes /proc, /sys, etc.)
-const userVolumes = await getAllVolumeMetadata({ 
-  includeSystemVolumes: false 
+const userVolumes = await getAllVolumeMetadata({
+  includeSystemVolumes: false,
 });
 
 // Custom filtering for specific filesystem types
-const dataVolumes = userVolumes.filter(v => 
-  ["ext4", "xfs", "btrfs", "zfs"].includes(v.fstype)
+const dataVolumes = userVolumes.filter((v) =>
+  ["ext4", "xfs", "btrfs", "zfs"].includes(v.fstype),
 );
 ```
 
@@ -231,7 +240,7 @@ import { getAllVolumeMetadata } from "@photostructure/fs-metadata";
 const volumes = await getAllVolumeMetadata();
 
 // Find APFS volumes
-const apfsVolumes = volumes.filter(v => v.fstype === "apfs");
+const apfsVolumes = volumes.filter((v) => v.fstype === "apfs");
 
 // APFS containers share space, so available space might be the same
 const containers = new Map();
@@ -242,33 +251,6 @@ for (const vol of apfsVolumes) {
   }
   containers.get(key).push(vol.mountPoint);
 }
-```
-
-## Monitoring Storage Space
-
-```typescript
-import { getAllVolumeMetadata } from "@photostructure/fs-metadata";
-
-async function checkLowDiskSpace(thresholdPercent = 90) {
-  const volumes = await getAllVolumeMetadata();
-  
-  const warnings = volumes
-    .filter(v => v.status === "healthy" && v.pctUsed > thresholdPercent)
-    .map(v => ({
-      mountPoint: v.mountPoint,
-      pctUsed: v.pctUsed,
-      availableGB: (v.available / 1024 / 1024 / 1024).toFixed(2)
-    }));
-    
-  if (warnings.length > 0) {
-    console.warn("Low disk space warnings:", warnings);
-  }
-  
-  return warnings;
-}
-
-// Run periodic checks
-setInterval(() => checkLowDiskSpace(85), 60 * 60 * 1000); // Every hour
 ```
 
 ## Debug Logging
