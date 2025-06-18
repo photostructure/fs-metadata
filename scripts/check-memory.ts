@@ -140,7 +140,10 @@ if (os.platform() === "linux") {
       ) {
         throw new Error(`Invalid script path: ${valgrindScript}`);
       }
-      execFileSync("bash", [valgrindScript], { stdio: "inherit", shell: false });
+      execFileSync("bash", [valgrindScript], {
+        stdio: "inherit",
+        shell: false,
+      });
       console.log(color(colors.GREEN, "✓ Valgrind tests passed"));
     } catch (error) {
       console.log(color(colors.RED, "✗ Valgrind tests failed"));
