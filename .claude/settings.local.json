@@ -58,7 +58,8 @@
       "Bash(cmd.exe:*)",
       "WebFetch(domain:drmemory.org)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:clang.llvm.org)"
+      "WebFetch(domain:clang.llvm.org)",
+      "Bash(/dev/null)"
     ],
     "deny": []
   },
