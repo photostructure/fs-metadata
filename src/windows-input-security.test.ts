@@ -1,7 +1,7 @@
 // src/windows-input-security.test.ts
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { isHidden } from "./index";
 import { describePlatform } from "./test-utils/platform";
 
