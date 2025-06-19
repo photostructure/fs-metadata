@@ -1,3 +1,5 @@
+# https://prettier.io/docs/ignore.html
+
 # Dependencies
 node_modules/
 
