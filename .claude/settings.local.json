@@ -60,7 +60,8 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:clang.llvm.org)",
       "Bash(/dev/null)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(gh run watch:*)"
     ],
     "deny": []
   },

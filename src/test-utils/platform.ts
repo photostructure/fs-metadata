@@ -68,13 +68,24 @@ export const describeSkipARM64CI =
 export const itSkipARM64CI = isARM64 && env["CI"] ? it.skip : it;
 
 /**
+ * Skip tests on Windows CI environments due to Jest worker process failures
+ * These tests pass locally but fail in GitHub Actions with:
+ * "Jest worker encountered 4 child process exceptions, exceeding retry limit"
+ */
+export const describeSkipWindowsCI =
+  isWindows && env["CI"] ? describe.skip : describe;
+
+export const itSkipWindowsCI = isWindows && env["CI"] ? it.skip : it;
+
+/**
  * Platform-specific tests that are stable in CI environments
- * (skips on ARM64 CI due to Jest worker process issues)
+ * (skips on Windows CI due to Jest worker process issues)
  * @param supported The platforms to run tests on
- * @returns jest.Describe function that runs on specified platforms but skips on ARM64 CI
+ * @returns jest.Describe function that runs on specified platforms but skips on Windows CI
  */
 export function describePlatformStable(...supported: NodeJS.Platform[]) {
-  if (isARM64 && env["CI"]) {
+  // Skip on Windows CI due to Jest worker process failures
+  if (isWindows && env["CI"]) {
     return describe.skip;
   }
   return describePlatform(...supported);

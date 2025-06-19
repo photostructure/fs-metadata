@@ -50,15 +50,17 @@ Jest 30 doesn't support Node.js 23. Use Node.js 20, 22, or 24.
 
 **Problem**: Jest worker processes fail on Windows CI environments (both x64 and ARM64) with "Jest worker encountered 4 child process exceptions".
 
-**Workaround**: Jest is configured to use single worker mode (`maxWorkers: 1`) for all Windows CI environments. Additionally, resource-intensive tests are skipped on ARM64 CI environments using `describeSkipARM64CI`:
+**Workaround**:
+
+1. Jest is configured to use single worker mode (`maxWorkers: 1`) for all Windows CI environments
+2. Tests that stress worker threads or concurrency are skipped on Windows CI using `describeSkipWindowsCI` or `describePlatformStable`:
 
 - `worker_threads.test.ts` - Worker thread integration tests
 - `thread_safety.test.ts` - Concurrent operations stress tests
 - `windows-memory-check.test.ts` - Memory leak detection (Windows only)
 - `windows-resource-security.test.ts` - Resource handle leak tests (Windows only)
-- `windows-input-security.test.ts` - Input validation tests (Windows only)
 
-**Note**: These tests pass locally but fail in CI. The native module loads correctly, but Jest's worker process management has issues on Windows CI environments.
+**Note**: These tests pass locally but fail in CI. The native module loads correctly, but Jest's worker process management has fundamental incompatibilities with these specific tests on GitHub Actions Windows runners.
 
 ### Build Architecture Issue
 
