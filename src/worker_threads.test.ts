@@ -68,14 +68,18 @@ describeSkipAlpineARM64("Worker Threads Support", () => {
         }
       };
 
-      worker.on("message", (message: WorkerResult<T>) => {
+      worker.on("message", (message: WorkerResult<T> | any) => {
         if (!isResolved) {
           isResolved = true;
           cleanup().then(() => {
             if (message.success) {
               resolve(message.result);
             } else {
-              reject(new Error(message.error));
+              // Enhanced error handling for debugging
+              const errorMsg = message.stack && process.env.CI 
+                ? `${message.error}\nPlatform: ${message.platform}, Arch: ${message.arch}\nStack: ${message.stack}`
+                : message.error;
+              reject(new Error(errorMsg));
             }
           });
         }

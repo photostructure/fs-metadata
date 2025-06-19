@@ -10,10 +10,24 @@ const isESM =
   process.env.TEST_ESM === "1" ||
   process.env.NODE_OPTIONS?.includes("--experimental-vm-modules");
 
+// Windows ARM64 CI detection
+const isWindowsARM64CI = platform === "win32" && process.arch === "arm64" && process.env.CI;
+
+if (isWindowsARM64CI) {
+  console.log("[Jest Config] Windows ARM64 CI detected, applying workarounds:");
+  console.log("  - maxWorkers: 1 (single worker mode)");
+  console.log("  - workerIdleMemoryLimit: 1GB");
+}
+
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 const config = {
   displayName: `@photostructure/fs-metadata (${isESM ? "ESM" : "CJS"})`,
   testEnvironment: "jest-environment-node",
+  // Workaround for Windows ARM64 Jest worker issues
+  ...(isWindowsARM64CI && {
+    maxWorkers: 1, // Force single worker to avoid worker thread issues
+    workerIdleMemoryLimit: "1GB", // Increase memory limit
+  }),
   roots: ["<rootDir>/src"],
   coverageProvider: "v8",
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
