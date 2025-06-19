@@ -67,8 +67,8 @@ function runJavaScriptMemoryTests(): void {
       env: {
         ...process.env,
         TEST_MEMORY: "1",
-        TEST_ESM: "1",
-        NODE_OPTIONS: "--expose-gc --experimental-vm-modules --no-warnings",
+        TEST_ESM: "0", // Use CommonJS mode for memory tests
+        NODE_OPTIONS: "--expose-gc --no-warnings",
         // Clear any ASAN environment variables that might interfere
         DYLD_INSERT_LIBRARIES: undefined,
         ASAN_OPTIONS: undefined,
