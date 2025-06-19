@@ -25,6 +25,7 @@ Windows ARM64 support for native Node.js modules is a rapidly evolving area. Thi
 ### Scoped Package Handling
 
 For scoped npm packages like `@photostructure/fs-metadata`:
+
 - Package scope uses `+` instead of `/` in filenames
 - Example: `@photostructure+fs-metadata.glibc.node`
 - This is standard prebuildify behavior
@@ -34,6 +35,7 @@ For scoped npm packages like `@photostructure/fs-metadata`:
 ### Current State of the Ecosystem (2025)
 
 1. **GitHub Actions Support**: Windows ARM64 runners are in public preview
+
    - Free for public repositories
    - Run Windows 11 Desktop image
    - Native ARM64 compilation (no emulation)
@@ -47,6 +49,7 @@ For scoped npm packages like `@photostructure/fs-metadata`:
 ### Architecture Detection Challenges
 
 Windows SDK headers require architecture-specific defines before including `<windows.h>`:
+
 - x64: `/D_M_X64 /D_WIN64 /D_AMD64_`
 - ARM64: `/D_M_ARM64 /D_WIN64`
 
@@ -58,7 +61,7 @@ Our solution: Set `CL` environment variable in build scripts (see `scripts/prebu
 
 ```yaml
 prebuild-win-arm64:
-  runs-on: windows-11-arm  # Native ARM64 runner
+  runs-on: windows-11-arm # Native ARM64 runner
   steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -93,15 +96,18 @@ test-win-arm64:
 ### Problem: Jest Worker Process Failures
 
 **Symptoms**:
+
 - "Jest worker encountered 4 child process exceptions, exceeding retry limit"
 - Tests fail only in CI, not locally
 
 **Root Causes**:
+
 1. Module resolution differs in worker threads
 2. `__dirname` context changes in Jest environment
 3. Relative paths may not resolve correctly
 
 **Solutions**:
+
 1. Use multiple fallback paths when loading native modules
 2. Try `process.cwd()` in addition to relative paths
 3. Ensure prebuilds are in expected locations
@@ -109,15 +115,18 @@ test-win-arm64:
 ### Problem: Native Module Not Found
 
 **Symptoms**:
+
 - "No native build was found for platform=win32 arch=arm64"
 - Module loads on x64 but not ARM64
 
 **Root Causes**:
+
 1. Missing prebuilt binary for the platform
 2. Incorrect platform detection
 3. node-gyp-build not finding the prebuild
 
 **Solutions**:
+
 1. Verify prebuild exists in `prebuilds/win32-arm64/`
 2. Check that `process.platform` === "win32" and `process.arch` === "arm64"
 3. Use `node-gyp-build` diagnostic output to debug loading
@@ -125,15 +134,18 @@ test-win-arm64:
 ### Problem: Build Failures on Windows ARM64
 
 **Symptoms**:
+
 - "No Target Architecture" errors
 - Windows SDK header compilation errors
 
 **Root Causes**:
+
 - Missing architecture defines for Windows SDK
 - Prebuildify not passing through defines from binding.gyp
 
 **Solution**:
 Set environment variables before building:
+
 ```javascript
 if (process.platform === "win32" && process.arch === "arm64") {
   process.env.CL = "/D_M_ARM64 /D_WIN64";
@@ -143,7 +155,9 @@ if (process.platform === "win32" && process.arch === "arm64") {
 ## Testing Strategies
 
 ### 1. Memory Testing
+
 Traditional Windows memory tools don't work with Node.js:
+
 - Dr. Memory: "Unable to load client library"
 - Debug CRT: Cannot be loaded by Node.js
 - Visual Leak Detector: Requires debug builds
@@ -151,11 +165,13 @@ Traditional Windows memory tools don't work with Node.js:
 Use JavaScript-based testing instead (see `src/windows-memory-check.test.ts`)
 
 ### 2. Worker Thread Testing
+
 - Test native module loading in both main and worker threads
 - Use integration tests, not mocks
 - Verify actual functionality, not just loading
 
 ### 3. Cross-Platform Testing
+
 - Test on actual ARM64 hardware when possible
 - Use GitHub Actions for CI testing
 - Be aware of performance differences (ARM64 can be slower)
@@ -163,6 +179,7 @@ Use JavaScript-based testing instead (see `src/windows-memory-check.test.ts`)
 ## Debugging Tips
 
 ### 1. Verify Prebuild Location
+
 ```bash
 # List prebuilds
 ls -la prebuilds/
@@ -172,23 +189,25 @@ ls -la prebuilds/win32-arm64/
 ```
 
 ### 2. Test Native Module Loading
+
 ```javascript
 // test-native-load.js
-const nodeGypBuild = require('node-gyp-build');
+const nodeGypBuild = require("node-gyp-build");
 try {
   const binding = nodeGypBuild(process.cwd());
-  console.log('✓ Native module loaded');
-  console.log('Functions:', Object.keys(binding));
+  console.log("✓ Native module loaded");
+  console.log("Functions:", Object.keys(binding));
 } catch (error) {
-  console.error('✗ Failed to load:', error.message);
+  console.error("✗ Failed to load:", error.message);
 }
 ```
 
 ### 3. Check Process Information
+
 ```javascript
-console.log('Platform:', process.platform);
-console.log('Architecture:', process.arch);
-console.log('Node version:', process.version);
+console.log("Platform:", process.platform);
+console.log("Architecture:", process.arch);
+console.log("Node version:", process.version);
 ```
 
 ## Future Considerations

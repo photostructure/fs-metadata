@@ -11,7 +11,8 @@ const isESM =
   process.env.NODE_OPTIONS?.includes("--experimental-vm-modules");
 
 // Windows ARM64 CI detection
-const isWindowsARM64CI = platform === "win32" && process.arch === "arm64" && process.env.CI;
+const isWindowsARM64CI =
+  platform === "win32" && process.arch === "arm64" && process.env.CI;
 
 if (isWindowsARM64CI) {
   console.log("[Jest Config] Windows ARM64 CI detected, applying workarounds:");
