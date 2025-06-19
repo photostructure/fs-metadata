@@ -74,8 +74,8 @@ describeMemory("Memory Tests", () => {
         }
       },
       {
-        targetDurationMs: 10_000,  // Reduced from 20s to 10s for faster CI
-        maxTimeoutMs: 30_000,      // Reduced from 60s to 30s
+        targetDurationMs: 10_000, // Reduced from 20s to 10s for faster CI
+        maxTimeoutMs: 30_000, // Reduced from 60s to 30s
         minIterations: 10,
         debug: !!process.env["DEBUG_BENCHMARK"],
       },

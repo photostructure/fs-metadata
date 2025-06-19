@@ -62,18 +62,18 @@ export const describeSkipAlpineARM64 =
  * - Alpine ARM64: emulation timing issues
  * - Windows ARM64: Jest worker process failures
  */
-export const describeSkipARM64CI = 
-  (isARM64 && env["CI"]) ? describe.skip : describe;
+export const describeSkipARM64CI =
+  isARM64 && env["CI"] ? describe.skip : describe;
 
-export const itSkipARM64CI = 
-  (isARM64 && env["CI"]) ? it.skip : it;
+export const itSkipARM64CI = isARM64 && env["CI"] ? it.skip : it;
 
 /**
- * Helper for platform-specific tests that should also skip on ARM64 CI
+ * Platform-specific tests that are stable in CI environments
+ * (skips on ARM64 CI due to Jest worker process issues)
  * @param supported The platforms to run tests on
  * @returns jest.Describe function that runs on specified platforms but skips on ARM64 CI
  */
-export function describePlatformSkipARM64CI(...supported: NodeJS.Platform[]) {
+export function describePlatformStable(...supported: NodeJS.Platform[]) {
   if (isARM64 && env["CI"]) {
     return describe.skip;
   }
