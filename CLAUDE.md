@@ -51,6 +51,7 @@ Jest 30 doesn't support Node.js 23. Use Node.js 20, 22, or 24.
 **Problem**: Jest worker processes fail on ARM64 CI environments with "Jest worker encountered 4 child process exceptions".
 
 **Workaround**: Resource-intensive tests are skipped on all ARM64 CI environments using `describeSkipARM64CI`:
+
 - `worker_threads.test.ts` - Worker thread integration tests
 - `thread_safety.test.ts` - Concurrent operations stress tests
 - `windows-memory-check.test.ts` - Memory leak detection (Windows only)
