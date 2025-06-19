@@ -24,7 +24,7 @@ type WorkerTask =
 
 type WorkerResult<T> =
   | { success: true; result: T }
-  | { success: false; error: string };
+  | { success: false; error: string; stack?: string; platform?: string; arch?: string };
 
 // Path to the worker helper file
 const workerHelperPath = join(
@@ -68,7 +68,7 @@ describeSkipAlpineARM64("Worker Threads Support", () => {
         }
       };
 
-      worker.on("message", (message: WorkerResult<T> | any) => {
+      worker.on("message", (message: WorkerResult<T>) => {
         if (!isResolved) {
           isResolved = true;
           cleanup().then(() => {
@@ -76,7 +76,7 @@ describeSkipAlpineARM64("Worker Threads Support", () => {
               resolve(message.result);
             } else {
               // Enhanced error handling for debugging
-              const errorMsg = message.stack && process.env.CI 
+              const errorMsg = message.stack && process.env["CI"]
                 ? `${message.error}\nPlatform: ${message.platform}, Arch: ${message.arch}\nStack: ${message.stack}`
                 : message.error;
               reject(new Error(errorMsg));
