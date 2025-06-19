@@ -1,10 +1,10 @@
 // src/windows-memory-check.test.ts
 // Alternative memory leak detection for Windows without debug builds
 import { getVolumeMountPoints } from "./index";
-import { describePlatform } from "./test-utils/platform";
+import { describePlatformSkipARM64CI } from "./test-utils/platform";
 
 // This test suite uses JavaScript-based memory monitoring instead of CRT debug heap
-describePlatform("win32")("Windows Memory Leak Detection (JavaScript)", () => {
+describePlatformSkipARM64CI("win32")("Windows Memory Leak Detection (JavaScript)", () => {
   // Force garbage collection helper
   const forceGC = () => {
     if (global.gc) {

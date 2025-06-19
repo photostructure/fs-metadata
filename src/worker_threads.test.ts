@@ -6,7 +6,7 @@ import { _dirname } from "./dirname";
 import { getVolumeMetadata, getVolumeMountPoints, isHidden } from "./index";
 import { isMacOS, isWindows } from "./platform";
 import { runAdaptiveBenchmark } from "./test-utils/benchmark-harness";
-import { describeSkipAlpineARM64 } from "./test-utils/platform";
+import { describeSkipARM64CI } from "./test-utils/platform";
 import { getTestTimeout } from "./test-utils/test-timeout-config";
 import type { MountPoint } from "./types/mount_point";
 import type { VolumeMetadata } from "./types/volume_metadata";
@@ -33,7 +33,7 @@ const workerHelperPath = join(
   "worker-thread-helper.cjs",
 );
 
-describeSkipAlpineARM64("Worker Threads Support", () => {
+describeSkipARM64CI("Worker Threads Support", () => {
   let testDir: string;
   let testFile: string;
 

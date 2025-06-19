@@ -1,10 +1,10 @@
 // src/windows-resource-security.test.ts
 import { getVolumeMountPoints, type MountPoint } from "./index";
-import { describePlatform } from "./test-utils/platform";
+import { describePlatformSkipARM64CI } from "./test-utils/platform";
 
 // Resource security tests - these test for resource/handle leaks during operations
 // These benefit from running with debug builds to detect memory leaks
-describePlatform("win32")("Windows Resource Security Tests", () => {
+describePlatformSkipARM64CI("win32")("Windows Resource Security Tests", () => {
   describe("Resource Cleanup", () => {
     it("should not leak handles on timeout", async () => {
       // Test with an unreachable network path

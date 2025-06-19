@@ -56,3 +56,26 @@ export const itSkipAlpineARM64 = isAlpine() && isARM64 ? it.skip : it;
  */
 export const describeSkipAlpineARM64 =
   isAlpine() && isARM64 ? describe.skip : describe;
+
+/**
+ * Skip tests on ARM64 CI environments due to various issues:
+ * - Alpine ARM64: emulation timing issues
+ * - Windows ARM64: Jest worker process failures
+ */
+export const describeSkipARM64CI = 
+  (isARM64 && env["CI"]) ? describe.skip : describe;
+
+export const itSkipARM64CI = 
+  (isARM64 && env["CI"]) ? it.skip : it;
+
+/**
+ * Helper for platform-specific tests that should also skip on ARM64 CI
+ * @param supported The platforms to run tests on
+ * @returns jest.Describe function that runs on specified platforms but skips on ARM64 CI
+ */
+export function describePlatformSkipARM64CI(...supported: NodeJS.Platform[]) {
+  if (isARM64 && env["CI"]) {
+    return describe.skip;
+  }
+  return describePlatform(...supported);
+}

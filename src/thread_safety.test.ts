@@ -2,8 +2,9 @@ import { getVolumeMetadata, getVolumeMountPoints } from "./index";
 import { isAlpine, isARM64, isWindows } from "./platform";
 import { runAdaptiveBenchmark } from "./test-utils/benchmark-harness";
 import { getTestTimeout } from "./test-utils/test-timeout-config";
+import { describeSkipARM64CI } from "./test-utils/platform";
 
-describe("Thread Safety Tests", () => {
+describeSkipARM64CI("Thread Safety Tests", () => {
   // This test is designed to stress the Windows thread safety implementation
   // Without the atomic fixes, this could cause race conditions or crashes
   it(

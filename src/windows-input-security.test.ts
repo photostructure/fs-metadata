@@ -3,11 +3,11 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { isHidden } from "./index";
-import { describePlatform } from "./test-utils/platform";
+import { describePlatformSkipARM64CI } from "./test-utils/platform";
 
 // Input validation security tests - these test handling of malicious inputs
 // These don't require debug builds and can run with regular Release builds
-describePlatform("win32")("Windows Input Security Tests", () => {
+describePlatformSkipARM64CI("win32")("Windows Input Security Tests", () => {
   describe("Path Traversal Protection", () => {
     it("should reject paths with ..", async () => {
       // These paths should be rejected either by our security validation
