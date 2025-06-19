@@ -36,7 +36,7 @@ const shouldRunMemoryTests = !!process.env["TEST_MEMORY"];
 const describeMemory = shouldRunMemoryTests ? describe : describe.skip;
 
 describeMemory("Memory Tests", () => {
-  jest.setTimeout(getTestTimeout(60_000)); // Base 60s timeout for memory-intensive tests
+  jest.setTimeout(getTestTimeout(40_000)); // Base 40s timeout (reduced from 60s)
 
   // Helper to get memory usage after GC
   async function getMemoryUsage(): Promise<number> {
@@ -74,8 +74,8 @@ describeMemory("Memory Tests", () => {
         }
       },
       {
-        targetDurationMs: 20_000,
-        maxTimeoutMs: 60_000,
+        targetDurationMs: 10_000,  // Reduced from 20s to 10s for faster CI
+        maxTimeoutMs: 30_000,      // Reduced from 60s to 30s
         minIterations: 10,
         debug: !!process.env["DEBUG_BENCHMARK"],
       },
