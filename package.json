@@ -50,7 +50,7 @@
     "snyk": "snyk code test",
     "fmt": "run-p fmt:*",
     "// fmt:cpp": "on ubuntu: `sudo apt install clang-format`. Note that windows emits `invalid format` with this || true approach, but it works and is better than introducing Yet Another Script Script (like scripts/clang-format.mjs).",
-    "fmt:cpp": "clang-format --style=LLVM -i src/*.cpp src/*/*.cpp src/*/*.h || echo \"\"",
+    "fmt:cpp": "clang-format --style=LLVM -i src/*.cpp src/*/*.cpp src/*/*.h || echo \"problem with clang-format\"",
     "fmt:js": "prettier --write \"**/*.{cjs,mjs,js}\"",
     "fmt:ts": "prettier --write \"**/*.{cts,mts,ts}\"",
     "fmt:md": "prettier --write \"**/*.md\"",
@@ -60,7 +60,7 @@
     "update": "run-p update:*",
     "update:deps": "ncu -u",
     "install:pinact": "go install github.com/suzuki-shunsuke/pinact/cmd/pinact@latest",
-    "update:actions": "pinact run -u",
+    "update:actions": "pinact run -u || echo \"problem with pinact\"",
     "// precommit": "should be manually run by developers before they run `git commit`",
     "precommit": "npx --yes tsx scripts/precommit.ts",
     "prepare-release": "npm run build:dist"
