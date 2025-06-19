@@ -18,10 +18,11 @@ function run(command: string, description: string) {
 
 // Always run these
 run("npm run install", "Installing dependencies");
+run("npm run update", "Updating dependencies");
 run("npm run clean", "Start fresh");
 run("npm run fmt", "Formatting code");
-run("npm run docs", "TypeDoc generation");
 run("npm run lint", "Running linting checks");
+run("npm run docs", "TypeDoc generation");
 run("npm run build:dist", "Building distribution files");
 
 // Build native module with portable GLIBC
