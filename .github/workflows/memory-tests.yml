@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -24,7 +24,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libglib2.0-dev libblkid-dev uuid-dev build-essential valgrind clang
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
@@ -42,7 +42,7 @@ jobs:
 
       - name: Upload memory test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: memory-test-results-${{ matrix.os }}-node${{ matrix.node-version }}
           path: |
