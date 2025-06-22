@@ -42,6 +42,7 @@
     "tests": "run-s test:*",
     "test:cjs": "cross-env TEST_ESM=0 jest",
     "test:esm": "cross-env TEST_ESM=1 node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js",
+    "test:memory": "cross-env NODE_OPTIONS='--expose-gc --no-warnings' tsx scripts/memory-test-runner.ts",
     "check:memory": "tsx scripts/check-memory.ts",
     "lint": "run-s lint:*",
     "lint:native": "tsx scripts/clang-tidy.ts",

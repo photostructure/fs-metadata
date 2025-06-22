@@ -50,7 +50,14 @@ Jest 30 doesn't support Node.js 23. Use Node.js 20, 22, or 24.
 
 **Problem**: Jest worker processes fail on Windows CI environments (both x64 and ARM64) with "Jest worker encountered 4 child process exceptions".
 
-**Workaround**:
+**Solution for Memory Tests**:
+
+Memory tests now use a standalone TypeScript runner (`src/test-utils/memory-test-runner.ts`) that bypasses Jest entirely on all platforms. This provides more accurate memory measurements without Jest overhead and avoids worker process issues.
+
+- Run full memory check suite (includes native tools): `npm run check:memory`
+- Memory test logic is in `src/test-utils/memory-test-core.ts`
+
+**Workaround for Other Tests**:
 
 1. Jest is configured to use single worker mode (`maxWorkers: 1`) for all Windows CI environments
 2. Tests that stress worker threads or concurrency are skipped on Windows CI using `describeSkipWindowsCI` or `describePlatformStable`:
@@ -185,3 +192,7 @@ npm version patch|minor|major
 npm publish
 git push origin main --follow-tags
 ```
+
+## General guidance
+
+Never do inline imports like `const { mkdirSync } = await import("node:fs");` -- just use standard imports.
