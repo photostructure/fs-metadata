@@ -19,6 +19,7 @@ function run(command: string, description: string) {
 // Always run these
 run("npm run install", "Installing dependencies");
 run("npm run update", "Updating dependencies");
+run("npm run install --force", "Updating dependencies");
 run("npm run clean", "Start fresh");
 run("npm run fmt", "Formatting code");
 run("npm run lint", "Running linting checks");

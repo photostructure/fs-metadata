@@ -58,7 +58,7 @@
     "fmt:yml": "prettier --write \"**/*.{yaml,yml}\"",
     "fmt:pkg": "npm pkg fix",
     "update": "run-p update:*",
-    "update:deps": "ncu -u --install always",
+    "update:deps": "ncu -u",
     "install:pinact": "go install github.com/suzuki-shunsuke/pinact/cmd/pinact@latest",
     "update:actions": "pinact run -u || echo \"problem with pinact\"",
     "// precommit": "should be manually run by developers before they run `git commit`",
