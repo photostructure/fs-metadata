@@ -333,13 +333,11 @@ public:
 ### Memory Management Rules
 
 1. **Core Foundation Create/Copy/Get Rule**:
-
    - Functions with "Create" or "Copy" return owned objects (must release)
    - Functions with "Get" return borrowed references (don't release)
    - Always use CFReleaser for owned objects
 
 2. **Buffer Management**:
-
    - Use RAII wrappers for malloc'd buffers
    - Prefer stack allocation when size is known
    - Use std::vector for dynamic arrays
@@ -429,13 +427,11 @@ public:
 ### Error Recovery Strategies
 
 1. **Network Volume Timeouts**:
-
    - Use timeouts for all volume operations
    - Mark as "disconnected" on timeout
    - Continue processing other volumes
 
 2. **Permission Errors**:
-
    - Check with faccessat before operations
    - Provide clear error messages
    - Don't expose sensitive paths in errors

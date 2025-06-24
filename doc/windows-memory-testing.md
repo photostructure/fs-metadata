@@ -92,13 +92,11 @@ npm run check:memory
 ## Future Improvements
 
 1. Investigate fixing debug build loading:
-
    - Ship debug CRT dependencies
    - Use manifest embedding for dependency resolution
    - Investigate short path alternatives to avoid UNC paths
 
 2. Enhanced JavaScript monitoring:
-
    - Native memory tracking via N-API
    - V8 heap snapshots comparison
    - Event loop lag correlation

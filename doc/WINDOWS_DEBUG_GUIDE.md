@@ -10,14 +10,12 @@ The debuglog.test.ts file was failing on:
 ## Changes Made
 
 1. **Replaced execFileSync with spawnSync**
-
    - `spawnSync` provides better process control and doesn't throw errors with circular references
    - Added `windowsHide: true` to prevent console windows from appearing on Windows
    - Added `shell: true` on Windows only for proper npx execution
    - Increased timeout to 30 seconds for slower environments like Alpine Linux containers
 
 2. **Enhanced Error Handling**
-
    - Extract only serializable properties from errors (message, code, status, stderr, stdout)
    - Added detailed logging for Windows-specific debugging
    - Prevent circular reference errors from reaching Jest's worker communication
@@ -44,7 +42,6 @@ To test these changes on your Windows test box:
    ```
 
 3. **If tests fail, check for:**
-
    - Console output showing "Windows child process error" with detailed info
    - Error messages, status codes, and stderr output
    - Whether `npx tsx` is available and working correctly

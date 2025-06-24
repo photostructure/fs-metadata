@@ -35,7 +35,6 @@ For scoped npm packages like `@photostructure/fs-metadata`:
 ### Current State of the Ecosystem (2025)
 
 1. **GitHub Actions Support**: Windows ARM64 runners are in public preview
-
    - Free for public repositories
    - Run Windows 11 Desktop image
    - Native ARM64 compilation (no emulation)

@@ -322,23 +322,19 @@ Example:
    ```
 
 2. **Key Import**
-
    - Imports the private key from the `GPG_PRIVATE_KEY` secret
    - Restarts gpg-agent to ensure configuration is loaded
 
 3. **Wrapper Script Creation**
-
    - Creates a unique wrapper script at `/tmp/gpg-wrapper-$$-$RANDOM.sh`
    - The wrapper automatically provides the passphrase to GPG
    - Exports `GPG_WRAPPER_PATH` to the environment for subsequent steps
 
 4. **Trust Configuration**
-
    - Extracts the key ID and sets trust level to 5 (ultimate)
    - Validates that the key was imported successfully
 
 5. **Email Validation** (NEW!)
-
    - Extracts email from the GPG key
    - Compares with `GIT_USER_EMAIL`
    - Fails fast if emails don't match, preventing confusing signing failures later

@@ -32,7 +32,6 @@ clang-tidy has limited support on Windows due to fundamental incompatibilities b
 
 1. **Use Visual Studio Code Analysis**: The built-in Code Analysis in Visual Studio provides better Windows-specific checking
 2. **Focus on Warnings**: Despite header errors, clang-tidy still catches many issues:
-
    - Uninitialized variables
    - RAII violations
    - Member initialization issues

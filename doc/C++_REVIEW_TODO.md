@@ -266,14 +266,12 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 ### Code Quality
 
 1. **const-correctness**: Added `const` qualifiers to all appropriate local variables across the codebase
-
    - All Napi::Env instances
    - All GCharPtr, GObjectPtr, GFileInfoPtr instances
    - All std::lock_guard instances
    - Improves code safety and enables compiler optimizations
 
 2. **Static Analysis**: Integrated clang-tidy
-
    - Added to CI/CD pipeline
    - Uses bear to generate compile_commands.json
    - Runs only on platform-relevant files
