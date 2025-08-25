@@ -1,52 +1,70 @@
-import { familySync } from "detect-libc";
 import { execSync } from "node:child_process";
+import { rmSync } from "node:fs";
 import { platform } from "node:os";
+import { exit } from "node:process";
 
 const isLinux = platform() === "linux";
 const isMacOS = platform() === "darwin";
-const isGlibc = isLinux && familySync() === "glibc";
 
-function run(command: string, description: string) {
-  console.log(`\n▶ ${description ?? command}`);
+function run({
+  cmd,
+  desc,
+  exitOnFail: shouldExit = true,
+}: {
+  cmd: string;
+  desc: string;
+  exitOnFail?: boolean;
+}) {
+  console.log(`\n▶ ${desc ?? cmd}`);
   try {
-    execSync(command, { stdio: "inherit" });
+    execSync(cmd, { stdio: "inherit" });
   } catch (error) {
-    console.error(`✗ Failed: ${description ?? command}: ` + error);
-    process.exit(1);
+    console.error(`✗ Failed: ${desc ?? cmd}: ` + error);
+    if (shouldExit) exit(1);
   }
 }
 
-// Always run these
-run("npm run install", "Installing dependencies");
-run("npm run update", "Updating dependencies");
-run("npm run install --force", "Updating dependencies");
-run("npm run clean", "Start fresh");
-run("npm run fmt", "Formatting code");
-run("npm run lint", "Running linting checks");
-run("npm run docs", "TypeDoc generation");
-run("npm run build:dist", "Building distribution files");
+run({ cmd: "npm install", desc: "Installing dependencies" });
+run({ cmd: "npm run update", desc: "Updating dependencies" });
+rmSync("package-lock.json", { force: true });
+run({ cmd: "npm install", desc: "Updating dependencies" });
+run({ cmd: "npm run clean", desc: "Start fresh" });
+run({ cmd: "npm run fmt", desc: "Formatting code" });
+run({ cmd: "npm run lint", desc: "Running linting checks" });
+run({ cmd: "npm run docs", desc: "TypeDoc generation" });
+run({ cmd: "npm run build:dist", desc: "Building distribution files" });
+
+// Detect if we're using glibc (vs musl)
+// Check process.report for musl loader - if not found, assume glibc
+const isGlibc = (() => {
+  if (!isLinux) return false;
+  const report = process.report?.getReport() as any;
+  return !report?.sharedObjects?.some((lib: string) => /ld-musl/.test(lib));
+})();
 
 // Build native module with portable GLIBC
 if (isLinux && isGlibc) {
-  run(
-    "npm run build:linux-glibc",
-    "Building native project with portable GLIBC",
-  );
+  run({
+    cmd: "npm run build:linux-glibc",
+    desc: "Building native project with portable GLIBC",
+  });
 } else {
   // Clean old native builds to ensure fresh compilation
-  run("npm run clean:native", "Cleaning old native builds");
-  run("npm run build:native", "Building native module");
+  run({ cmd: "npm run clean:native", desc: "Cleaning old native builds" });
+  run({ cmd: "npm run build:native", desc: "Building native module" });
 }
 
-run("npm run tests", "Running tests in ESM & CJS mode");
+run({ cmd: "npm run tests", desc: "Running tests in ESM & CJS mode" });
 
 // Platform-specific checks
 if (isLinux || isMacOS) {
-  run("npm run lint:native", "Running clang-tidy");
+  // Remove stale compile_commands.json to ensure it's regenerated with current settings
+  rmSync("compile_commands.json", { force: true });
+  run({ cmd: "npm run lint:native", desc: "Running clang-tidy" });
 }
 
 // Run comprehensive memory tests (cross-platform)
 // This includes Windows debug memory check on Windows
-run("npm run check:memory", "Comprehensive memory tests");
+run({ cmd: "npm run check:memory", desc: "Comprehensive memory tests" });
 
 console.log("\n✅ All precommit checks passed!");
