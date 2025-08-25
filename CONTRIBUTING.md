@@ -26,7 +26,7 @@ Install the Xcode Command Line Tools, and then
 
 ### On Ubuntu/Debian
 
-    sudo apt-get install build-essential clang-format libglib2.0-dev libblkid-dev uuid-dev
+    sudo apt-get install bear build-essential clang-format libglib2.0-dev libblkid-dev uuid-dev
 
 ## Before submitting your PR
 
