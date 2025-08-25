@@ -10,25 +10,33 @@ const isESM =
   process.env.TEST_ESM === "1" ||
   process.env.NODE_OPTIONS?.includes("--experimental-vm-modules");
 
-// Windows CI detection - Jest workers have issues on Windows CI environments
+const nodeVersion = parseInt(process.version.slice(1).split(".")[0], 10);
+
+const isNode24ESM = nodeVersion >= 24 && isESM;
 const isWindowsCI = platform === "win32" && process.env.CI;
+
+// Determine maxWorkers based on environment
+let maxWorkers = undefined; // undefined means Jest uses default (number of cores - 1)
+let workerIdleMemoryLimit = undefined; // undefined means Jest uses default
 
 if (isWindowsCI) {
   console.log("[Jest Config] Windows CI detected, applying workarounds:");
-  console.log(`  - Architecture: ${process.arch}`);
-  console.log("  - maxWorkers: 1 (single worker mode)");
-  console.log("  - workerIdleMemoryLimit: 1GB");
+  maxWorkers = 1;
+  workerIdleMemoryLimit = "1GB";
+} else if (isNode24ESM) {
+  console.log(
+    "[Jest Config] Node 24+ with ESM detected, applying workarounds:",
+  );
+  // Node 24 + ESM detection (avoid "module is already linked")
+  maxWorkers = 1;
 }
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 const config = {
   displayName: `@photostructure/fs-metadata (${isESM ? "ESM" : "CJS"})`,
   testEnvironment: "jest-environment-node",
-  // Workaround for Windows CI Jest worker issues (affects both x64 and ARM64)
-  ...(isWindowsCI && {
-    maxWorkers: 1, // Force single worker to avoid worker thread issues
-    workerIdleMemoryLimit: "1GB", // Increase memory limit
-  }),
+  ...(maxWorkers != null ? { maxWorkers } : {}),
+  ...(workerIdleMemoryLimit != null ? { workerIdleMemoryLimit } : {}),
   roots: ["<rootDir>/src"],
   coverageProvider: "v8",
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
