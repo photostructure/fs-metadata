@@ -24,7 +24,9 @@ public:
     }
 
     // Check for excessive length (prevent buffer overflow)
-    if (path.length() > MAX_PATH) {
+    // Windows 10+ supports paths up to 32,768 characters (PATHCCH_MAX_CCH)
+    // UTF-8 worst case: 3 bytes per wide character
+    if (path.length() > PATHCCH_MAX_CCH * 3) {
       return false;
     }
 
@@ -102,14 +104,21 @@ public:
     return true;
   }
 
-  // Safe path normalization
+  // Safe path normalization with long path support (up to 32,768 characters)
+  // Uses PathCchCanonicalizeEx to support Windows 10+ long paths
   static std::wstring NormalizePath(const std::wstring &path) {
-    // Use PathCchCanonicalize for safe canonicalization
-    wchar_t canonicalPath[MAX_PATH];
-    HRESULT hr = PathCchCanonicalize(canonicalPath, MAX_PATH, path.c_str());
+    // Use PATHCCH_MAX_CCH (32,768) instead of MAX_PATH (260)
+    wchar_t canonicalPath[PATHCCH_MAX_CCH];
+    HRESULT hr = PathCchCanonicalizeEx(
+        canonicalPath,
+        PATHCCH_MAX_CCH,
+        path.c_str(),
+        PATHCCH_ALLOW_LONG_PATHS  // Enable long path support for Windows 10+
+    );
 
     if (FAILED(hr)) {
-      throw std::runtime_error("Failed to canonicalize path");
+      throw std::runtime_error("Failed to canonicalize path: HRESULT " +
+                               std::to_string(hr));
     }
 
     return std::wstring(canonicalPath);
@@ -132,8 +141,10 @@ public:
   }
 
   // Safe string conversion with validation
+  // Default max length supports long paths (PATHCCH_MAX_CCH = 32,768 wide chars)
+  // UTF-8 worst case: 3 bytes per wide character
   static std::wstring SafeStringToWide(const std::string &str,
-                                       size_t maxLength = MAX_PATH) {
+                                       size_t maxLength = PATHCCH_MAX_CCH * 3) {
     if (str.empty()) {
       return L"";
     }
