@@ -68,7 +68,9 @@
       "WebFetch(domain:stackoverflow.com)",
       "WebFetch(domain:tsup.egoist.dev)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(Select-String -Pattern \"(PASS|FAIL|Test Suites:)\")",
+      "Bash(Select-Object -Last 20)"
     ],
     "deny": []
   },
