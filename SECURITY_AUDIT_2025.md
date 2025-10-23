@@ -125,12 +125,17 @@ TEST(PathValidation, RejectsDirectoryTraversal) {
 
 ---
 
-### Finding #2: Windows Path Length Restriction
+### Finding #2: Windows Path Length Restriction ✅ FIXED
 
-**Severity**: 🔴 CRITICAL
+**Severity**: 🔴 CRITICAL → ✅ RESOLVED
 **Files Affected**:
 
-- `src/windows/security_utils.h:106-116`
+- `src/windows/security_utils.h:106-116` (updated)
+- `src/windows-input-security.test.ts` (tests added)
+- `doc/WINDOWS_API_REFERENCE.md` (documentation updated)
+- `doc/gotchas.md` (documentation added)
+
+**Status**: Fixed on 2025-10-23
 
 **Issue**:
 `PathCchCanonicalize` restricts paths to MAX_PATH (260 characters), preventing access to legitimate long paths that Windows 10+ supports (up to 32,768 characters).
@@ -161,10 +166,10 @@ static std::wstring NormalizePath(const std::wstring &path) {
 }
 ```
 
-**Recommended Fix**:
+**Implemented Fix**:
 
 ```cpp
-// src/windows/security_utils.h
+// src/windows/security_utils.h (IMPLEMENTED)
 #include <pathcch.h>
 
 static std::wstring NormalizePath(const std::wstring &path) {
@@ -174,31 +179,52 @@ static std::wstring NormalizePath(const std::wstring &path) {
     canonicalPath,
     PATHCCH_MAX_CCH,
     path.c_str(),
-    PATHCCH_ALLOW_LONG_PATHS  // Enable long path support
+    PATHCCH_ALLOW_LONG_PATHS  // Enable long path support for Windows 10+
   );
 
   if (FAILED(hr)) {
-    throw std::runtime_error("Failed to canonicalize path: " + std::to_string(hr));
+    throw std::runtime_error("Failed to canonicalize path: HRESULT " +
+                             std::to_string(hr));
   }
 
   return std::wstring(canonicalPath);
 }
 
-// Also update IsPathSecure to handle long paths
+// Updated IsPathSecure to handle long paths
 static bool IsPathSecure(const std::string &path) {
   // Check for empty path
   if (path.empty()) {
     return false;
   }
 
-  // Allow paths longer than MAX_PATH for Windows 10+
-  if (path.length() > PATHCCH_MAX_CCH * 3) {  // UTF-8 worst case: 3 bytes per char
+  // Windows 10+ supports paths up to 32,768 characters (PATHCCH_MAX_CCH)
+  // UTF-8 worst case: 3 bytes per wide character
+  if (path.length() > PATHCCH_MAX_CCH * 3) {
     return false;
   }
 
   // ... rest of validation
 }
+
+// Updated SafeStringToWide to support long paths
+static std::wstring SafeStringToWide(const std::string &str,
+                                     size_t maxLength = PATHCCH_MAX_CCH * 3) {
+  // ... implementation supports long paths
+}
 ```
+
+**Test Coverage Added**:
+
+- Paths exceeding MAX_PATH (260 chars) but under PATHCCH_MAX_CCH (32,768)
+- Paths at MAX_PATH boundary
+- Paths exceeding PATHCCH_MAX_CCH limit (rejection)
+- Unicode paths with multi-byte UTF-8 sequences
+- Mixed path separator normalization
+
+**Documentation Updated**:
+
+- `doc/WINDOWS_API_REFERENCE.md`: Added PathCchCanonicalizeEx documentation
+- `doc/gotchas.md`: Added long path support section with registry configuration instructions
 
 **Required Project Configuration**:
 
@@ -1291,7 +1317,7 @@ describe("Security: Path Validation", () => {
 ### Week 1: Critical Fixes
 
 - [ ] Fix #1: Implement `realpath()` validation (macOS/Linux)
-- [ ] Fix #2: Switch to `PathCchCanonicalizeEx` (Windows)
+- [x] Fix #2: Switch to `PathCchCanonicalizeEx` (Windows) - ✅ Completed 2025-10-23
 - [ ] Fix #3: Add overflow checks to string conversion (Windows)
 
 ### Week 2: High Priority Fixes
@@ -1342,4 +1368,5 @@ describe("Security: Path Validation", () => {
 
 **Change Log**:
 
+- 2025-10-23: Fixed Finding #2 - PathCchCanonicalizeEx implementation with comprehensive tests
 - 2025-01-23: Initial comprehensive security audit completed
