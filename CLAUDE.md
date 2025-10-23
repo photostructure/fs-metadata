@@ -196,3 +196,5 @@ git push origin main --follow-tags
 ## General guidance
 
 Never do inline imports like `const { mkdirSync } = await import("node:fs");` -- just use standard imports.
+
+Never include claude code messages in git commits
