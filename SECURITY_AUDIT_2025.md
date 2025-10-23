@@ -11,6 +11,7 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 **Overall Security Rating: B+ (Good with identified improvements needed)**
 
 ### Strengths
+
 - ✅ Excellent RAII patterns preventing resource leaks
 - ✅ Comprehensive integer overflow protection
 - ✅ Strong Windows security compiler flags (/guard:cf, /sdl, /Qspectre)
@@ -18,6 +19,7 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 - ✅ Proper exception safety throughout
 
 ### Areas Requiring Improvement
+
 - ⚠️ Path validation can be bypassed (Critical)
 - ⚠️ Thread safety issues with macOS DiskArbitration and Linux GIO (High)
 - ⚠️ Memory leak risks in error handling (High)
@@ -30,17 +32,20 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 
 **Severity**: 🔴 CRITICAL
 **Files Affected**:
+
 - `src/darwin/hidden.cpp:23-30`
 - `src/darwin/volume_metadata.cpp:76-83`
 
 **Issue**:
 Simple string-based path validation using `path.find("..")` can be bypassed with:
+
 - URL-encoded sequences (`%2e%2e`)
 - Unicode normalization attacks
 - Redundant separators (`/.//./..`)
 - Absolute path traversal
 
 **Current Code**:
+
 ```cpp
 // src/darwin/hidden.cpp:23-30
 if (path_.find("..") != std::string::npos) {
@@ -50,6 +55,7 @@ if (path_.find("..") != std::string::npos) {
 ```
 
 **Vulnerability Example**:
+
 ```cpp
 // These paths would pass validation but escape intended boundaries:
 "/tmp/./foo/../../etc/passwd"     // Resolves to /etc/passwd
@@ -57,9 +63,11 @@ if (path_.find("..") != std::string::npos) {
 ```
 
 **Official Documentation**:
+
 - [Apple: Race Conditions and Secure File Operations](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html)
 
 **Recommended Fix**:
+
 ```cpp
 // Add to src/darwin/hidden.cpp and src/darwin/volume_metadata.cpp
 bool ValidatePathSecurity(const std::string& path, std::string& error) {
@@ -105,6 +113,7 @@ void GetHiddenWorker::Execute() {
 ```
 
 **Test Cases to Add**:
+
 ```cpp
 // These should all be rejected:
 TEST(PathValidation, RejectsDirectoryTraversal) {
@@ -120,20 +129,24 @@ TEST(PathValidation, RejectsDirectoryTraversal) {
 
 **Severity**: 🔴 CRITICAL
 **Files Affected**:
+
 - `src/windows/security_utils.h:106-116`
 
 **Issue**:
 `PathCchCanonicalize` restricts paths to MAX_PATH (260 characters), preventing access to legitimate long paths that Windows 10+ supports (up to 32,768 characters).
 
 **Official Documentation**:
+
 - [PathCchCanonicalize](https://learn.microsoft.com/en-us/windows/win32/api/pathcch/nf-pathcch-pathcchcanonicalize) - "restricts the final path to a length of MAX_PATH"
 - [PathCchCanonicalizeEx](https://learn.microsoft.com/en-us/windows/win32/api/pathcch/nf-pathcch-pathcchcanonicalizeex) - Supports longer paths
 - [Maximum Path Length Limitation](https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation)
 
 **Microsoft Security Warning**:
+
 > "With untrusted input, this function by itself, cannot be used to convert paths into a form that can be compared with other paths for sub-path or identity."
 
 **Current Code**:
+
 ```cpp
 // src/windows/security_utils.h:106-116
 static std::wstring NormalizePath(const std::wstring &path) {
@@ -149,6 +162,7 @@ static std::wstring NormalizePath(const std::wstring &path) {
 ```
 
 **Recommended Fix**:
+
 ```cpp
 // src/windows/security_utils.h
 #include <pathcch.h>
@@ -187,6 +201,7 @@ static bool IsPathSecure(const std::string &path) {
 ```
 
 **Required Project Configuration**:
+
 ```xml
 <!-- Add to app.manifest for long path support -->
 <application xmlns="urn:schemas-microsoft-com:asm.v3">
@@ -202,16 +217,19 @@ static bool IsPathSecure(const std::string &path) {
 
 **Severity**: 🔴 CRITICAL
 **Files Affected**:
+
 - `src/windows/string.h:9-21`
 
 **Issue**:
 `WideToUtf8()` doesn't validate that `size` is positive or check for integer overflow before allocation.
 
 **Official Documentation**:
+
 - [MultiByteToWideChar Security](https://learn.microsoft.com/en-us/archive/blogs/esiu/insecurity-of-multibytetowidechar-and-widechartomultibyte-part-1)
 - [WideCharToMultiByte](https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte)
 
 **Current Code**:
+
 ```cpp
 // src/windows/string.h:9-21
 inline std::string WideToUtf8(const WCHAR *wide) {
@@ -229,6 +247,7 @@ inline std::string WideToUtf8(const WCHAR *wide) {
 ```
 
 **Recommended Fix**:
+
 ```cpp
 // src/windows/string.h
 inline std::string WideToUtf8(const WCHAR *wide) {
@@ -264,6 +283,7 @@ inline std::string WideToUtf8(const WCHAR *wide) {
 ```
 
 **Similar Fix Needed for PathConverter::ToWString**:
+
 ```cpp
 // src/windows/string.h:25-45
 static std::wstring ToWString(const std::string &path) {
@@ -308,16 +328,19 @@ static std::wstring ToWString(const std::string &path) {
 
 **Severity**: 🟠 HIGH
 **Files Affected**:
+
 - `src/windows/error_utils.h:19-40`
 
 **Issue**:
 `FormatMessageA` with `FORMAT_MESSAGE_ALLOCATE_BUFFER` requires `LocalFree`, but if the `std::string` constructor throws an exception, memory leaks.
 
 **Official Documentation**:
+
 - [FormatMessage](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-formatmessagea)
 - Raymond Chen: [FormatMessage security](https://devblogs.microsoft.com/oldnewthing/20120210-00?p=8333)
 
 **Current Code**:
+
 ```cpp
 // src/windows/error_utils.h:25-36
 LPVOID messageBuffer;
@@ -338,6 +361,7 @@ return operation + " failed: " + errorMessage;
 ```
 
 **Recommended Fix**:
+
 ```cpp
 // src/windows/error_utils.h
 static std::string FormatWindowsError(const std::string &operation, DWORD error) {
@@ -387,6 +411,7 @@ static std::string FormatWindowsError(const std::string &operation, DWORD error)
 ```
 
 **Test Case**:
+
 ```cpp
 // Verify no leaks even with large error messages
 TEST(ErrorUtils, NoLeakOnLargeErrorMessage) {
@@ -406,21 +431,25 @@ TEST(ErrorUtils, NoLeakOnLargeErrorMessage) {
 
 **Severity**: 🟠 HIGH
 **Files Affected**:
+
 - `src/darwin/volume_metadata.cpp:160-217`
 
 **Issue**:
 While the code uses a mutex to serialize DiskArbitration access, Apple's documentation doesn't explicitly guarantee thread safety for `DADiskCopyDescription`. The framework is designed for main-thread use with run loops.
 
 **Research Findings**:
+
 - Apple Developer Forums show no explicit thread-safety guarantees
 - DiskArbitration is designed to work with CFRunLoop (main thread pattern)
 - No documented CVEs, but framework assumptions may not hold in worker threads
 
 **Official Documentation**:
-- [DADiskCopyDescription](https://developer.apple.com/documentation/diskarbitration/dadiskcopydescription(_:))
+
+- [DADiskCopyDescription](<https://developer.apple.com/documentation/diskarbitration/dadiskcopydescription(_:)>)
 - Apple: [Thread Safety Summary](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/ThreadSafetySummary/ThreadSafetySummary.html)
 
 **Current Code**:
+
 ```cpp
 // src/darwin/volume_metadata.cpp:173
 // Use a global mutex to serialize DiskArbitration access
@@ -431,6 +460,7 @@ CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
 ```
 
 **Recommended Fix - Option 1 (Conservative)**:
+
 ```cpp
 // Add to src/darwin/volume_metadata.cpp header comment:
 //
@@ -464,6 +494,7 @@ void GetDiskArbitrationInfoSafe() {
 ```
 
 **Recommended Fix - Option 2 (More Robust)**:
+
 ```cpp
 // Use dispatch_sync to main queue for DA operations
 #include <dispatch/dispatch.h>
@@ -549,6 +580,7 @@ void GetDiskArbitrationInfoSafe() {
 ```
 
 **Testing**:
+
 ```bash
 # Test with ThreadSanitizer to detect race conditions
 clang++ -fsanitize=thread -g src/darwin/volume_metadata.cpp ...
@@ -566,6 +598,7 @@ wait
 
 **Severity**: 🟠 HIGH
 **Files Affected**:
+
 - `src/linux/gio_utils.cpp:14-22`
 - `src/linux/gio_mount_points.cpp` (if it exists)
 
@@ -573,10 +606,12 @@ wait
 The code accesses `GVolumeMonitor` from AsyncWorker threads, but GIO documentation explicitly forbids this.
 
 **Official Documentation**:
+
 - [GVolumeMonitor](https://developer-old.gnome.org/gio/stable/GVolumeMonitor.html):
   > "GVolumeMonitor is not thread-default-context aware, and so should not be used other than from the main thread, with no thread-default-context active."
 
 **Current Code**:
+
 ```cpp
 // src/linux/gio_utils.cpp:15-22
 // HEY FUTURE ME: DON'T `g_object_unref` THIS POINTER!
@@ -591,6 +626,7 @@ GVolumeMonitor *MountIterator::getMonitor() {
 ```
 
 **Recommended Fix**:
+
 ```cpp
 // src/linux/gio_utils.cpp
 
@@ -622,6 +658,7 @@ GVolumeMonitor *MountIterator::getMonitor() {
 ```
 
 **Alternative: Use GUnixMountEntry Instead**:
+
 ```cpp
 // For volume metadata, consider using GUnixMountEntry which has fewer restrictions
 #include <gio/gunixmounts.h>
@@ -652,6 +689,7 @@ void GetMountMetadataAlternative(const std::string &mountPoint, VolumeMetadata &
 ```
 
 **Required Code Change**:
+
 ```cpp
 // In src/linux/gio_mount_points.cpp or wherever GIO is called from worker threads:
 // Move GIO operations to main thread using idle callback
@@ -707,16 +745,19 @@ void Execute() override {
 
 **Severity**: 🟠 HIGH
 **Files Affected**:
+
 - `src/linux/gio_utils.cpp:24-71`
 
 **Issue**:
 The code manually calls `g_object_unref(mount)` in multiple places (lines 50, 58, 64) and then uses `g_list_free_full` with `g_object_unref`, which may cause double-free.
 
 **Official Documentation**:
+
 - [g_list_free_full](https://docs.gtk.org/glib/func.list_free_full.html) - Calls the destroy function on each element
 - [g_object_unref thread safety](https://discourse.gnome.org/t/using-g-object-unref-from-non-main-threads/7046)
 
 **Current Code**:
+
 ```cpp
 // src/linux/gio_utils.cpp:33-71
 for (GList *l = mounts; l != nullptr; l = l->next) {
@@ -756,6 +797,7 @@ g_list_free_full(mounts, reinterpret_cast<GDestroyNotify>(g_object_unref));  // 
 ```
 
 **Reference Count Analysis**:
+
 ```
 Initial state: mount has ref count N (from g_volume_monitor_get_mounts)
 Line 42: g_object_ref(mount) -> ref count = N+1
@@ -764,6 +806,7 @@ Line 70: g_list_free_full calls g_object_unref -> ref count = N-1 (DOUBLE UNREF!
 ```
 
 **Recommended Fix**:
+
 ```cpp
 // src/linux/gio_utils.cpp
 void MountIterator::forEachMount(const MountCallback &callback) {
@@ -812,11 +855,13 @@ void MountIterator::forEachMount(const MountCallback &callback) {
 
 **Why This Matters**:
 Double-unref can cause:
+
 1. Use-after-free vulnerabilities
 2. Crashes when GObject reaches ref count 0 prematurely
 3. Memory corruption if object is freed and reallocated
 
 **Test Case**:
+
 ```cpp
 // Run under Valgrind to detect double-free
 TEST(GioUtils, NoDoubleFreeMounts) {
@@ -840,12 +885,14 @@ TEST(GioUtils, NoDoubleFreeMounts) {
 
 **Severity**: 🟡 MEDIUM
 **Files Affected**:
+
 - `src/darwin/volume_metadata.cpp:22-61`
 
 **Issue**:
 The code correctly checks the return value of `CFStringGetCString`, but doesn't log why conversion failed, making debugging difficult.
 
 **Current Code**:
+
 ```cpp
 Boolean success = CFStringGetCString(cfString, &result[0], maxSize, kCFStringEncodingUTF8);
 if (!success) {
@@ -854,6 +901,7 @@ if (!success) {
 ```
 
 **Recommended Fix**:
+
 ```cpp
 Boolean success = CFStringGetCString(cfString, &result[0], maxSize, kCFStringEncodingUTF8);
 if (!success) {
@@ -871,6 +919,7 @@ if (!success) {
 
 **Severity**: 🟡 MEDIUM
 **Files Affected**:
+
 - `src/darwin/volume_metadata.cpp:104-116`
 - `src/linux/volume_metadata.cpp:32-35`
 
@@ -878,10 +927,12 @@ if (!success) {
 Time-of-check-time-of-use race condition: mount point could be unmounted or replaced between `statvfs` call and subsequent operations.
 
 **Official Documentation**:
+
 - [Apple: Race Conditions and Secure File Operations](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html)
 - [statvfs(2) man page](https://man7.org/linux/man-pages/man2/statvfs.2.html)
 
 **Current Code**:
+
 ```cpp
 // src/darwin/volume_metadata.cpp:104
 struct statvfs vfs;
@@ -892,12 +943,14 @@ if (statvfs(mountPoint.c_str(), &vfs) != 0) {
 ```
 
 **Attack Scenario**:
+
 1. Process calls `statvfs("/mnt/usb")` -> returns valid data
 2. Attacker unmounts `/mnt/usb` and mounts malicious filesystem
 3. Process continues using stale `vfs` data
 4. Information disclosure or confused deputy attack
 
 **Recommended Fix**:
+
 ```cpp
 // Use file descriptor to prevent TOCTOU
 bool GetBasicVolumeInfo() {
@@ -946,6 +999,7 @@ bool GetBasicVolumeInfo() {
 ```
 
 **Why This Matters**:
+
 - Prevents race conditions where mount points change during operation
 - File descriptor holds a reference to the filesystem
 - More secure for security-sensitive applications
@@ -956,15 +1010,18 @@ bool GetBasicVolumeInfo() {
 
 **Severity**: 🟡 MEDIUM (Documentation)
 **Files Affected**:
+
 - `src/linux/volume_metadata.cpp:82-97`
 
 **Issue**:
 The code correctly uses `free()` on strings returned by `blkid_get_tag_value`, but a comment explaining this would help future maintainers.
 
 **Official Documentation**:
+
 - [libblkid source](https://github.com/util-linux/util-linux/blob/master/libblkid/src/resolve.c) shows `blkid_get_tag_value` uses `strdup()`
 
 **Current Code** (CORRECT):
+
 ```cpp
 char *uuid = blkid_get_tag_value(cache.get(), "UUID", options_.device.c_str());
 if (uuid) {
@@ -974,6 +1031,7 @@ if (uuid) {
 ```
 
 **Recommended Fix (Add Comments)**:
+
 ```cpp
 // blkid_get_tag_value returns a string allocated with strdup()
 // Must be freed with free(), not delete (C API)
@@ -1003,18 +1061,21 @@ if (label) {
 
 **Severity**: 🟢 LOW
 **Files Affected**:
+
 - `src/windows/thread_pool.h:147-187`
 
 **Issue**:
 Hard-coded 5-second timeout for thread shutdown may be insufficient for slow I/O operations (network drives, slow HDDs).
 
 **Current Code**:
+
 ```cpp
 DWORD result = WaitForMultipleObjects(static_cast<DWORD>(handles.size()),
                                       handles.data(), TRUE, 5000);  // Hard-coded!
 ```
 
 **Recommended Fix**:
+
 ```cpp
 // src/windows/thread_pool.h
 class ThreadPool {
@@ -1079,60 +1140,64 @@ public:
 
 **Severity**: 🟢 LOW (Documentation)
 **Files Affected**:
+
 - `binding.gyp:109-132`
 
 **Issue**:
 ARM64 builds exclude `/Qspectre` and `/CETCOMPAT` without explaining why.
 
 **Current Code**:
+
 ```javascript
-["target_arch=='arm64'", {
-  "defines": ["_M_ARM64", "_WIN64"],
-  "msvs_settings": {
-    "VCCLCompilerTool": {
-      "AdditionalOptions": ["/guard:cf", "/ZH:SHA_256", "/sdl"]
-      // Missing /Qspectre and /CETCOMPAT
-    }
-  }
-}]
+[
+  "target_arch=='arm64'",
+  {
+    defines: ["_M_ARM64", "_WIN64"],
+    msvs_settings: {
+      VCCLCompilerTool: {
+        AdditionalOptions: ["/guard:cf", "/ZH:SHA_256", "/sdl"],
+        // Missing /Qspectre and /CETCOMPAT
+      },
+    },
+  },
+];
 ```
 
 **Recommended Fix**:
+
 ```javascript
 // binding.gyp
 [
   "target_arch=='arm64'",
   {
-    "defines": [
-      "_M_ARM64",
-      "_WIN64"
-    ],
-    "msvs_settings": {
-      "VCCLCompilerTool": {
-        "AdditionalOptions": [
-          "/guard:cf",      // Control Flow Guard (supported on ARM64)
-          "/ZH:SHA_256",    // Hash algorithm for checksums
-          "/sdl"            // Security Development Lifecycle checks
+    defines: ["_M_ARM64", "_WIN64"],
+    msvs_settings: {
+      VCCLCompilerTool: {
+        AdditionalOptions: [
+          "/guard:cf", // Control Flow Guard (supported on ARM64)
+          "/ZH:SHA_256", // Hash algorithm for checksums
+          "/sdl", // Security Development Lifecycle checks
           // NOTE: /Qspectre is x64-specific, not available for ARM64
           // NOTE: /CETCOMPAT is x64-specific (Intel CET), ARM64 has different security features
           // TODO: Consider ARM64 shadow stack once compiler support stabilizes
         ],
-        "ExceptionHandling": 1,
-        "RuntimeTypeInfo": "true"
+        ExceptionHandling: 1,
+        RuntimeTypeInfo: "true",
       },
-      "VCLinkerTool": {
-        "AdditionalOptions": [
-          "/guard:cf",      // Control Flow Guard at link time
-          "/DYNAMICBASE"    // ASLR support
+      VCLinkerTool: {
+        AdditionalOptions: [
+          "/guard:cf", // Control Flow Guard at link time
+          "/DYNAMICBASE", // ASLR support
           // NOTE: /CETCOMPAT omitted - x64 specific
-        ]
-      }
-    }
-  }
-]
+        ],
+      },
+    },
+  },
+];
 ```
 
 **Reference**:
+
 - [ARM64 Security Features](https://learn.microsoft.com/en-us/windows/arm/arm64-security-features)
 - [Spectre Mitigations](https://learn.microsoft.com/en-us/cpp/build/reference/qspectre)
 
@@ -1140,33 +1205,34 @@ ARM64 builds exclude `/Qspectre` and `/CETCOMPAT` without explaining why.
 
 ## API Usage Verification Matrix
 
-| API/Function | Platform | Documentation Verified | Status | Finding # |
-|--------------|----------|----------------------|---------|-----------|
-| `MultiByteToWideChar` | Windows | ✅ Microsoft | ⚠️ Needs overflow checks | #3 |
-| `WideCharToMultiByte` | Windows | ✅ Microsoft | ⚠️ Needs overflow checks | #3 |
-| `FormatMessageA` | Windows | ✅ Microsoft | ⚠️ Memory leak risk | #4 |
-| `PathCchCanonicalize` | Windows | ✅ Microsoft | ⚠️ Use Ex version | #2 |
-| `PathCchCanonicalizeEx` | Windows | ✅ Microsoft | ✅ Recommended | #2 |
-| `GetVolumeInformationW` | Windows | ✅ Microsoft | ✅ Correct | - |
-| `WNetGetConnectionA` | Windows | ✅ Microsoft | ✅ Correct | - |
-| `FindFirstFileExA` | Windows | ✅ Microsoft | ✅ Correct | - |
-| `GetDriveTypeA` | Windows | ✅ Microsoft | ✅ Correct | - |
-| `GetDiskFreeSpaceExA` | Windows | ✅ Microsoft | ✅ Correct | - |
-| `DADiskCopyDescription` | macOS | ✅ Apple | ⚠️ Thread safety unclear | #5 |
-| `CFStringGetCString` | macOS | ✅ Apple | ✅ Correct (enhance logging) | #8 |
-| `statvfs` | macOS/Linux | ✅ man7.org/Apple | ⚠️ TOCTOU risk | #9 |
-| `statfs` | macOS | ✅ Apple | ⚠️ TOCTOU risk | #9 |
-| `fstatvfs` | macOS/Linux | ✅ man7.org/Apple | ✅ Recommended | #9 |
-| `realpath` | macOS/Linux | ✅ man7.org/Apple | ✅ Recommended | #1 |
-| `blkid_get_tag_value` | Linux | ✅ kernel.org/GitHub | ✅ Correct | #10 |
-| `g_volume_monitor_get` | Linux | ✅ gnome.org | ⚠️ Thread safety violation | #6 |
-| `g_object_unref` | Linux | ✅ gnome.org | ⚠️ Double-free risk | #7 |
+| API/Function            | Platform    | Documentation Verified | Status                       | Finding # |
+| ----------------------- | ----------- | ---------------------- | ---------------------------- | --------- |
+| `MultiByteToWideChar`   | Windows     | ✅ Microsoft           | ⚠️ Needs overflow checks     | #3        |
+| `WideCharToMultiByte`   | Windows     | ✅ Microsoft           | ⚠️ Needs overflow checks     | #3        |
+| `FormatMessageA`        | Windows     | ✅ Microsoft           | ⚠️ Memory leak risk          | #4        |
+| `PathCchCanonicalize`   | Windows     | ✅ Microsoft           | ⚠️ Use Ex version            | #2        |
+| `PathCchCanonicalizeEx` | Windows     | ✅ Microsoft           | ✅ Recommended               | #2        |
+| `GetVolumeInformationW` | Windows     | ✅ Microsoft           | ✅ Correct                   | -         |
+| `WNetGetConnectionA`    | Windows     | ✅ Microsoft           | ✅ Correct                   | -         |
+| `FindFirstFileExA`      | Windows     | ✅ Microsoft           | ✅ Correct                   | -         |
+| `GetDriveTypeA`         | Windows     | ✅ Microsoft           | ✅ Correct                   | -         |
+| `GetDiskFreeSpaceExA`   | Windows     | ✅ Microsoft           | ✅ Correct                   | -         |
+| `DADiskCopyDescription` | macOS       | ✅ Apple               | ⚠️ Thread safety unclear     | #5        |
+| `CFStringGetCString`    | macOS       | ✅ Apple               | ✅ Correct (enhance logging) | #8        |
+| `statvfs`               | macOS/Linux | ✅ man7.org/Apple      | ⚠️ TOCTOU risk               | #9        |
+| `statfs`                | macOS       | ✅ Apple               | ⚠️ TOCTOU risk               | #9        |
+| `fstatvfs`              | macOS/Linux | ✅ man7.org/Apple      | ✅ Recommended               | #9        |
+| `realpath`              | macOS/Linux | ✅ man7.org/Apple      | ✅ Recommended               | #1        |
+| `blkid_get_tag_value`   | Linux       | ✅ kernel.org/GitHub   | ✅ Correct                   | #10       |
+| `g_volume_monitor_get`  | Linux       | ✅ gnome.org           | ⚠️ Thread safety violation   | #6        |
+| `g_object_unref`        | Linux       | ✅ gnome.org           | ⚠️ Double-free risk          | #7        |
 
 ---
 
 ## Testing Recommendations
 
 ### Memory Leak Detection
+
 ```bash
 # Linux
 valgrind --leak-check=full --show-leak-kinds=all npm test
@@ -1180,6 +1246,7 @@ leaks --atExit -- npm test
 ```
 
 ### Thread Safety Testing
+
 ```bash
 # ThreadSanitizer (Linux/macOS)
 export CC=clang
@@ -1193,17 +1260,26 @@ for i in {1..100}; do npm test & done; wait
 ```
 
 ### Path Traversal Testing
+
 ```typescript
 // Add to test suite
-describe('Security: Path Validation', () => {
-  it('rejects directory traversal attempts', async () => {
-    await expect(isHidden('/tmp/../etc/passwd')).rejects.toThrow(/invalid path/i);
-    await expect(isHidden('/home/user/./../root')).rejects.toThrow(/invalid path/i);
-    await expect(isHidden('/../../../etc/shadow')).rejects.toThrow(/invalid path/i);
+describe("Security: Path Validation", () => {
+  it("rejects directory traversal attempts", async () => {
+    await expect(isHidden("/tmp/../etc/passwd")).rejects.toThrow(
+      /invalid path/i,
+    );
+    await expect(isHidden("/home/user/./../root")).rejects.toThrow(
+      /invalid path/i,
+    );
+    await expect(isHidden("/../../../etc/shadow")).rejects.toThrow(
+      /invalid path/i,
+    );
   });
 
-  it('rejects null byte injection', async () => {
-    await expect(isHidden('/tmp\0/../../etc/passwd')).rejects.toThrow(/invalid path/i);
+  it("rejects null byte injection", async () => {
+    await expect(isHidden("/tmp\0/../../etc/passwd")).rejects.toThrow(
+      /invalid path/i,
+    );
   });
 });
 ```
@@ -1213,22 +1289,26 @@ describe('Security: Path Validation', () => {
 ## Priority Action Plan
 
 ### Week 1: Critical Fixes
+
 - [ ] Fix #1: Implement `realpath()` validation (macOS/Linux)
 - [ ] Fix #2: Switch to `PathCchCanonicalizeEx` (Windows)
 - [ ] Fix #3: Add overflow checks to string conversion (Windows)
 
 ### Week 2: High Priority Fixes
+
 - [ ] Fix #4: Add RAII to `FormatMessageA` (Windows)
 - [ ] Fix #5: Document/fix DiskArbitration threading (macOS)
 - [ ] Fix #6: Enforce main-thread for GVolumeMonitor (Linux)
 - [ ] Fix #7: Fix double-free in GIO iteration (Linux)
 
 ### Week 3: Medium Priority Improvements
+
 - [ ] Fix #8: Add CFString error logging (macOS)
 - [ ] Fix #9: Use `fstatvfs()` with fd (macOS/Linux)
 - [ ] Fix #10: Add blkid documentation (Linux)
 
 ### Week 4: Testing & Documentation
+
 - [ ] Add path traversal tests
 - [ ] Run ThreadSanitizer on all platforms
 - [ ] Run memory leak detection
@@ -1239,6 +1319,7 @@ describe('Security: Path Validation', () => {
 ## References
 
 ### Official Documentation Sources
+
 - **Windows APIs**: [Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/)
 - **macOS APIs**: [Apple Developer Documentation](https://developer.apple.com/documentation/)
 - **Linux System Calls**: [man7.org](https://man7.org/linux/man-pages/)
@@ -1246,6 +1327,7 @@ describe('Security: Path Validation', () => {
 - **libblkid**: [util-linux GitHub](https://github.com/util-linux/util-linux)
 
 ### Security Resources
+
 - [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal)
 - [CWE-22: Path Traversal](https://cwe.mitre.org/data/definitions/22.html)
 - [CWE-362: TOCTOU Race Condition](https://cwe.mitre.org/data/definitions/362.html)
@@ -1259,4 +1341,5 @@ describe('Security: Path Validation', () => {
 **Next Review**: April 2026 (or after major dependency updates)
 
 **Change Log**:
+
 - 2025-01-23: Initial comprehensive security audit completed
