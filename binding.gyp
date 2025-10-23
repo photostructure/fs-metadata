@@ -108,6 +108,8 @@
               [
                 "target_arch=='arm64'",
                 {
+                  # ARM64 Security Configuration
+                  # See doc/WINDOWS_ARM64_SECURITY.md for detailed explanation
                   "defines": [
                     "_M_ARM64",
                     "_WIN64"
@@ -115,17 +117,23 @@
                   "msvs_settings": {
                     "VCCLCompilerTool": {
                       "AdditionalOptions": [
-                        "/guard:cf",
-                        "/ZH:SHA_256",
-                        "/sdl"
+                        "/guard:cf",     # Control Flow Guard (supported on ARM64)
+                        "/ZH:SHA_256",   # SHA-256 hash algorithm for checksums
+                        "/sdl"           # Security Development Lifecycle checks
+                        # NOTE: /Qspectre is x64/x86-specific, not available for ARM64
+                        #       ARM64 has hardware-level Spectre mitigations
+                        # NOTE: /CETCOMPAT is Intel CET (x64-specific)
+                        #       ARM64 uses PAC (Pointer Authentication) and BTI instead
                       ],
                       "ExceptionHandling": 1,
                       "RuntimeTypeInfo": "true"
                     },
                     "VCLinkerTool": {
                       "AdditionalOptions": [
-                        "/guard:cf",
-                        "/DYNAMICBASE"
+                        "/guard:cf",      # Control Flow Guard at link time
+                        "/DYNAMICBASE"    # ASLR (Address Space Layout Randomization)
+                        # NOTE: /CETCOMPAT omitted - Intel CET is x64-specific
+                        #       ARM64 has equivalent hardware security features
                       ]
                     }
                   }
