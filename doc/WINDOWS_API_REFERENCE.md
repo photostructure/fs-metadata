@@ -136,6 +136,7 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 - **Security**: Use `MB_ERR_INVALID_CHARS` to detect invalid sequences
 - **Integer Overflow Protection**: Always validate returned size before allocation
 - **Pattern**:
+
   ```cpp
   int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
                                 source, -1, nullptr, 0);
@@ -164,6 +165,7 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 - **Flags**: Use `WC_ERR_INVALID_CHARS` for Vista+ to detect errors
 - **Integer Overflow Protection**: Validate size before `size - 1` subtraction
 - **Pattern**:
+
   ```cpp
   int size = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
 
@@ -307,6 +309,19 @@ _CrtDumpMemoryLeaks();
 3. Check for INVALID_HANDLE_VALUE
 4. Never use handles after closing
 
+### Memory Management with Windows APIs
+
+1. **FormatMessage with FORMAT_MESSAGE_ALLOCATE_BUFFER**:
+   - Always use RAII wrapper (LocalFreeGuard) to prevent leaks
+   - If `std::string` constructor throws, buffer must still be freed
+   - Never rely on manual `LocalFree` after potential throwing operations
+2. **HeapAlloc/LocalAlloc**:
+   - Prefer RAII wrappers over manual free calls
+   - Use smart pointers or custom deleters for C++ integration
+3. **Exception Safety**:
+   - Any API that allocates memory must have cleanup in destructor
+   - Never assume operations won't throw in low-memory conditions
+
 ### Thread Safety
 
 1. Protect shared data with synchronization
@@ -332,8 +347,28 @@ _CrtDumpMemoryLeaks();
 
 ### FormatMessage
 
+- **Docs**: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-formatmessagea
+- **Memory Management**: With `FORMAT_MESSAGE_ALLOCATE_BUFFER`, must call `LocalFree`
+- **Exception Safety**: Use RAII wrapper to prevent leaks if exceptions thrown
+- **Pattern**:
+
 ```cpp
+// UNSAFE - memory leak if exception thrown:
 LPVOID msgBuffer;
+FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | ..., &msgBuffer, ...);
+std::string msg((LPSTR)msgBuffer);  // If this throws, LocalFree never called!
+LocalFree(msgBuffer);
+
+// SAFE - RAII wrapper ensures cleanup:
+struct LocalFreeGuard {
+  LPVOID ptr;
+  explicit LocalFreeGuard(LPVOID p) : ptr(p) {}
+  ~LocalFreeGuard() { if (ptr) LocalFree(ptr); }
+  LocalFreeGuard(const LocalFreeGuard&) = delete;
+  LocalFreeGuard& operator=(const LocalFreeGuard&) = delete;
+};
+
+LPVOID msgBuffer = nullptr;
 FormatMessageA(
     FORMAT_MESSAGE_ALLOCATE_BUFFER |
     FORMAT_MESSAGE_FROM_SYSTEM |
@@ -345,8 +380,13 @@ FormatMessageA(
     0,
     NULL
 );
-// Use message
-LocalFree(msgBuffer);
+
+LocalFreeGuard guard(msgBuffer);  // RAII ensures LocalFree called
+if (msgBuffer) {
+    std::string msg((LPSTR)msgBuffer);  // Now safe - guard cleans up
+    // ... use msg
+}
+// guard destructor calls LocalFree automatically
 ```
 
 ## Testing Recommendations

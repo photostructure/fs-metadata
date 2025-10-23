@@ -363,12 +363,16 @@ static std::wstring ToWString(const std::string &path) {
 
 ## High Priority Findings
 
-### Finding #4: Memory Leak in Windows Error Formatting
+### Finding #4: Memory Leak in Windows Error Formatting ✅ FIXED
 
-**Severity**: 🟠 HIGH
+**Severity**: 🟠 HIGH → ✅ RESOLVED
 **Files Affected**:
 
-- `src/windows/error_utils.h:19-40`
+- `src/windows/error_utils.h:19-95` (updated)
+- `src/windows-error-utils-security.test.ts` (tests added)
+- `doc/WINDOWS_API_REFERENCE.md` (documentation updated)
+
+**Status**: Fixed on 2025-10-23
 
 **Issue**:
 `FormatMessageA` with `FORMAT_MESSAGE_ALLOCATE_BUFFER` requires `LocalFree`, but if the `std::string` constructor throws an exception, memory leaks.
@@ -378,28 +382,7 @@ static std::wstring ToWString(const std::string &path) {
 - [FormatMessage](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-formatmessagea)
 - Raymond Chen: [FormatMessage security](https://devblogs.microsoft.com/oldnewthing/20120210-00?p=8333)
 
-**Current Code**:
-
-```cpp
-// src/windows/error_utils.h:25-36
-LPVOID messageBuffer;
-size_t size = FormatMessageA(
-    FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_IGNORE_INSERTS,
-    NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-    (LPSTR)&messageBuffer, 0, NULL);
-
-if (size == 0 || !messageBuffer) {
-  return operation + " failed with error code: " + std::to_string(error);
-}
-
-std::string errorMessage((LPSTR)messageBuffer, size);  // If this throws...
-LocalFree(messageBuffer);  // ...this never executes!
-
-return operation + " failed: " + errorMessage;
-```
-
-**Recommended Fix**:
+**Implemented Fix**:
 
 ```cpp
 // src/windows/error_utils.h
@@ -446,23 +429,35 @@ static std::string FormatWindowsError(const std::string &operation, DWORD error)
   }
 
   return operation + " failed: " + errorMessage;
+  // guard destructor automatically calls LocalFree here
 }
 ```
 
-**Test Case**:
+**Security Improvements**:
 
-```cpp
-// Verify no leaks even with large error messages
-TEST(ErrorUtils, NoLeakOnLargeErrorMessage) {
-  // ERROR_INVALID_PARAMETER has a long message
-  for (int i = 0; i < 1000; i++) {
-    FSException e("TestOperation", ERROR_INVALID_PARAMETER);
-    std::string msg = e.what();
-    EXPECT_FALSE(msg.empty());
-  }
-  // Run under LeakSanitizer or Dr. Memory
-}
-```
+1. **RAII LocalFreeGuard**: Ensures `LocalFree` is always called, even if exceptions thrown
+2. **Move Semantics**: Supports move operations for flexibility while preventing copies
+3. **Null Safety**: Initializes `messageBuffer` to `nullptr` before use
+4. **Error Logging**: Logs `FormatMessageA` failures with detailed error information
+5. **Message Cleanup**: Trims trailing newlines/carriage returns from Windows error messages
+6. **Exception Safe**: String construction now safe - memory freed regardless of outcome
+
+**Test Coverage Added** (src/windows-error-utils-security.test.ts):
+
+- Large error message handling (1000 iterations) to detect leaks
+- Proper buffer cleanup on success path
+- Rapid error formatting (500 concurrent operations) for resource exhaustion testing
+- Common Windows error codes formatting verification
+- Various message lengths handling
+- Memory pressure scenarios with 100 concurrent operations
+- Consistent error messages for same error code
+
+**Why This Matters**:
+
+- Prevents memory leaks in error handling paths (critical for long-running services)
+- Exception-safe even in low-memory conditions
+- No resource exhaustion from repeated error formatting
+- Reliable cleanup regardless of code path taken
 
 ---
 
@@ -1335,7 +1330,7 @@ describe("Security: Path Validation", () => {
 
 ### Week 2: High Priority Fixes
 
-- [ ] Fix #4: Add RAII to `FormatMessageA` (Windows)
+- [x] Fix #4: Add RAII to `FormatMessageA` (Windows) - ✅ Completed 2025-10-23
 - [ ] Fix #5: Document/fix DiskArbitration threading (macOS)
 - [ ] Fix #6: Enforce main-thread for GVolumeMonitor (Linux)
 - [ ] Fix #7: Fix double-free in GIO iteration (Linux)
@@ -1381,6 +1376,7 @@ describe("Security: Path Validation", () => {
 
 **Change Log**:
 
+- 2025-10-23: Fixed Finding #4 - RAII LocalFreeGuard for FormatMessageA memory leak prevention
 - 2025-10-23: Fixed Finding #3 - Integer overflow protection in string conversions (WideToUtf8, ToWString)
 - 2025-10-23: Fixed Finding #2 - PathCchCanonicalizeEx implementation with comprehensive tests
 - 2025-01-23: Initial comprehensive security audit completed
