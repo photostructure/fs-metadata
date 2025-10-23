@@ -163,13 +163,26 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
   - `CSIDL_PROGRAM_FILES`: Program Files
 - **Buffer Size**: MAX_PATH is always sufficient
 
-### PathCchCanonicalize
+### PathCchCanonicalizeEx
 
 - **Docs**: https://docs.microsoft.com/en-us/windows/win32/api/pathcch/nf-pathcch-pathcchcanonicalize
-- **Purpose**: Simplifies a path by removing navigation elements
+- **Purpose**: Simplifies a path by removing navigation elements with extended options
 - **Header**: `#include <pathcch.h>`
 - **Library**: `-lPathcch.lib`
 - **Security**: Prevents directory traversal attacks
+- **Long Path Support**: Use `PATHCCH_ALLOW_LONG_PATHS` flag for paths > MAX_PATH (260 chars)
+- **Buffer Size**: `PATHCCH_MAX_CCH` (32,768 characters) supports Windows 10+ long paths
+- **Usage**:
+  ```cpp
+  wchar_t canonicalPath[PATHCCH_MAX_CCH];
+  HRESULT hr = PathCchCanonicalizeEx(
+      canonicalPath,
+      PATHCCH_MAX_CCH,
+      inputPath,
+      PATHCCH_ALLOW_LONG_PATHS  // Enable long path support
+  );
+  ```
+- **Note**: Supersedes `PathCchCanonicalize` which is limited to MAX_PATH (260 chars)
 
 ## Threading APIs
 
@@ -236,7 +249,11 @@ _CrtDumpMemoryLeaks();
 3. Check for device names (CON, PRN, AUX, etc.)
 4. Check for alternate data streams
 5. Validate UTF-8 sequences
-6. Use `PathCchCanonicalize` for normalization
+6. Use `PathCchCanonicalizeEx` with `PATHCCH_ALLOW_LONG_PATHS` for normalization
+7. Validate path length:
+   - Legacy limit: MAX_PATH (260 characters)
+   - Windows 10+ limit: PATHCCH_MAX_CCH (32,768 wide characters)
+   - UTF-8 validation: Account for multi-byte sequences (up to 3 bytes per wide char)
 
 ### Buffer Overflow Prevention
 

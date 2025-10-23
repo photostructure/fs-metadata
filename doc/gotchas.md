@@ -58,6 +58,30 @@ const volumes = await getAllVolumeMetadata({ includeSystemVolumes: false });
 // C:\ will still be included on Windows
 ```
 
+#### Long Path Support
+
+Windows 10+ supports paths longer than 260 characters (MAX_PATH) when long path support is enabled:
+
+```typescript
+// Paths up to 32,768 characters are now supported
+const longPath = "C:\\" + "verylongdirectoryname\\".repeat(20) + "file.txt";
+const metadata = await getVolumeMetadata(longPath);
+```
+
+**Requirements**:
+- Windows 10 version 1607 or later
+- Long path support enabled in registry or manifest
+- Path must not exceed PATHCCH_MAX_CCH (32,768 wide characters)
+
+**Enabling long paths** (administrator required):
+```powershell
+# Set registry key
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+  -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+```
+
+**Note**: Even without long path support enabled system-wide, the library handles paths up to 32,768 characters internally and fails gracefully on older systems.
+
 #### Build Issues
 
 If you see "No Target Architecture" errors when building from source, ensure Visual Studio build tools are properly installed. See [Windows Build Guide](./windows-build.md).
