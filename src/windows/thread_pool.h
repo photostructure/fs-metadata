@@ -145,7 +145,7 @@ public:
   }
 
   void Shutdown() {
-    DEBUG_LOG("[ThreadPool] Shutting down");
+    DEBUG_LOG("[ThreadPool] Shutting down with timeout 5000 ms");
 
     // Signal shutdown
     queue->Shutdown();
@@ -157,7 +157,7 @@ public:
     }
     LeaveCriticalSection(&poolCs);
 
-    // Wait for threads to exit
+    // Wait for threads to exit with timeout
     std::vector<HANDLE> handles;
     for (const auto &thread : threads) {
       if (thread->handle) {
@@ -170,7 +170,10 @@ public:
                                             handles.data(), TRUE, 5000);
 
       if (result == WAIT_TIMEOUT) {
-        DEBUG_LOG("[ThreadPool] WARNING: Threads did not exit gracefully");
+        DEBUG_LOG("[ThreadPool] WARNING: %zu threads did not exit within 5000 ms",
+                  handles.size());
+        // Note: TerminateThread is dangerous and not recommended
+        // Threads will be forcefully terminated when process exits
       }
     }
 
