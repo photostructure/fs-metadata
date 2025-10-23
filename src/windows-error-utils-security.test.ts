@@ -17,10 +17,10 @@ describePlatformStable("win32")("Windows Error Utils Security", () => {
         // Use invalid paths to trigger error formatting
         const invalidPath = `C:\\invalid\\path\\${i}\\does\\not\\exist.txt`;
         promises.push(
-          isHidden(invalidPath).catch((err) => {
+          isHidden(invalidPath).catch((err: unknown) => {
             // Expected to fail - we're testing that error formatting doesn't leak
             expect(err).toBeDefined();
-            expect(err.message).toBeDefined();
+            expect((err as Error).message).toBeDefined();
           }),
         );
       }
@@ -61,7 +61,7 @@ describePlatformStable("win32")("Windows Error Utils Security", () => {
 
       for (let i = 0; i < 500; i++) {
         promises.push(
-          isHidden(`C:\\test_${i}\\invalid.txt`).catch((err) => {
+          isHidden(`C:\\test_${i}\\invalid.txt`).catch((err: unknown) => {
             expect(err).toBeDefined();
           }),
         );
@@ -134,7 +134,7 @@ describePlatformStable("win32")("Windows Error Utils Security", () => {
 
       for (let i = 0; i < concurrentOps; i++) {
         promises.push(
-          isHidden(`C:\\concurrent_test_${i}\\invalid.txt`).catch(() => {
+          isHidden(`C:\\concurrent_test_${i}\\invalid.txt`).catch((_err: unknown) => {
             // Expected to fail
           }),
         );
