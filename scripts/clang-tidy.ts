@@ -355,6 +355,8 @@ function filterWindowsHeaderErrors(output: string): {
 
   // Known system header error messages that appear in user files
   const systemHeaderErrors = [
+    // File not found errors - these are the most common MSVC header issues
+    /'(chrono|functional|windows\.h|iostream|string|vector|memory|algorithm|map|set|unordered_map|iterator|utility|tuple|type_traits|cstddef|cstdint|exception|new|limits|stdexcept)' file not found/,
     /no member named '\w+' in the global namespace/,
     /no member named '\w+' in namespace 'std'/,
     /no template named '\w+' in namespace 'std'/,
