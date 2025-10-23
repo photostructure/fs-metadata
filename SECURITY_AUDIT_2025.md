@@ -150,22 +150,6 @@ TEST(PathValidation, RejectsDirectoryTraversal) {
 
 > "With untrusted input, this function by itself, cannot be used to convert paths into a form that can be compared with other paths for sub-path or identity."
 
-**Current Code**:
-
-```cpp
-// src/windows/security_utils.h:106-116
-static std::wstring NormalizePath(const std::wstring &path) {
-  wchar_t canonicalPath[MAX_PATH];  // Only 260 characters!
-  HRESULT hr = PathCchCanonicalize(canonicalPath, MAX_PATH, path.c_str());
-
-  if (FAILED(hr)) {
-    throw std::runtime_error("Failed to canonicalize path");
-  }
-
-  return std::wstring(canonicalPath);
-}
-```
-
 **Implemented Fix**:
 
 ```cpp
@@ -239,12 +223,16 @@ static std::wstring SafeStringToWide(const std::string &str,
 
 ---
 
-### Finding #3: Integer Overflow in String Conversion
+### Finding #3: Integer Overflow in String Conversion ✅ FIXED
 
-**Severity**: 🔴 CRITICAL
+**Severity**: 🔴 CRITICAL → ✅ RESOLVED
 **Files Affected**:
 
-- `src/windows/string.h:9-21`
+- `src/windows/string.h:9-103` (updated)
+- `src/windows-string-security.test.ts` (tests added)
+- `doc/WINDOWS_API_REFERENCE.md` (documentation updated)
+
+**Status**: Fixed on 2025-10-23
 
 **Issue**:
 `WideToUtf8()` doesn't validate that `size` is positive or check for integer overflow before allocation.
@@ -254,28 +242,13 @@ static std::wstring SafeStringToWide(const std::string &str,
 - [MultiByteToWideChar Security](https://learn.microsoft.com/en-us/archive/blogs/esiu/insecurity-of-multibytetowidechar-and-widechartomultibyte-part-1)
 - [WideCharToMultiByte](https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte)
 
-**Current Code**:
+**Implemented Fix**:
 
 ```cpp
-// src/windows/string.h:9-21
-inline std::string WideToUtf8(const WCHAR *wide) {
-  if (!wide || wide[0] == 0)
-    return "";
+// src/windows/string.h (IMPLEMENTED)
+// Maximum reasonable size for string conversions (1MB)
+constexpr int MAX_STRING_CONVERSION_SIZE = 1024 * 1024;
 
-  int size = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
-  if (size <= 0)  // Good! But needs more checks
-    return "";
-
-  std::string result(size - 1, 0);  // What if size == INT_MAX?
-  WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size, nullptr, nullptr);
-  return result;
-}
-```
-
-**Recommended Fix**:
-
-```cpp
-// src/windows/string.h
 inline std::string WideToUtf8(const WCHAR *wide) {
   if (!wide || wide[0] == 0)
     return "";
@@ -290,17 +263,22 @@ inline std::string WideToUtf8(const WCHAR *wide) {
   }
 
   // Check for overflow: size - 1 should be positive and reasonable
-  if (size > INT_MAX - 1 || size > 1024 * 1024) {  // 1MB sanity limit
-    DEBUG_LOG("[WideToUtf8] Size too large: %d", size);
+  // INT_MAX - 1 check prevents overflow in subtraction
+  // MAX_STRING_CONVERSION_SIZE check prevents excessive allocations
+  if (size > INT_MAX - 1 || size > MAX_STRING_CONVERSION_SIZE) {
+    DEBUG_LOG("[WideToUtf8] Size too large: %d (max: %d)", size,
+              MAX_STRING_CONVERSION_SIZE);
     throw std::runtime_error("String conversion size exceeds reasonable limits");
   }
 
   std::string result(static_cast<size_t>(size - 1), 0);
 
   // Perform conversion and check result
-  int written = WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size, nullptr, nullptr);
+  int written = WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size,
+                                    nullptr, nullptr);
   if (written <= 0) {
-    DEBUG_LOG("[WideToUtf8] WideCharToMultiByte conversion failed: %lu", GetLastError());
+    DEBUG_LOG("[WideToUtf8] WideCharToMultiByte conversion failed: %lu",
+              GetLastError());
     throw std::runtime_error("String conversion failed");
   }
 
@@ -308,43 +286,78 @@ inline std::string WideToUtf8(const WCHAR *wide) {
 }
 ```
 
-**Similar Fix Needed for PathConverter::ToWString**:
+**PathConverter::ToWString Also Fixed**:
 
 ```cpp
-// src/windows/string.h:25-45
+// src/windows/string.h (IMPLEMENTED)
 static std::wstring ToWString(const std::string &path) {
   if (path.empty()) {
     return L"";
   }
 
-  int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                                  path.c_str(), static_cast<int>(path.length()),
-                                  nullptr, 0);
+  // Validate input length fits in int (required by MultiByteToWideChar)
+  if (path.length() > static_cast<size_t>(INT_MAX)) {
+    DEBUG_LOG("[ToWString] Input path length exceeds INT_MAX: %zu",
+              path.length());
+    throw std::runtime_error("Input string too large for conversion");
+  }
+
+  int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(),
+                                 static_cast<int>(path.length()), nullptr, 0);
 
   // Validate wlen
   if (wlen <= 0) {
-    DEBUG_LOG("[ToWString] MultiByteToWideChar returned invalid size: %d (error: %lu)",
-              wlen, GetLastError());
+    DEBUG_LOG(
+        "[ToWString] MultiByteToWideChar returned invalid size: %d (error: %lu)",
+        wlen, GetLastError());
     return L"";
   }
 
+  // Check for reasonable size (PATHCCH_MAX_CCH for paths)
   if (wlen > PATHCCH_MAX_CCH) {
-    DEBUG_LOG("[ToWString] Size exceeds maximum path length: %d", wlen);
+    DEBUG_LOG("[ToWString] Size exceeds maximum path length: %d (max: %d)",
+              wlen, PATHCCH_MAX_CCH);
     throw std::runtime_error("Path too long for conversion");
   }
 
   std::wstring wpath(static_cast<size_t>(wlen), 0);
-  int written = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                                     path.c_str(), static_cast<int>(path.length()),
-                                     &wpath[0], wlen);
+
+  // Perform conversion with error checking
+  int written =
+      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(),
+                          static_cast<int>(path.length()), &wpath[0], wlen);
   if (written <= 0) {
-    DEBUG_LOG("[ToWString] MultiByteToWideChar conversion failed: %lu", GetLastError());
+    DEBUG_LOG("[ToWString] MultiByteToWideChar conversion failed: %lu",
+              GetLastError());
     throw std::runtime_error("String conversion failed");
   }
 
   return wpath;
 }
 ```
+
+**Security Improvements**:
+
+1. **Overflow Protection**: Validates `size > INT_MAX - 1` before `size - 1` subtraction
+2. **Sanity Limits**: Enforces 1MB limit for general string conversions, PATHCCH_MAX_CCH for paths
+3. **Input Validation**: Checks input length fits in `int` type
+4. **Error Detection**: Uses `MB_ERR_INVALID_CHARS` flag to detect invalid UTF-8
+5. **Conversion Verification**: Validates both size query and actual conversion succeed
+6. **Debug Logging**: All failure paths log detailed error information
+
+**Test Coverage Added**:
+
+- Extremely large string conversions (overflow scenarios)
+- Strings at conversion size limits
+- Invalid UTF-8 sequences
+- Multi-byte UTF-8 characters (2, 3, and 4 bytes)
+- Size limit enforcement (1MB sanity check)
+- Empty strings and null inputs
+- Stress testing with 100+ rapid conversions
+
+**Documentation Updated**:
+
+- `doc/WINDOWS_API_REFERENCE.md`: Added integer overflow protection patterns for both APIs
 
 ---
 
@@ -1318,7 +1331,7 @@ describe("Security: Path Validation", () => {
 
 - [ ] Fix #1: Implement `realpath()` validation (macOS/Linux)
 - [x] Fix #2: Switch to `PathCchCanonicalizeEx` (Windows) - ✅ Completed 2025-10-23
-- [ ] Fix #3: Add overflow checks to string conversion (Windows)
+- [x] Fix #3: Add overflow checks to string conversion (Windows) - ✅ Completed 2025-10-23
 
 ### Week 2: High Priority Fixes
 
@@ -1368,5 +1381,6 @@ describe("Security: Path Validation", () => {
 
 **Change Log**:
 
+- 2025-10-23: Fixed Finding #3 - Integer overflow protection in string conversions (WideToUtf8, ToWString)
 - 2025-10-23: Fixed Finding #2 - PathCchCanonicalizeEx implementation with comprehensive tests
 - 2025-01-23: Initial comprehensive security audit completed

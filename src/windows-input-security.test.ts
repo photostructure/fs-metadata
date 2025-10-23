@@ -58,8 +58,10 @@ describePlatformStable("win32")("Windows Input Security Tests", () => {
       // Should not crash, but will fail because path doesn't exist
       try {
         await isHidden(longPath);
-      } catch (error: any) {
-        expect(error.message).toMatch(/not found|cannot find|access denied/i);
+      } catch (error: unknown) {
+        expect((error as Error).message).toMatch(
+          /not found|cannot find|access denied/i,
+        );
       }
     });
 
@@ -101,10 +103,10 @@ describePlatformStable("win32")("Windows Input Security Tests", () => {
       // We just verify it doesn't crash the process
       try {
         await isHidden(testPath);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Expected errors: file not found, path not found, or access denied
         // These are acceptable - we're testing it doesn't crash
-        expect(error.message).toMatch(
+        expect((error as Error).message).toMatch(
           /not found|cannot find|access denied|invalid path/i,
         );
       }
@@ -131,9 +133,11 @@ describePlatformStable("win32")("Windows Input Security Tests", () => {
         // This should work even on systems without long path support
         try {
           await isHidden(boundaryPath);
-        } catch (error: any) {
+        } catch (error: unknown) {
           // File not found is acceptable - we're testing path handling
-          expect(error.message).toMatch(/not found|cannot find|access denied/i);
+          expect((error as Error).message).toMatch(
+            /not found|cannot find|access denied/i,
+          );
         }
       }
     });
@@ -145,9 +149,9 @@ describePlatformStable("win32")("Windows Input Security Tests", () => {
       // Should handle mixed separators without crashing
       try {
         await isHidden(mixedPath);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Expected to fail (file doesn't exist), but shouldn't crash
-        expect(error.message).toMatch(
+        expect((error as Error).message).toMatch(
           /not found|cannot find|access denied|invalid path/i,
         );
       }
@@ -165,9 +169,9 @@ describePlatformStable("win32")("Windows Input Security Tests", () => {
       for (const unicodePath of unicodePaths) {
         try {
           await isHidden(unicodePath);
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Expected to fail (file doesn't exist), but shouldn't crash
-          expect(error.message).toMatch(
+          expect((error as Error).message).toMatch(
             /not found|cannot find|access denied|invalid path/i,
           );
         }

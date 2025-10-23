@@ -134,14 +134,26 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 - **Docs**: https://docs.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
 - **Purpose**: Maps a character string to a UTF-16 wide character string
 - **Security**: Use `MB_ERR_INVALID_CHARS` to detect invalid sequences
+- **Integer Overflow Protection**: Always validate returned size before allocation
 - **Pattern**:
   ```cpp
   int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
                                 source, -1, nullptr, 0);
-  if (len > 0) {
-      std::wstring result(len - 1, L'\0');
-      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                         source, -1, &result[0], len);
+  if (len <= 0) {
+      // Handle error
+      return L"";
+  }
+
+  // Validate size to prevent overflow
+  if (len > PATHCCH_MAX_CCH) {
+      throw std::runtime_error("String too long for conversion");
+  }
+
+  std::wstring result(static_cast<size_t>(len - 1), L'\0');
+  int written = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                    source, -1, &result[0], len);
+  if (written <= 0) {
+      throw std::runtime_error("Conversion failed");
   }
   ```
 
@@ -150,6 +162,27 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 - **Docs**: https://docs.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
 - **Purpose**: Maps a UTF-16 wide character string to a character string
 - **Flags**: Use `WC_ERR_INVALID_CHARS` for Vista+ to detect errors
+- **Integer Overflow Protection**: Validate size before `size - 1` subtraction
+- **Pattern**:
+  ```cpp
+  int size = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
+
+  if (size <= 0) {
+      return "";  // Conversion failed
+  }
+
+  // Check for overflow and excessive size (1MB limit recommended)
+  if (size > INT_MAX - 1 || size > 1024 * 1024) {
+      throw std::runtime_error("String conversion size exceeds reasonable limits");
+  }
+
+  std::string result(static_cast<size_t>(size - 1), 0);
+  int written = WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size, nullptr, nullptr);
+  if (written <= 0) {
+      throw std::runtime_error("String conversion failed");
+  }
+  return result;
+  ```
 
 ## Shell APIs
 
@@ -261,6 +294,11 @@ _CrtDumpMemoryLeaks();
 2. Use safe string functions (StringCch\*)
 3. Validate all input lengths
 4. Use dynamic allocation when size unknown
+5. **Integer overflow checks** for string conversions:
+   - Validate `MultiByteToWideChar`/`WideCharToMultiByte` return values
+   - Check `size > INT_MAX - 1` before subtraction
+   - Enforce reasonable size limits (e.g., 1MB for general strings)
+   - Use `static_cast<size_t>()` for allocations to prevent sign issues
 
 ### Handle Management
 
