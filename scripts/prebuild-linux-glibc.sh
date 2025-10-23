@@ -97,10 +97,21 @@ docker exec "$CONTAINER_NAME" sh -c "
   $BUILD_CMD
 "
 
-# Copy artifacts back with proper ownership
+# Copy artifacts back
 docker cp "$CONTAINER_NAME:/tmp/project/prebuilds" . 2>/dev/null || true
 docker cp "$CONTAINER_NAME:/tmp/project/build" . 2>/dev/null || true
 docker cp "$CONTAINER_NAME:/tmp/project/config.gypi" . 2>/dev/null || true
+
+# Fix ownership (docker cp preserves container's root ownership)
+if [ -d prebuilds ]; then
+  chown -R "$(id -u):$(id -g)" prebuilds
+fi
+if [ -d build ]; then
+  chown -R "$(id -u):$(id -g)" build
+fi
+if [ -f config.gypi ]; then
+  chown "$(id -u):$(id -g)" config.gypi
+fi
 
 # Clean up container
 docker rm -f "$CONTAINER_NAME" >/dev/null
