@@ -69,11 +69,13 @@ const metadata = await getVolumeMetadata(longPath);
 ```
 
 **Requirements**:
+
 - Windows 10 version 1607 or later
 - Long path support enabled in registry or manifest
 - Path must not exceed PATHCCH_MAX_CCH (32,768 wide characters)
 
 **Enabling long paths** (administrator required):
+
 ```powershell
 # Set registry key
 New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
