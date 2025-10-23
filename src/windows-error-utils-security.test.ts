@@ -11,7 +11,7 @@ describePlatformStable("win32")("Windows Error Utils Security", () => {
 
       // ERROR_INVALID_PARAMETER (87) generates a reasonably long message
       // Perform many operations to detect potential leaks
-      const promises: Promise<any>[] = [];
+      const promises: Promise<boolean | undefined>[] = [];
 
       for (let i = 0; i < 1000; i++) {
         // Use invalid paths to trigger error formatting
@@ -21,6 +21,7 @@ describePlatformStable("win32")("Windows Error Utils Security", () => {
             // Expected to fail - we're testing that error formatting doesn't leak
             expect(err).toBeDefined();
             expect((err as Error).message).toBeDefined();
+            return undefined;
           }),
         );
       }
@@ -57,12 +58,13 @@ describePlatformStable("win32")("Windows Error Utils Security", () => {
       const { isHidden } = await import("./index");
 
       // Rapid-fire error generation to stress test cleanup
-      const promises: Promise<any>[] = [];
+      const promises: Promise<boolean | undefined>[] = [];
 
       for (let i = 0; i < 500; i++) {
         promises.push(
           isHidden(`C:\\test_${i}\\invalid.txt`).catch((err: unknown) => {
             expect(err).toBeDefined();
+            return undefined;
           }),
         );
       }
@@ -130,12 +132,13 @@ describePlatformStable("win32")("Windows Error Utils Security", () => {
       // Create many concurrent operations that will fail
       // This simulates memory pressure conditions
       const concurrentOps = 100;
-      const promises: Promise<any>[] = [];
+      const promises: Promise<boolean | undefined>[] = [];
 
       for (let i = 0; i < concurrentOps; i++) {
         promises.push(
-          isHidden(`C:\\concurrent_test_${i}\\invalid.txt`).catch((_err: unknown) => {
-            // Expected to fail
+          isHidden(`C:\\concurrent_test_${i}\\invalid.txt`).catch(() => {
+            // Expected to fail - intentionally swallowing error
+            return undefined;
           }),
         );
       }
