@@ -88,7 +88,8 @@
       "WebFetch(domain:developer-old.gnome.org)",
       "Bash(pkg-config:*)",
       "Read(//usr/include/glib-2.0/**)",
-      "Read(//usr/include/**)"
+      "Read(//usr/include/**)",
+      "WebFetch(domain:man7.org)"
     ],
     "deny": []
   },
