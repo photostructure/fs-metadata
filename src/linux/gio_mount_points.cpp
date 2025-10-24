@@ -21,25 +21,24 @@ void GioMountPointsWorker::Execute() {
   try {
     DEBUG_LOG("[GioMountPoints] processing mounts");
 
-    MountIterator::forEachMount([this](GMount * /*mount*/, GFile *root) {
-      const GCharPtr path(g_file_get_path(root));
-      if (path) {
-        const GFileInfoPtr info(g_file_query_filesystem_info(
-            root, G_FILE_ATTRIBUTE_FILESYSTEM_TYPE, nullptr, nullptr));
-        if (info) {
-          const char *fs_type_str = g_file_info_get_attribute_string(
-              info.get(), G_FILE_ATTRIBUTE_FILESYSTEM_TYPE);
-          if (fs_type_str) {
-            const GCharPtr fs_type(g_strdup(fs_type_str));
-            DEBUG_LOG("[GioMountPoints] found {mountPoint: %s, fsType: %s}",
-                      path.get(), fs_type.get());
-            MountPoint point{};
-            point.mountPoint = path.get();
-            point.fstype = fs_type.get();
-            mountPoints.push_back(point);
-          }
-        }
+    // Use thread-safe g_unix_mounts_get() API
+    MountIterator::forEachMount([this](GUnixMountEntry *entry) {
+      // Get mount path and filesystem type from thread-safe Unix mount API
+      const char *mount_path = g_unix_mount_get_mount_path(entry);
+      const char *fs_type = g_unix_mount_get_fs_type(entry);
+
+      if (mount_path && fs_type) {
+        DEBUG_LOG("[GioMountPoints] found {mountPoint: %s, fsType: %s}",
+                  mount_path, fs_type);
+
+        MountPoint point{};
+        point.mountPoint = mount_path;
+        point.fstype = fs_type;
+        mountPoints.push_back(point);
+      } else {
+        DEBUG_LOG("[GioMountPoints] skipping mount with null path or fstype");
       }
+
       return true; // Continue iteration
     });
 

@@ -50,10 +50,10 @@
                     "ENABLE_GIO=1"
                   ],
                   "libraries": [
-                    "<!@(pkg-config --libs gio-2.0)"
+                    "<!@(pkg-config --libs gio-unix-2.0)"
                   ],
                   "cflags": [
-                    "<!@(pkg-config --cflags gio-2.0)"
+                    "<!@(pkg-config --cflags gio-unix-2.0)"
                   ]
                 }
               ]

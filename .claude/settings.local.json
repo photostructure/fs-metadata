@@ -79,7 +79,16 @@
       "Bash(xargs cat:*)",
       "Bash(ASAN_OPTIONS=detect_leaks=0 npm test:*)",
       "Bash(NODE_OPTIONS='--expose-gc' tsx:*)",
-      "Bash(NODE_OPTIONS='--expose-gc' npx tsx:*)"
+      "Bash(NODE_OPTIONS='--expose-gc' npx tsx:*)",
+      "Bash(if [ -f /etc/os-release ])",
+      "Bash(then cat /etc/os-release)",
+      "Bash(fi)",
+      "Bash(mount:*)",
+      "WebFetch(domain:docs.gtk.org)",
+      "WebFetch(domain:developer-old.gnome.org)",
+      "Bash(pkg-config:*)",
+      "Read(//usr/include/glib-2.0/**)",
+      "Read(//usr/include/**)"
     ],
     "deny": []
   },

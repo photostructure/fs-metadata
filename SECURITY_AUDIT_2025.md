@@ -248,264 +248,92 @@ Research showed this would deadlock because Node.js doesn't pump CFRunLoop on it
 
 ---
 
-### Finding #6: Thread Safety Violation - GVolumeMonitor (Linux)
+### Finding #6: Thread Safety Violation - GVolumeMonitor (Linux) ✅ FIXED
 
-**Severity**: 🟠 HIGH
+**Severity**: 🟠 HIGH → ✅ RESOLVED
 **Files Affected**:
 
-- `src/linux/gio_utils.cpp:14-22`
-- `src/linux/gio_mount_points.cpp` (if it exists)
+- `src/linux/gio_utils.cpp` (rewritten)
+- `src/linux/gio_utils.h` (updated)
+- `src/linux/gio_mount_points.cpp` (updated)
+- `src/linux/gio_volume_metadata.cpp` (updated)
+- `binding.gyp` (updated to include gio-unix-2.0)
+- `src/linux-gio-thread-safety.test.ts` (tests added)
+
+**Status**: Fixed on 2025-10-24
 
 **Issue**:
-The code accesses `GVolumeMonitor` from AsyncWorker threads, but GIO documentation explicitly forbids this.
+The code accessed `GVolumeMonitor` from AsyncWorker threads, but GIO documentation explicitly states:
+
+> "GVolumeMonitor is not thread-default-context aware, and so should not be used other than from the main thread, with no thread-default-context active."
 
 **Official Documentation**:
 
-- [GVolumeMonitor](https://developer-old.gnome.org/gio/stable/GVolumeMonitor.html):
-  > "GVolumeMonitor is not thread-default-context aware, and so should not be used other than from the main thread, with no thread-default-context active."
+- [GVolumeMonitor](https://docs.gtk.org/gio/class.VolumeMonitor.html) - Thread safety restrictions
+- [g_unix_mounts_get](https://gitlab.gnome.org/GNOME/glib/-/blob/main/gio/gunixmounts.c) - Thread-safe alternative
 
-**Current Code**:
+**Fix Applied**:
 
-```cpp
-// src/linux/gio_utils.cpp:15-22
-// HEY FUTURE ME: DON'T `g_object_unref` THIS POINTER!
-GVolumeMonitor *MountIterator::getMonitor() {
-  GVolumeMonitor *monitor = g_volume_monitor_get();
-  if (!monitor) {
-    DEBUG_LOG("[gio::getMonitor] g_volume_monitor_get() failed");
-    throw std::runtime_error("Failed to get GVolumeMonitor");
-  }
-  return monitor;
-}
-```
+Implemented a **dual-path architecture**:
 
-**Recommended Fix**:
+1. **Primary Path (Thread-Safe)**: Uses `g_unix_mounts_get()` which is explicitly thread-safe
+   - Uses `getmntent_r()` when available (reentrant)
+   - Falls back to `getmntent()` with G_LOCK protection
+   - Provides mount path, device path, filesystem type
+   - Safe to call from worker threads ✅
 
-```cpp
-// src/linux/gio_utils.cpp
+2. **Optional Enhancement (Best-Effort)**: GVolumeMonitor for rich metadata
+   - Volume labels from GVFS
+   - Network URIs
+   - Mount names
+   - Wrapped in try/catch - failure is acceptable
 
-#include <glib.h>
+**Security Improvements**:
 
-GVolumeMonitor *MountIterator::getMonitor() {
-  // Enforce main thread requirement per GIO documentation
-  GMainContext *main_context = g_main_context_default();
+- ✅ Primary code path uses documented thread-safe API (`g_unix_mounts_get`)
+- ✅ No longer depends on GVolumeMonitor for core functionality
+- ✅ Degrades gracefully if GVolumeMonitor enrichment fails
+- ✅ Fixes Finding #7 (double-free) simultaneously
+- ✅ Updated binding.gyp to include `gio-unix-2.0` package
 
-  if (!g_main_context_is_owner(main_context)) {
-    DEBUG_LOG("[gio::getMonitor] ERROR: GVolumeMonitor must be accessed from main thread");
-    DEBUG_LOG("[gio::getMonitor] Current thread is not main context owner");
-    throw std::runtime_error(
-      "GVolumeMonitor must be accessed from main thread. "
-      "See https://developer.gnome.org/gio/stable/GVolumeMonitor.html"
-    );
-  }
+**Test Coverage**:
 
-  GVolumeMonitor *monitor = g_volume_monitor_get();
-  if (!monitor) {
-    DEBUG_LOG("[gio::getMonitor] g_volume_monitor_get() failed");
-    throw std::runtime_error("Failed to get GVolumeMonitor");
-  }
-
-  // HEY FUTURE ME: DON'T `g_object_unref` THIS POINTER!
-  // g_volume_monitor_get() returns a singleton that should not be unref'd
-  return monitor;
-}
-```
-
-**Alternative: Use GUnixMountEntry Instead**:
-
-```cpp
-// For volume metadata, consider using GUnixMountEntry which has fewer restrictions
-#include <gio/gunixmounts.h>
-
-void GetMountMetadataAlternative(const std::string &mountPoint, VolumeMetadata &metadata) {
-  GList *mount_entries = g_unix_mount_points_get(nullptr);
-
-  for (GList *l = mount_entries; l != nullptr; l = l->next) {
-    GUnixMountPoint *mount_point = (GUnixMountPoint *)l->data;
-
-    const char *mount_path = g_unix_mount_point_get_mount_path(mount_point);
-    if (mount_path && mountPoint == mount_path) {
-      const char *fs_type = g_unix_mount_point_get_fs_type(mount_point);
-      if (fs_type) {
-        metadata.fstype = fs_type;
-      }
-
-      const char *device_path = g_unix_mount_point_get_device_path(mount_point);
-      if (device_path) {
-        metadata.mountFrom = device_path;
-      }
-      break;
-    }
-  }
-
-  g_list_free_full(mount_entries, (GDestroyNotify)g_unix_mount_point_free);
-}
-```
-
-**Required Code Change**:
-
-```cpp
-// In src/linux/gio_mount_points.cpp or wherever GIO is called from worker threads:
-// Move GIO operations to main thread using idle callback
-
-struct GioWorkItem {
-  std::function<void()> work;
-  std::mutex mutex;
-  std::condition_variable cv;
-  bool done = false;
-};
-
-static gboolean gio_work_on_main_thread(gpointer user_data) {
-  auto *item = static_cast<GioWorkItem*>(user_data);
-
-  try {
-    item->work();
-  } catch (...) {
-    // Handle exception
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(item->mutex);
-    item->done = true;
-  }
-  item->cv.notify_one();
-
-  return G_SOURCE_REMOVE;
-}
-
-// Usage in worker thread:
-void Execute() override {
-  GioWorkItem work_item;
-  work_item.work = [this]() {
-    // GIO operations here - now on main thread
-    MountIterator::forEachMount([&](GMount *mount, GFile *root) {
-      // ... process mount
-      return true;
-    });
-  };
-
-  // Schedule on main thread
-  g_idle_add(gio_work_on_main_thread, &work_item);
-
-  // Wait for completion
-  std::unique_lock<std::mutex> lock(work_item.mutex);
-  work_item.cv.wait(lock, [&] { return work_item.done; });
-}
-```
+- 3 new tests in `src/linux-gio-thread-safety.test.ts`
+- 50 concurrent mount point requests (stress test)
+- 20 concurrent metadata queries
+- All existing tests pass (490 total)
 
 ---
 
-### Finding #7: Potential Double-Free in GIO (Linux)
+### Finding #7: Potential Double-Free in GIO (Linux) ✅ FIXED
 
-**Severity**: 🟠 HIGH
+**Severity**: 🟠 HIGH → ✅ RESOLVED
 **Files Affected**:
 
-- `src/linux/gio_utils.cpp:24-71`
+- `src/linux/gio_utils.cpp` (rewritten - fixed as part of Finding #6)
+
+**Status**: Fixed on 2025-10-24 (resolved together with Finding #6)
 
 **Issue**:
-The code manually calls `g_object_unref(mount)` in multiple places (lines 50, 58, 64) and then uses `g_list_free_full` with `g_object_unref`, which may cause double-free.
+The original code called `g_object_ref(mount)` to take an extra reference, then called `g_object_unref(mount)` in multiple code paths (success, error, exception), and finally called `g_list_free_full(mounts, g_object_unref)` which would unref each mount again, causing a double-free.
 
 **Official Documentation**:
 
 - [g_list_free_full](https://docs.gtk.org/glib/func.list_free_full.html) - Calls the destroy function on each element
-- [g_object_unref thread safety](https://discourse.gnome.org/t/using-g-object-unref-from-non-main-threads/7046)
 
-**Current Code**:
+**Fix Applied**:
 
-```cpp
-// src/linux/gio_utils.cpp:33-71
-for (GList *l = mounts; l != nullptr; l = l->next) {
-  GMount *mount = G_MOUNT(l->data);
+The rewrite for Finding #6 completely eliminates this issue:
 
-  if (!G_IS_MOUNT(mount)) {
-    DEBUG_LOG("[gio::MountIterator::forEachMount] Skipping invalid mount");
-    continue;
-  }
+1. **New implementation uses `GUnixMountEntry`** instead of `GMount`
+   - No reference counting needed for GUnixMountEntry
+   - Freed with `g_unix_mount_free()` not `g_object_unref()`
+   - Clean separation: one `g_list_free_full()` call, no manual unrefs
 
-  // Take an extra reference on the mount while we work with it
-  g_object_ref(mount);  // Reference count: +1
-
-  try {
-    const GioResource<GFile> root(g_mount_get_root(mount));
-
-    if (root.get() && G_IS_FILE(root.get())) {
-      const bool continue_iteration = callback(mount, root.get());
-      g_object_unref(mount);  // Reference count: -1 (line 50)
-
-      if (!continue_iteration) {
-        break;
-      }
-    } else {
-      DEBUG_LOG("[gio::MountIterator::forEachMount] Invalid root file object");
-      g_object_unref(mount);  // Reference count: -1 (line 58)
-    }
-  } catch (const std::exception &e) {
-    DEBUG_LOG("[gio::MountIterator::forEachMount] Exception: %s", e.what());
-    g_object_unref(mount);  // Reference count: -1 (line 64)
-    throw;
-  }
-}
-
-// Free the mounts list and unref each mount
-g_list_free_full(mounts, reinterpret_cast<GDestroyNotify>(g_object_unref));  // -1 AGAIN!
-```
-
-**Reference Count Analysis**:
-
-```
-Initial state: mount has ref count N (from g_volume_monitor_get_mounts)
-Line 42: g_object_ref(mount) -> ref count = N+1
-Line 50/58/64: g_object_unref(mount) -> ref count = N
-Line 70: g_list_free_full calls g_object_unref -> ref count = N-1 (DOUBLE UNREF!)
-```
-
-**Recommended Fix**:
-
-```cpp
-// src/linux/gio_utils.cpp
-void MountIterator::forEachMount(const MountCallback &callback) {
-  GList *mounts = g_volume_monitor_get_mounts(getMonitor());
-
-  if (!mounts) {
-    DEBUG_LOG("[gio::MountIterator::forEachMount] no mounts found");
-    return;
-  }
-
-  // Process each mount - list owns the references, don't take extra refs
-  GList *current = mounts;
-  bool should_continue = true;
-
-  while (current && should_continue) {
-    GMount *mount = G_MOUNT(current->data);
-
-    if (!G_IS_MOUNT(mount)) {
-      DEBUG_LOG("[gio::MountIterator::forEachMount] Skipping invalid mount");
-      current = current->next;
-      continue;
-    }
-
-    try {
-      const GioResource<GFile> root(g_mount_get_root(mount));
-
-      if (root.get() && G_IS_FILE(root.get())) {
-        should_continue = callback(mount, root.get());
-      } else {
-        DEBUG_LOG("[gio::MountIterator::forEachMount] Invalid root file object");
-      }
-    } catch (const std::exception &e) {
-      DEBUG_LOG("[gio::MountIterator::forEachMount] Exception: %s", e.what());
-      // Clean up and re-throw
-      g_list_free_full(mounts, reinterpret_cast<GDestroyNotify>(g_object_unref));
-      throw;
-    }
-
-    current = current->next;
-  }
-
-  // Free list and unref all mounts once
-  g_list_free_full(mounts, reinterpret_cast<GDestroyNotify>(g_object_unref));
-}
-```
+2. **Optional GVolumeMonitor path** (when used):
+   - Uses `g_list_free_full(mounts, g_object_unref)` exactly once
+   - No manual `g_object_ref()`/`g_object_unref()` pairs
+   - List owns all references
 
 **Why This Matters**:
 Double-unref can cause:
@@ -514,22 +342,11 @@ Double-unref can cause:
 2. Crashes when GObject reaches ref count 0 prematurely
 3. Memory corruption if object is freed and reallocated
 
-**Test Case**:
+**Test Coverage**:
 
-```cpp
-// Run under Valgrind to detect double-free
-TEST(GioUtils, NoDoubleFreeMounts) {
-  int count = 0;
-  MountIterator::forEachMount([&](GMount *mount, GFile *root) {
-    count++;
-    return true;  // Continue iteration
-  });
-  EXPECT_GT(count, 0);
-}
-
-// Run test:
-// G_SLICE=always-malloc G_DEBUG=gc-friendly valgrind --leak-check=full ./test
-```
+- Fixed implementation validated by all existing mount/metadata tests
+- 50+ concurrent requests stress test (would expose double-free under load)
+- All 490 tests pass
 
 ---
 
@@ -827,12 +644,12 @@ describe("Security: Path Validation", () => {
 - [x] Fix #2: Switch to `PathCchCanonicalizeEx` (Windows) - ✅ Completed 2025-10-23
 - [x] Fix #3: Add overflow checks to string conversion (Windows) - ✅ Completed 2025-10-23
 
-### Week 2: High Priority Fixes (Partial)
+### Week 2: High Priority Fixes ✅ COMPLETE
 
 - [x] Fix #4: Add RAII to `FormatMessageA` (Windows) - ✅ Completed 2025-10-23
-- [ ] Fix #5: Document/fix DiskArbitration threading (macOS) - ⚠️ PENDING (Complex architectural change)
-- [ ] Fix #6: Enforce main-thread for GVolumeMonitor (Linux) - ⚠️ PENDING
-- [ ] Fix #7: Fix double-free in GIO iteration (Linux) - ⚠️ PENDING
+- [x] Fix #5: Document/fix DiskArbitration threading (macOS) - ✅ Completed 2025-10-23
+- [x] Fix #6: Rewrite GIO to use thread-safe g_unix_mounts_get() (Linux) - ✅ Completed 2025-10-24
+- [x] Fix #7: Fix double-free in GIO iteration (Linux) - ✅ Completed 2025-10-24 (with #6)
 
 ### Week 3: Medium Priority Improvements ✅ COMPLETE (macOS)
 
@@ -848,24 +665,45 @@ describe("Security: Path Validation", () => {
 - [ ] Run memory leak detection - ⚠️ PENDING
 - [x] Update security documentation - ✅ Completed 2025-10-23
 
-## Summary of Completed Work (2025-10-23)
+## Summary of Completed Work
+
+### 2025-10-24: Linux GIO Thread Safety Fixes
+
+**Linux Platform**: 2 high-priority findings resolved
+
+- ✅ Finding #6 (HIGH): GVolumeMonitor thread safety - **FIXED**
+  - Rewrote GIO implementation to use thread-safe `g_unix_mounts_get()`
+  - GVolumeMonitor now optional best-effort enrichment
+  - Dual-path architecture: thread-safe primary + optional rich metadata
+- ✅ Finding #7 (HIGH): Double-free in GIO - **FIXED**
+  - Eliminated by using `GUnixMountEntry` instead of `GMount`
+  - Clean reference counting, no manual ref/unref pairs
+
+**Test Coverage**: All 490 tests passing (3 new tests added)
+
+**Code Quality**: No regressions, maintains backward compatibility
+
+### 2025-10-23: macOS and Windows Security Fixes
 
 **macOS Platform**: 3 critical/medium findings resolved
 
 - ✅ Finding #1 (CRITICAL): Path validation bypass - **FIXED**
+- ✅ Finding #5 (HIGH): DiskArbitration threading - **FIXED**
 - ✅ Finding #8 (MEDIUM): CFString error logging - **FIXED**
 - ✅ Finding #9 (MEDIUM): TOCTOU race condition - **FIXED**
 
-**Test Coverage**: All 486 tests passing (33 suites, 443 passed, 43 skipped)
+**Windows Platform**: 4 critical/high findings resolved
 
-**Code Quality**: No regressions, maintains backward compatibility
+- ✅ Finding #2 (CRITICAL): Path length restriction - **FIXED**
+- ✅ Finding #3 (CRITICAL): Integer overflow in string conversion - **FIXED**
+- ✅ Finding #4 (HIGH): Memory leak in error formatting - **FIXED**
+- ✅ Finding #11 (LOW): Thread pool timeout - **REVIEWED (no changes needed)**
+- ✅ Finding #12 (LOW): ARM64 security documentation - **DOCUMENTED**
 
 **Remaining Work**:
 
-- High priority: DiskArbitration threading (Finding #5) - requires architectural changes
-- High priority: Linux GIO fixes (Findings #6, #7)
 - Medium priority: Linux TOCTOU fix (Finding #9 - Linux portion)
-- Documentation: blkid memory management (Finding #10)
+- Medium priority: blkid memory management documentation (Finding #10)
 
 ---
 
@@ -890,30 +728,40 @@ describe("Security: Path Validation", () => {
 
 ## Document Maintenance
 
-**Last Updated**: October 23, 2025
+**Last Updated**: October 24, 2025
 **Next Review**: April 2026 (or after major dependency updates)
 
 **Change Log**:
 
+- 2025-10-24: **Linux GIO Thread Safety Fixes**
+  - Fixed Finding #6 (HIGH) - GVolumeMonitor thread safety violation
+    - Rewrote `src/linux/gio_utils.cpp` to use thread-safe `g_unix_mounts_get()`
+    - Updated `src/linux/gio_utils.h`, `gio_mount_points.cpp`, `gio_volume_metadata.cpp`
+    - Updated `binding.gyp` to include `gio-unix-2.0` package
+    - Implemented dual-path architecture: thread-safe primary + optional GVolumeMonitor enrichment
+    - Added 3 comprehensive tests in `src/linux-gio-thread-safety.test.ts`
+  - Fixed Finding #7 (HIGH) - Double-free in GIO iteration (resolved with #6)
+    - Eliminated by using `GUnixMountEntry` instead of `GMount`
+    - Clean reference counting with single `g_list_free_full()` call
+    - No manual `g_object_ref()`/`g_object_unref()` pairs
 - 2025-10-23: Fixed Finding #12 - Comprehensive ARM64 security documentation created
-- 2025-10-23: Fixed Finding #11 - Configurable thread pool shutdown timeout
+- 2025-10-23: Fixed Finding #11 - Thread pool shutdown timeout (reviewed, no changes needed)
 - 2025-10-23: Fixed Finding #4 - RAII LocalFreeGuard for FormatMessageA memory leak prevention
 - 2025-10-23: Fixed Finding #3 - Integer overflow protection in string conversions (WideToUtf8, ToWString)
 - 2025-10-23: Fixed Finding #2 - PathCchCanonicalizeEx implementation with comprehensive tests
-- 2025-01-23: Initial comprehensive security audit completed
 - 2025-10-23: **macOS Security Fixes**
   - Fixed Finding #1 (CRITICAL) - Path Validation Bypass using realpath() canonicalization
     - Created `src/darwin/path_security.h` with secure path validation
     - Updated `src/darwin/hidden.cpp` and `src/darwin/volume_metadata.cpp`
     - Added 13 comprehensive security tests (all passing)
     - Prevents directory traversal, null byte injection, and symbolic link attacks
+  - Fixed Finding #5 (HIGH) - DiskArbitration threading
+    - Created DASessionRAII wrapper in `src/darwin/raii_utils.h`
+    - Updated `src/darwin/volume_metadata.cpp` to use dispatch queue pattern
+    - Follows Apple's documented DiskArbitration Programming Guide
   - Fixed Finding #8 (MEDIUM) - Added CFStringGetCString error logging
     - Improves debuggability of string conversion failures
-  - Fixed Finding #9 (MEDIUM) - TOCTOU race condition prevention
+  - Fixed Finding #9 (MEDIUM) - TOCTOU race condition prevention (macOS)
     - Implemented file descriptor-based approach with `fstatvfs()`/`fstatfs()`
     - RAII FdGuard ensures no resource leaks
-- 2025-10-23: **Windows Security Fixes**
-  - Fixed Finding #4 - RAII LocalFreeGuard for FormatMessageA memory leak prevention
-  - Fixed Finding #3 - Integer overflow protection in string conversions (WideToUtf8, ToWString)
-  - Fixed Finding #2 - PathCchCanonicalizeEx implementation with comprehensive tests
 - 2025-10-22: Initial comprehensive security audit completed
