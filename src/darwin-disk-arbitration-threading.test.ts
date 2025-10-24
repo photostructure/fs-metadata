@@ -93,7 +93,7 @@ describe("DiskArbitration Threading (macOS)", () => {
       try {
         await getVolumeMetadata(rootPath);
         successCount++;
-      } catch (error) {
+      } catch {
         errorCount++;
       }
     });
