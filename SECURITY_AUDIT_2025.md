@@ -45,11 +45,13 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 **Issue**: Simple string-based path validation using `path.find("..")` could be bypassed with URL-encoded sequences, Unicode normalization attacks, redundant separators, or absolute path traversal.
 
 **Fix Applied**:
+
 - Created `src/darwin/path_security.h` with `realpath()`-based validation
 - Updated `src/darwin/hidden.cpp` and `src/darwin/volume_metadata.cpp`
 - Added 13 comprehensive security tests (all passing)
 
 **Security Improvements**:
+
 - ✅ Uses `realpath()` to canonicalize paths, eliminating `../`, `./`, and symbolic links
 - ✅ Validates parent directory for non-existent paths
 - ✅ Prevents null byte injection
@@ -72,6 +74,7 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 **Issue**: `PathCchCanonicalize` restricts paths to MAX_PATH (260 characters), preventing access to legitimate long paths that Windows 10+ supports (up to 32,768 characters).
 
 **Fix Applied**:
+
 - Migrated to `PathCchCanonicalizeEx` with `PATHCCH_ALLOW_LONG_PATHS` flag
 - Updated buffer sizes from MAX_PATH (260) to PATHCCH_MAX_CCH (32,768)
 - Added comprehensive test coverage for long paths
@@ -95,6 +98,7 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 **Issue**: `WideToUtf8()` and `ToWString()` didn't validate that conversion sizes were positive or check for integer overflow before allocation.
 
 **Fix Applied**:
+
 - Added overflow protection: validates `size > INT_MAX - 1` before subtraction
 - Enforced sanity limits: 1MB for general strings, PATHCCH_MAX_CCH for paths
 - Added input validation: checks input length fits in `int` type
@@ -121,6 +125,7 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 **Issue**: `FormatMessageA` with `FORMAT_MESSAGE_ALLOCATE_BUFFER` requires `LocalFree`, but if the `std::string` constructor throws an exception, memory leaks.
 
 **Fix Applied**:
+
 - Implemented RAII `LocalFreeGuard` to ensure `LocalFree` is always called
 - Added null safety and error logging
 - Made exception-safe: memory freed regardless of code path
@@ -621,6 +626,7 @@ Time-of-check-time-of-use race condition: mount point could be unmounted or repl
 - [statvfs(2) man page](https://man7.org/linux/man-pages/man2/statvfs.2.html)
 
 **Fix Applied (macOS)**:
+
 - Use file descriptor-based approach: `open()` with `O_DIRECTORY`, then `fstatvfs()`/`fstatfs()`
 - Added RAII `FdGuard` to ensure file descriptor is always closed
 - File descriptor holds reference to filesystem, preventing mount changes during operation
