@@ -170,8 +170,9 @@ public:
                                             handles.data(), TRUE, 5000);
 
       if (result == WAIT_TIMEOUT) {
-        DEBUG_LOG("[ThreadPool] WARNING: %zu threads did not exit within 5000 ms",
-                  handles.size());
+        DEBUG_LOG(
+            "[ThreadPool] WARNING: %zu threads did not exit within 5000 ms",
+            handles.size());
         // Note: TerminateThread is dangerous and not recommended
         // Threads will be forcefully terminated when process exits
       }
