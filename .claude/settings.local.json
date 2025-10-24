@@ -70,7 +70,14 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebSearch",
       "Bash(Select-String -Pattern \"(PASS|FAIL|Test Suites:)\")",
-      "Bash(Select-Object -Last 20)"
+      "Bash(Select-Object -Last 20)",
+      "Read(//Library/Developer/CommandLineTools/usr/bin/**)",
+      "Read(//opt/homebrew/Cellar/llvm/21.1.4/bin/**)",
+      "WebFetch(domain:opensource.apple.com)",
+      "Read(//System/Library/Frameworks/DiskArbitration.framework/**)",
+      "Read(//Library/Developer/CommandLineTools/SDKs/**)",
+      "Bash(xargs cat:*)",
+      "Bash(ASAN_OPTIONS=detect_leaks=0 npm test:*)"
     ],
     "deny": []
   },
