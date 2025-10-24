@@ -77,7 +77,9 @@
       "Read(//System/Library/Frameworks/DiskArbitration.framework/**)",
       "Read(//Library/Developer/CommandLineTools/SDKs/**)",
       "Bash(xargs cat:*)",
-      "Bash(ASAN_OPTIONS=detect_leaks=0 npm test:*)"
+      "Bash(ASAN_OPTIONS=detect_leaks=0 npm test:*)",
+      "Bash(NODE_OPTIONS='--expose-gc' tsx:*)",
+      "Bash(NODE_OPTIONS='--expose-gc' npx tsx:*)"
     ],
     "deny": []
   },
