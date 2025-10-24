@@ -2,6 +2,7 @@
 #include "hidden.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
+#include "path_security.h"
 #include <string.h> // for strcmp
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -19,31 +20,43 @@ GetHiddenWorker::GetHiddenWorker(std::string path,
 void GetHiddenWorker::Execute() {
   DEBUG_LOG("[GetHiddenWorker] checking hidden status for: %s", path_.c_str());
 
-  // Add path validation to prevent directory traversal and null byte injection
-  if (path_.find("..") != std::string::npos) {
-    SetError("Invalid path containing '..'");
-    return;
-  }
-  if (path_.find('\0') != std::string::npos) {
-    SetError("Invalid path containing null byte");
+  // Validate and canonicalize path using realpath() to prevent directory
+  // traversal This follows Apple's Secure Coding Guide recommendations For
+  // isHidden(), we allow non-existent paths (they will fail stat() below)
+  std::string error;
+  std::string validated_path = ValidateAndCanonicalizePath(path_, error, true);
+  if (validated_path.empty()) {
+    // If validation failed, check if it's because the path doesn't exist
+    // In that case, return the expected "Path not found" error for TypeScript
+    // layer
+    if (error.find("realpath") != std::string::npos &&
+        error.find("No such file or directory") != std::string::npos) {
+      SetError("Path not found: '" + path_ + "'");
+    } else {
+      SetError(error);
+    }
     return;
   }
 
+  // Use the validated path for all subsequent operations
+  DEBUG_LOG("[GetHiddenWorker] Using validated path: %s",
+            validated_path.c_str());
+
   struct stat statbuf;
-  if (stat(path_.c_str(), &statbuf) != 0) {
+  if (stat(validated_path.c_str(), &statbuf) != 0) {
     int error = errno;
     if (error == ENOENT) {
-      DEBUG_LOG("[GetHiddenWorker] path not found: %s", path_.c_str());
-      SetError("Path not found: '" + path_ + "'");
+      DEBUG_LOG("[GetHiddenWorker] path not found: %s", validated_path.c_str());
+      SetError("Path not found: '" + validated_path + "'");
     } else {
       DEBUG_LOG("[GetHiddenWorker] failed to stat path %s: %s (%d)",
-                path_.c_str(), strerror(error), error);
-      SetError(CreatePathErrorMessage("stat", path_, error));
+                validated_path.c_str(), strerror(error), error);
+      SetError(CreatePathErrorMessage("stat", validated_path, error));
     }
     return;
   }
   is_hidden_ = (statbuf.st_flags & UF_HIDDEN) != 0;
-  DEBUG_LOG("[GetHiddenWorker] path %s is %s", path_.c_str(),
+  DEBUG_LOG("[GetHiddenWorker] path %s is %s", validated_path.c_str(),
             is_hidden_ ? "hidden" : "not hidden");
 }
 
@@ -94,26 +107,30 @@ void SetHiddenWorker::Execute() {
   // This is different from the dot-prefix convention used on Unix systems.
   // The chflags() system call modifies these BSD-specific file flags.
 
-  // Add path validation to prevent directory traversal and null byte injection
-  if (path_.find("..") != std::string::npos) {
-    SetError("Invalid path containing '..'");
-    return;
-  }
-  if (path_.find('\0') != std::string::npos) {
-    SetError("Invalid path containing null byte");
+  // Validate and canonicalize path using realpath() to prevent directory
+  // traversal This follows Apple's Secure Coding Guide recommendations For
+  // setHidden, the file must exist, so we use ValidatePathForRead
+  std::string error;
+  std::string validated_path = ValidatePathForRead(path_, error);
+  if (validated_path.empty()) {
+    SetError(error);
     return;
   }
 
+  // Use the validated path for all subsequent operations
+  DEBUG_LOG("[SetHiddenWorker] Using validated path: %s",
+            validated_path.c_str());
+
   struct stat statbuf;
-  if (stat(path_.c_str(), &statbuf) != 0) {
+  if (stat(validated_path.c_str(), &statbuf) != 0) {
     int error = errno;
     if (error == ENOENT) {
-      DEBUG_LOG("[SetHiddenWorker] path not found: %s", path_.c_str());
-      SetError("Path not found: '" + path_ + "'");
+      DEBUG_LOG("[SetHiddenWorker] path not found: %s", validated_path.c_str());
+      SetError("Path not found: '" + validated_path + "'");
     } else {
       DEBUG_LOG("[SetHiddenWorker] failed to stat path %s: %s (%d)",
-                path_.c_str(), strerror(error), error);
-      SetError(CreatePathErrorMessage("stat", path_, error));
+                validated_path.c_str(), strerror(error), error);
+      SetError(CreatePathErrorMessage("stat", validated_path, error));
     }
     return;
   }
@@ -125,15 +142,15 @@ void SetHiddenWorker::Execute() {
     new_flags = statbuf.st_flags & ~UF_HIDDEN;
   }
 
-  if (chflags(path_.c_str(), new_flags) != 0) {
+  if (chflags(validated_path.c_str(), new_flags) != 0) {
     int error = errno;
     DEBUG_LOG("[SetHiddenWorker] failed to set flags for %s: %s (%d)",
-              path_.c_str(), strerror(error), error);
+              validated_path.c_str(), strerror(error), error);
 
     // Check if this is an APFS filesystem issue
     struct statfs fs;
     bool is_apfs = false;
-    if (statfs(path_.c_str(), &fs) == 0) {
+    if (statfs(validated_path.c_str(), &fs) == 0) {
       is_apfs = (strcmp(fs.f_fstypename, "apfs") == 0);
       DEBUG_LOG("[SetHiddenWorker] filesystem type: %s", fs.f_fstypename);
     }
@@ -143,14 +160,14 @@ void SetHiddenWorker::Execute() {
       SetError("Setting hidden attribute failed on APFS filesystem. "
                "This is a known issue with some APFS volumes. "
                "Error: " +
-               CreatePathErrorMessage("chflags", path_, error));
+               CreatePathErrorMessage("chflags", validated_path, error));
     } else {
-      SetError(CreatePathErrorMessage("chflags", path_, error));
+      SetError(CreatePathErrorMessage("chflags", validated_path, error));
     }
     return;
   }
   DEBUG_LOG("[SetHiddenWorker] successfully set hidden=%d for: %s", hidden_,
-            path_.c_str());
+            validated_path.c_str());
 }
 
 void SetHiddenWorker::OnOK() {

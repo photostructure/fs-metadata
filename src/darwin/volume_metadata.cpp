@@ -3,16 +3,19 @@
 
 #include "../common/debug_log.h"
 #include "./fs_meta.h"
+#include "./path_security.h"
 #include "./raii_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
+#include <fcntl.h> // For open(), O_RDONLY, O_DIRECTORY
 #include <memory>
 #include <mutex>
 #include <string>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/statvfs.h>
+#include <unistd.h> // For close()
 
 namespace FSMeta {
 
@@ -43,6 +46,12 @@ static std::string CFStringToString(CFStringRef cfString) {
   Boolean success =
       CFStringGetCString(cfString, &result[0], maxSize, kCFStringEncodingUTF8);
   if (!success) {
+    // Log the failure for debugging
+    // Common reasons: encoding issue, buffer too small, or malformed string
+    DEBUG_LOG("[CFStringToString] Conversion failed - likely encoding issue or "
+              "buffer too small");
+    DEBUG_LOG("[CFStringToString] maxSize: %ld, string length: %ld", maxSize,
+              CFStringGetLength(cfString));
     return "";
   }
 
@@ -71,21 +80,32 @@ public:
     DEBUG_LOG("[GetVolumeMetadataWorker] Executing for mount point: %s",
               mountPoint.c_str());
     try {
-      // Validate mount point to prevent directory traversal and null byte
-      // injection
-      if (mountPoint.find("..") != std::string::npos) {
-        SetError("Invalid mount point containing '..'");
-        return;
-      }
-      if (mountPoint.find('\0') != std::string::npos) {
-        SetError("Invalid mount point containing null byte");
+      // Validate and canonicalize mount point using realpath()
+      // This follows Apple's Secure Coding Guide recommendations
+      std::string error;
+      std::string validated_mount_point =
+          ValidatePathForRead(mountPoint, error);
+      if (validated_mount_point.empty()) {
+        SetError(error);
         return;
       }
 
+      // Use validated path for all subsequent operations
+      DEBUG_LOG("[GetVolumeMetadataWorker] Using validated mount point: %s",
+                validated_mount_point.c_str());
+
+      // Temporarily store original mountPoint and replace with validated one
+      std::string original_mount_point = mountPoint;
+      mountPoint = validated_mount_point;
+
       if (!GetBasicVolumeInfo()) {
+        mountPoint = original_mount_point; // Restore for error reporting
         return;
       }
       GetDiskArbitrationInfoSafe();
+
+      // Restore original for consistency
+      mountPoint = original_mount_point;
     } catch (const std::exception &e) {
       DEBUG_LOG("[GetVolumeMetadataWorker] Exception: %s", e.what());
       SetError(e.what());
@@ -98,22 +118,52 @@ private:
   bool GetBasicVolumeInfo() {
     DEBUG_LOG("[GetVolumeMetadataWorker] Getting basic volume info for: %s",
               mountPoint.c_str());
+
+    // Use file descriptors to prevent TOCTOU race conditions
+    // Open the mount point directory with O_DIRECTORY to ensure it's a
+    // directory
+    int fd = open(mountPoint.c_str(), O_RDONLY | O_DIRECTORY);
+    if (fd < 0) {
+      int error = errno;
+      DEBUG_LOG("[GetVolumeMetadataWorker] open failed: %s (%d)",
+                strerror(error), error);
+      SetError(CreatePathErrorMessage("open", mountPoint, error));
+      return false;
+    }
+
+    // RAII wrapper for file descriptor to ensure it's always closed
+    struct FdGuard {
+      int fd;
+      ~FdGuard() {
+        if (fd >= 0) {
+          close(fd);
+        }
+      }
+    } fd_guard{fd};
+
     struct statvfs vfs;
     struct statfs fs;
 
-    if (statvfs(mountPoint.c_str(), &vfs) != 0) {
-      DEBUG_LOG("[GetVolumeMetadataWorker] statvfs failed: %s (%d)",
-                strerror(errno), errno);
-      SetError(CreatePathErrorMessage("statvfs", mountPoint, errno));
+    // Use fstatvfs and fstatfs on the file descriptor to prevent TOCTOU
+    // The fd holds a reference to the filesystem, preventing mount changes
+    if (fstatvfs(fd, &vfs) != 0) {
+      int error = errno;
+      DEBUG_LOG("[GetVolumeMetadataWorker] fstatvfs failed: %s (%d)",
+                strerror(error), error);
+      SetError(CreatePathErrorMessage("fstatvfs", mountPoint, error));
       return false;
     }
 
-    if (statfs(mountPoint.c_str(), &fs) != 0) {
-      DEBUG_LOG("[GetVolumeMetadataWorker] statfs failed: %s (%d)",
-                strerror(errno), errno);
-      SetError(CreatePathErrorMessage("statfs", mountPoint, errno));
+    if (fstatfs(fd, &fs) != 0) {
+      int error = errno;
+      DEBUG_LOG("[GetVolumeMetadataWorker] fstatfs failed: %s (%d)",
+                strerror(error), error);
+      SetError(CreatePathErrorMessage("fstatfs", mountPoint, error));
       return false;
     }
+
+    // fd_guard will automatically close the file descriptor when this function
+    // returns
 
     // Calculate sizes using uint64_t to prevent overflow
     const uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
