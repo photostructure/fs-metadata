@@ -797,7 +797,10 @@ async function main(): Promise<void> {
 
     // Show filtering statistics for transparency
     const totalFilesChecked = files.length;
-    const totalFilteredErrors = results.reduce((sum, r) => sum + (r.filtered || 0), 0);
+    const totalFilteredErrors = results.reduce(
+      (sum, r) => sum + (r.filtered || 0),
+      0,
+    );
 
     if (totalFilteredErrors > 0) {
       console.log(
