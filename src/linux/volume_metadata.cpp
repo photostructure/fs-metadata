@@ -4,8 +4,10 @@
 #include "../common/error_utils.h"
 #include "../common/metadata_worker.h"
 #include "blkid_cache.h"
+#include <fcntl.h> // for open(), O_DIRECTORY, O_RDONLY, O_CLOEXEC
 #include <memory>
 #include <sys/statvfs.h>
+#include <unistd.h> // for close()
 
 #ifdef ENABLE_GIO
 #include "gio_volume_metadata.h"
@@ -29,10 +31,51 @@ public:
     try {
       DEBUG_LOG("[LinuxMetadataWorker] starting statvfs for %s",
                 mountPoint.c_str());
-      struct statvfs vfs;
-      if (statvfs(mountPoint.c_str(), &vfs) != 0) {
-        throw FSException(CreatePathErrorMessage("statvfs", mountPoint, errno));
+
+      // SECURITY: Use file descriptor-based approach to prevent TOCTOU race
+      // condition
+      //
+      // Time-of-check-time-of-use (TOCTOU) vulnerability:
+      // The mount point could be unmounted or replaced between the statvfs call
+      // and subsequent operations. Using a file descriptor prevents this.
+      //
+      // See: Finding #9 in SECURITY_AUDIT_2025.md
+      // Reference: https://man7.org/linux/man-pages/man2/open.2.html
+      //
+      // O_DIRECTORY: Ensures we're opening a directory, fails if not
+      // O_RDONLY: Read-only access (sufficient for fstatvfs)
+      // O_CLOEXEC: Close on exec (prevents fd leaks in multithreaded programs)
+      int fd = open(mountPoint.c_str(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+      if (fd < 0) {
+        int error = errno;
+        DEBUG_LOG("[LinuxMetadataWorker] open failed for %s: %s (%d)",
+                  mountPoint.c_str(), strerror(error), error);
+        throw FSException(CreatePathErrorMessage("open", mountPoint, error));
       }
+
+      // RAII guard to ensure file descriptor is always closed
+      struct FdGuard {
+        int fd;
+        ~FdGuard() {
+          if (fd >= 0) {
+            close(fd);
+          }
+        }
+      } fd_guard{fd};
+
+      // Use fstatvfs on the file descriptor instead of statvfs on the path
+      // The fd holds a reference to the filesystem, preventing TOCTOU issues
+      struct statvfs vfs;
+      if (fstatvfs(fd, &vfs) != 0) {
+        int error = errno;
+        DEBUG_LOG("[LinuxMetadataWorker] fstatvfs failed for %s: %s (%d)",
+                  mountPoint.c_str(), strerror(error), error);
+        throw FSException(
+            CreatePathErrorMessage("fstatvfs", mountPoint, error));
+      }
+
+      // fd_guard will automatically close the file descriptor when this
+      // function returns (whether by normal return or exception)
 
       const uint64_t blockSize = vfs.f_frsize ? vfs.f_frsize : vfs.f_bsize;
       const uint64_t totalBlocks = static_cast<uint64_t>(vfs.f_blocks);
@@ -79,11 +122,30 @@ public:
                   options_.device.c_str());
         try {
           BlkidCache cache;
+
+          // MEMORY MANAGEMENT: blkid_get_tag_value() returns strings allocated
+          // with strdup()
+          //
+          // CRITICAL: These strings MUST be freed with free(), NOT delete or
+          // delete[] blkid is a C library (libblkid), and blkid_get_tag_value()
+          // uses strdup() internally which allocates memory with malloc().
+          //
+          // Memory allocated with malloc() must be deallocated with free().
+          // Using delete or delete[] would invoke the wrong deallocator and
+          // cause undefined behavior (likely a crash).
+          //
+          // See: Finding #10 in SECURITY_AUDIT_2025.md
+          // Reference:
+          // https://github.com/util-linux/util-linux/blob/master/libblkid/src/resolve.c
+          // The blkid_get_tag_value() implementation shows it uses strdup():
+          //   return res ? strdup(res) : NULL;
+
           char *uuid =
               blkid_get_tag_value(cache.get(), "UUID", options_.device.c_str());
           if (uuid) {
             metadata.uuid = uuid;
-            free(uuid);
+            free(uuid); // IMPORTANT: Use free(), not delete (C API, uses
+                        // malloc/strdup)
             DEBUG_LOG("[LinuxMetadataWorker] found UUID for %s: %s",
                       options_.device.c_str(), metadata.uuid.c_str());
           }
@@ -92,7 +154,8 @@ public:
                                             options_.device.c_str());
           if (label) {
             metadata.label = label;
-            free(label);
+            free(label); // IMPORTANT: Use free(), not delete (C API, uses
+                         // malloc/strdup)
             DEBUG_LOG("[LinuxMetadataWorker] found label for %s: %s",
                       options_.device.c_str(), metadata.label.c_str());
           }

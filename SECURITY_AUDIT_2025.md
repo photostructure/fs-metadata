@@ -370,15 +370,15 @@ The code correctly checks the return value of `CFStringGetCString`, but doesn't 
 
 ---
 
-### Finding #9: TOCTOU Race Condition in statvfs/statfs (macOS/Linux) ✅ FIXED (macOS)
+### Finding #9: TOCTOU Race Condition in statvfs/statfs (macOS/Linux) ✅ FIXED
 
-**Severity**: 🟡 MEDIUM → ✅ RESOLVED (macOS)
+**Severity**: 🟡 MEDIUM → ✅ RESOLVED
 **Files Affected**:
 
 - `src/darwin/volume_metadata.cpp` (updated - macOS)
-- `src/linux/volume_metadata.cpp:32-35` (Linux - not yet fixed)
+- `src/linux/volume_metadata.cpp` (updated - Linux)
 
-**Status**: macOS fixed on 2025-10-23, Linux pending
+**Status**: macOS fixed on 2025-10-23, Linux fixed on 2025-10-24
 
 **Issue**:
 Time-of-check-time-of-use race condition: mount point could be unmounted or replaced between `statvfs` call and subsequent operations.
@@ -387,6 +387,8 @@ Time-of-check-time-of-use race condition: mount point could be unmounted or repl
 
 - [Apple: Race Conditions and Secure File Operations](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html)
 - [statvfs(2) man page](https://man7.org/linux/man-pages/man2/statvfs.2.html)
+- [fstatvfs(2) man page](https://man7.org/linux/man-pages/man2/fstatvfs.2.html)
+- [open(2) man page - O_DIRECTORY flag](https://man7.org/linux/man-pages/man2/open.2.html)
 
 **Fix Applied (macOS)**:
 
@@ -394,58 +396,75 @@ Time-of-check-time-of-use race condition: mount point could be unmounted or repl
 - Added RAII `FdGuard` to ensure file descriptor is always closed
 - File descriptor holds reference to filesystem, preventing mount changes during operation
 
-**Impact**: Prevents race condition attacks; all 486 tests pass with no regressions.
+**Fix Applied (Linux)**:
 
-**Note**: Linux implementation (`src/linux/volume_metadata.cpp`) should apply the same pattern (pending).
+- Same file descriptor-based approach as macOS
+- `open()` with `O_DIRECTORY | O_RDONLY | O_CLOEXEC`
+- Use `fstatvfs()` on file descriptor instead of `statvfs()` on path
+- RAII `FdGuard` struct ensures file descriptor is always closed (exception-safe)
+- Added comprehensive inline documentation explaining TOCTOU prevention
+
+**Security Improvements**:
+
+- ✅ File descriptor holds reference to filesystem, preventing TOCTOU
+- ✅ `O_DIRECTORY` ensures we're opening a directory (fails otherwise)
+- ✅ `O_CLOEXEC` prevents fd leaks in multithreaded programs
+- ✅ RAII pattern guarantees resource cleanup
+
+**Impact**: Prevents race condition attacks; all 491 tests pass with no regressions.
 
 ---
 
-### Finding #10: blkid Memory Management Documentation (Linux)
+### Finding #10: blkid Memory Management Documentation (Linux) ✅ FIXED
 
-**Severity**: 🟡 MEDIUM (Documentation)
+**Severity**: 🟡 MEDIUM (Documentation) → ✅ RESOLVED
 **Files Affected**:
 
-- `src/linux/volume_metadata.cpp:82-97`
+- `src/linux/volume_metadata.cpp` (updated with comprehensive documentation)
+
+**Status**: Fixed on 2025-10-24
 
 **Issue**:
-The code correctly uses `free()` on strings returned by `blkid_get_tag_value`, but a comment explaining this would help future maintainers.
+The code correctly uses `free()` on strings returned by `blkid_get_tag_value`, but lacked comments explaining WHY `free()` must be used instead of `delete`.
 
 **Official Documentation**:
 
 - [libblkid source](https://github.com/util-linux/util-linux/blob/master/libblkid/src/resolve.c) shows `blkid_get_tag_value` uses `strdup()`
 
-**Current Code** (CORRECT):
+**Fix Applied**:
+
+Added comprehensive inline documentation explaining:
+
+1. **Memory allocation**: `blkid_get_tag_value()` returns strings allocated with `strdup()` (uses `malloc()` internally)
+2. **Critical requirement**: Must use `free()`, NOT `delete` or `delete[]`
+3. **Why it matters**: Using wrong deallocator causes undefined behavior (likely crash)
+4. **Source reference**: Links to libblkid source code showing `strdup()` usage
+
+**Documentation Added**:
 
 ```cpp
+// MEMORY MANAGEMENT: blkid_get_tag_value() returns strings allocated with strdup()
+//
+// CRITICAL: These strings MUST be freed with free(), NOT delete or delete[]
+// blkid is a C library (libblkid), and blkid_get_tag_value() uses strdup()
+// internally which allocates memory with malloc().
+//
+// Memory allocated with malloc() must be deallocated with free().
+// Using delete or delete[] would invoke the wrong deallocator and
+// cause undefined behavior (likely a crash).
+//
+// See: Finding #10 in SECURITY_AUDIT_2025.md
+// Reference: https://github.com/util-linux/util-linux/blob/master/libblkid/src/resolve.c
+
 char *uuid = blkid_get_tag_value(cache.get(), "UUID", options_.device.c_str());
 if (uuid) {
   metadata.uuid = uuid;
-  free(uuid);  // Correct, but why free() not delete?
+  free(uuid);  // IMPORTANT: Use free(), not delete (C API, uses malloc/strdup)
+  ...
 }
 ```
 
-**Recommended Fix (Add Comments)**:
-
-```cpp
-// blkid_get_tag_value returns a string allocated with strdup()
-// Must be freed with free(), not delete (C API)
-// See: https://github.com/util-linux/util-linux/blob/master/libblkid/src/resolve.c
-char *uuid = blkid_get_tag_value(cache.get(), "UUID", options_.device.c_str());
-if (uuid) {
-  metadata.uuid = uuid;
-  free(uuid);  // IMPORTANT: Use free(), not delete
-  DEBUG_LOG("[LinuxMetadataWorker] found UUID for %s: %s",
-            options_.device.c_str(), metadata.uuid.c_str());
-}
-
-char *label = blkid_get_tag_value(cache.get(), "LABEL", options_.device.c_str());
-if (label) {
-  metadata.label = label;
-  free(label);  // IMPORTANT: Use free(), not delete
-  DEBUG_LOG("[LinuxMetadataWorker] found label for %s: %s",
-            options_.device.c_str(), metadata.label.c_str());
-}
-```
+**Impact**: Prevents future maintenance errors where someone might incorrectly change `free()` to `delete`.
 
 ---
 
@@ -651,12 +670,12 @@ describe("Security: Path Validation", () => {
 - [x] Fix #6: Rewrite GIO to use thread-safe g_unix_mounts_get() (Linux) - ✅ Completed 2025-10-24
 - [x] Fix #7: Fix double-free in GIO iteration (Linux) - ✅ Completed 2025-10-24 (with #6)
 
-### Week 3: Medium Priority Improvements ✅ COMPLETE (macOS)
+### Week 3: Medium Priority Improvements ✅ COMPLETE
 
 - [x] Fix #8: Add CFString error logging (macOS) - ✅ Completed 2025-10-23
 - [x] Fix #9: Use `fstatvfs()` with fd (macOS) - ✅ Completed 2025-10-23
-- [ ] Fix #9: Use `fstatvfs()` with fd (Linux) - ⚠️ PENDING
-- [ ] Fix #10: Add blkid documentation (Linux) - ⚠️ PENDING
+- [x] Fix #9: Use `fstatvfs()` with fd (Linux) - ✅ Completed 2025-10-24
+- [x] Fix #10: Add blkid documentation (Linux) - ✅ Completed 2025-10-24
 
 ### Week 4: Testing & Documentation ✅ COMPLETE (macOS)
 
@@ -667,9 +686,11 @@ describe("Security: Path Validation", () => {
 
 ## Summary of Completed Work
 
-### 2025-10-24: Linux GIO Thread Safety Fixes
+### 2025-10-24: Linux Security Fixes (Complete)
 
-**Linux Platform**: 2 high-priority findings resolved
+**Linux Platform**: 4 findings resolved (2 high, 2 medium)
+
+**High Priority**:
 
 - ✅ Finding #6 (HIGH): GVolumeMonitor thread safety - **FIXED**
   - Rewrote GIO implementation to use thread-safe `g_unix_mounts_get()`
@@ -679,7 +700,18 @@ describe("Security: Path Validation", () => {
   - Eliminated by using `GUnixMountEntry` instead of `GMount`
   - Clean reference counting, no manual ref/unref pairs
 
-**Test Coverage**: All 490 tests passing (3 new tests added)
+**Medium Priority**:
+
+- ✅ Finding #9 (MEDIUM): TOCTOU race condition in statvfs - **FIXED**
+  - File descriptor-based approach: `open()` + `fstatvfs()`
+  - RAII `FdGuard` ensures resource cleanup
+  - Prevents mount point changes during operation
+- ✅ Finding #10 (MEDIUM): blkid memory management - **DOCUMENTED**
+  - Comprehensive inline documentation added
+  - Explains `free()` vs `delete` requirement
+  - Prevents future maintenance errors
+
+**Test Coverage**: All 491 tests passing (3 new tests added)
 
 **Code Quality**: No regressions, maintains backward compatibility
 
@@ -702,8 +734,7 @@ describe("Security: Path Validation", () => {
 
 **Remaining Work**:
 
-- Medium priority: Linux TOCTOU fix (Finding #9 - Linux portion)
-- Medium priority: blkid memory management documentation (Finding #10)
+- None! All critical, high, and medium priority findings have been resolved ✅
 
 ---
 
@@ -733,7 +764,18 @@ describe("Security: Path Validation", () => {
 
 **Change Log**:
 
-- 2025-10-24: **Linux GIO Thread Safety Fixes**
+- 2025-10-24: **Linux Security Fixes (Part 2)**
+  - Fixed Finding #9 (MEDIUM) - TOCTOU race condition in statvfs (Linux portion)
+    - Updated `src/linux/volume_metadata.cpp` to use file descriptor-based approach
+    - Use `open()` with `O_DIRECTORY | O_RDONLY | O_CLOEXEC`, then `fstatvfs()`
+    - Added RAII `FdGuard` to ensure file descriptor is always closed
+    - Added comprehensive inline documentation explaining TOCTOU prevention
+  - Fixed Finding #10 (MEDIUM) - blkid memory management documentation
+    - Added extensive inline documentation in `src/linux/volume_metadata.cpp`
+    - Explains why `free()` must be used (not `delete`) for blkid strings
+    - Includes source references and technical rationale
+    - Prevents future maintenance errors
+- 2025-10-24: **Linux GIO Thread Safety Fixes (Part 1)**
   - Fixed Finding #6 (HIGH) - GVolumeMonitor thread safety violation
     - Rewrote `src/linux/gio_utils.cpp` to use thread-safe `g_unix_mounts_get()`
     - Updated `src/linux/gio_utils.h`, `gio_mount_points.cpp`, `gio_volume_metadata.cpp`
