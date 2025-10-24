@@ -1,6 +1,7 @@
 #pragma once
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <DiskArbitration/DiskArbitration.h>
 #include <sys/mount.h>
 
 // RAII (Resource Acquisition Is Initialization) utilities for macOS APIs.
@@ -121,6 +122,61 @@ public:
       reset();
       ref_ = other.ref_;
       other.ref_ = nullptr;
+    }
+    return *this;
+  }
+};
+
+// Specialized RAII wrapper for DASession that handles dispatch queue lifecycle.
+// DASessionSetDispatchQueue must be called with NULL before the session is
+// released. This wrapper ensures proper cleanup order: unschedule then release.
+class DASessionRAII {
+private:
+  CFReleaser<DASessionRef> session_;
+  bool is_scheduled_;
+
+public:
+  explicit DASessionRAII(DASessionRef session = nullptr) noexcept
+      : session_(session), is_scheduled_(false) {}
+
+  ~DASessionRAII() { unschedule(); }
+
+  // Schedule the session on a dispatch queue
+  void scheduleOnQueue(dispatch_queue_t queue) {
+    if (session_.isValid() && queue != nullptr) {
+      DASessionSetDispatchQueue(session_.get(), queue);
+      is_scheduled_ = true;
+    }
+  }
+
+  // Unschedule the session (must be called before session is released)
+  void unschedule() {
+    if (is_scheduled_ && session_.isValid()) {
+      DASessionSetDispatchQueue(session_.get(), nullptr);
+      is_scheduled_ = false;
+    }
+  }
+
+  DASessionRef get() const noexcept { return session_.get(); }
+  bool isValid() const noexcept { return session_.isValid(); }
+
+  // Prevent copying
+  DASessionRAII(const DASessionRAII &) = delete;
+  DASessionRAII &operator=(const DASessionRAII &) = delete;
+
+  // Allow moving
+  DASessionRAII(DASessionRAII &&other) noexcept
+      : session_(std::move(other.session_)),
+        is_scheduled_(other.is_scheduled_) {
+    other.is_scheduled_ = false;
+  }
+
+  DASessionRAII &operator=(DASessionRAII &&other) noexcept {
+    if (this != &other) {
+      unschedule();
+      session_ = std::move(other.session_);
+      is_scheduled_ = other.is_scheduled_;
+      other.is_scheduled_ = false;
     }
     return *this;
   }

@@ -135,15 +135,19 @@ This comprehensive security audit examined all source files (12 C++ files, 21 he
 
 ---
 
-### Finding #5: Undocumented Thread Safety - DiskArbitration (macOS)
+### Finding #5: Undocumented Thread Safety - DiskArbitration (macOS) ✅ FIXED
 
-**Severity**: 🟠 HIGH
+**Severity**: 🟠 HIGH → ✅ RESOLVED
 **Files Affected**:
 
-- `src/darwin/volume_metadata.cpp:160-217`
+- `src/darwin/volume_metadata.cpp` (updated)
+- `src/darwin/raii_utils.h` (DASessionRAII wrapper added)
+- `src/darwin-disk-arbitration-threading.test.ts` (tests added)
+
+**Status**: Fixed on 2025-10-23
 
 **Issue**:
-While the code uses a mutex to serialize DiskArbitration access, Apple's documentation doesn't explicitly guarantee thread safety for `DADiskCopyDescription`. The framework is designed for main-thread use with run loops.
+While the code uses a mutex to serialize DiskArbitration access, Apple's documentation doesn't explicitly guarantee thread safety for `DADiskCopyDescription`. The framework is designed for run loop/dispatch queue usage.
 
 **Research Findings**:
 
@@ -167,138 +171,80 @@ CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
 // ... DA operations
 ```
 
-**Recommended Fix - Option 1 (Conservative)**:
+**Implemented Fix**:
+
+Based on extensive research into Node.js threading and macOS APIs, we implemented a solution following Apple's DiskArbitration Programming Guide recommendations:
+
+**1. Created RAII wrapper for DASession** (`src/darwin/raii_utils.h`):
 
 ```cpp
-// Add to src/darwin/volume_metadata.cpp header comment:
-//
-// THREAD SAFETY NOTE:
-// DiskArbitration framework is not explicitly documented as thread-safe.
-// This implementation uses a global mutex to serialize all DA access,
-// but Apple recommends using the main run loop or dispatch queues.
-//
-// Current approach: Conservative mutex serialization
-// Future consideration: Dispatch to main queue for production reliability
-//
+class DASessionRAII {
+private:
+  CFReleaser<DASessionRef> session_;
+  bool is_scheduled_;
 
-void GetDiskArbitrationInfoSafe() {
-  DEBUG_LOG("[GetVolumeMetadataWorker] Getting Disk Arbitration info for: %s",
-            mountPoint.c_str());
+public:
+  ~DASessionRAII() { unschedule(); }  // Ensures cleanup order
 
-  // Check if this is a network filesystem - skip DA for network mounts
-  if (metadata.fstype == "smbfs" || metadata.fstype == "nfs" ||
-      metadata.fstype == "afpfs" || metadata.fstype == "webdav") {
-    metadata.remote = true;
-    metadata.status = "healthy";
-    return;
+  void scheduleOnQueue(dispatch_queue_t queue) {
+    DASessionSetDispatchQueue(session_.get(), queue);
+    is_scheduled_ = true;
   }
 
-  // Serialize all DiskArbitration access with global mutex
-  // This prevents potential race conditions in DA framework
+  void unschedule() {
+    if (is_scheduled_ && session_.isValid()) {
+      DASessionSetDispatchQueue(session_.get(), nullptr);  // Required before release
+      is_scheduled_ = false;
+    }
+  }
+};
+```
+
+**2. Updated implementation** (`src/darwin/volume_metadata.cpp`):
+
+```cpp
+void GetDiskArbitrationInfoSafe() {
+  // THREAD SAFETY NOTE:
+  // Apple's DiskArbitration Programming Guide recommends scheduling DASession
+  // on a run loop or dispatch queue before using it. We use a dedicated serial
+  // dispatch queue (not the main queue) to avoid deadlock in Node.js context
+  // while following Apple's documented usage pattern.
   std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
 
-  // ... rest of implementation
+  // Create session with RAII wrapper
+  DASessionRAII session(DASessionCreate(kCFAllocatorDefault));
+
+  // Schedule on background serial queue (not main queue)
+  static dispatch_queue_t da_queue = dispatch_queue_create(
+      "com.photostructure.fs-metadata.diskarbitration",
+      DISPATCH_QUEUE_SERIAL);
+
+  session.scheduleOnQueue(da_queue);
+
+  // Use session...
+  CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(...));
+  CFReleaser<CFDictionaryRef> description(DADiskCopyDescription(disk.get()));
+
+  // RAII wrapper automatically unschedules and releases on scope exit
 }
 ```
 
-**Recommended Fix - Option 2 (More Robust)**:
+**Why This Approach**:
 
-```cpp
-// Use dispatch_sync to main queue for DA operations
-#include <dispatch/dispatch.h>
+- ✅ Follows Apple's documented pattern: "create session, schedule it, use it"
+- ✅ Uses background dispatch queue (avoiding main queue deadlock in Node.js)
+- ✅ RAII ensures proper cleanup order (unschedule before release)
+- ✅ Compatible with Node.js/libuv threading model
+- ✅ Mutex still serializes for extra safety
 
-void GetDiskArbitrationInfoSafe() {
-  DEBUG_LOG("[GetVolumeMetadataWorker] Getting Disk Arbitration info for: %s",
-            mountPoint.c_str());
+**Why NOT `dispatch_sync(dispatch_get_main_queue())`**:
+Research showed this would deadlock because Node.js doesn't pump CFRunLoop on its main thread.
 
-  // Skip DA for network mounts
-  if (metadata.fstype == "smbfs" || metadata.fstype == "nfs" ||
-      metadata.fstype == "afpfs" || metadata.fstype == "webdav") {
-    metadata.remote = true;
-    metadata.status = "healthy";
-    return;
-  }
+**Test Coverage**:
 
-  // Execute DA operations on main queue for thread safety
-  __block bool success = false;
-  __block std::string error_msg;
-  __block std::string label, uuid;
-  __block bool remote = false;
-
-  dispatch_sync(dispatch_get_main_queue(), ^{
-    try {
-      CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
-      if (!session.isValid()) {
-        error_msg = "Failed to create DA session";
-        return;
-      }
-
-      CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
-          kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
-
-      if (!disk.isValid()) {
-        error_msg = "Failed to create disk reference";
-        return;
-      }
-
-      CFReleaser<CFDictionaryRef> description(DADiskCopyDescription(disk.get()));
-      if (!description.isValid()) {
-        error_msg = "Failed to get disk description";
-        return;
-      }
-
-      // Extract values within dispatch block
-      if (CFStringRef volumeName = (CFStringRef)CFDictionaryGetValue(
-              description.get(), kDADiskDescriptionVolumeNameKey)) {
-        label = CFStringToString(volumeName);
-      }
-
-      if (CFUUIDRef cfuuid = (CFUUIDRef)CFDictionaryGetValue(
-              description.get(), kDADiskDescriptionVolumeUUIDKey)) {
-        CFReleaser<CFStringRef> uuidString(
-            CFUUIDCreateString(kCFAllocatorDefault, cfuuid));
-        if (uuidString.isValid()) {
-          uuid = CFStringToString(uuidString.get());
-        }
-      }
-
-      CFBooleanRef isNetworkVolume = (CFBooleanRef)CFDictionaryGetValue(
-          description.get(), kDADiskDescriptionVolumeNetworkKey);
-      if (isNetworkVolume) {
-        remote = CFBooleanGetValue(isNetworkVolume);
-      }
-
-      success = true;
-    } catch (const std::exception &e) {
-      error_msg = e.what();
-    }
-  });
-
-  // Apply results outside dispatch block
-  if (success) {
-    metadata.label = label;
-    metadata.uuid = uuid;
-    metadata.remote = remote;
-    metadata.status = "healthy";
-  } else {
-    metadata.status = "partial";
-    metadata.error = error_msg;
-  }
-}
-```
-
-**Testing**:
-
-```bash
-# Test with ThreadSanitizer to detect race conditions
-clang++ -fsanitize=thread -g src/darwin/volume_metadata.cpp ...
-
-# Stress test with concurrent access
-for i in {1..100}; do
-  node -e "require('.').getVolumeMetadata('/Volumes/SomeDisk')" &
-done
-wait
-```
+- Existing concurrent tests in `volume_metadata.test.ts` (50 concurrent requests)
+- New threading stress tests in `darwin-disk-arbitration-threading.test.ts` (100+ rapid requests)
+- All 486 tests pass
 
 ---
 

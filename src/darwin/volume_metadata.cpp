@@ -219,17 +219,35 @@ private:
       return;
     }
 
-    // Use a global mutex to serialize DiskArbitration access
+    // THREAD SAFETY NOTE:
+    // Apple's DiskArbitration Programming Guide recommends scheduling DASession
+    // on a run loop or dispatch queue before using it. We use a dedicated
+    // serial dispatch queue (not the main queue) to avoid deadlock in Node.js
+    // context while following Apple's documented usage pattern.
+    //
+    // The mutex serializes DA operations across worker threads for extra
+    // safety.
     std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
 
-    // Create session without scheduling on run loop
-    CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
+    // Create session with RAII wrapper that handles unscheduling before release
+    DASessionRAII session(DASessionCreate(kCFAllocatorDefault));
     if (!session.isValid()) {
       DEBUG_LOG("[GetVolumeMetadataWorker] Failed to create DA session");
       metadata.status = "partial";
       metadata.error = "Failed to create DA session";
       return;
     }
+
+    // Schedule session on a dedicated serial dispatch queue
+    // This follows Apple's documented pattern: create session, schedule it, use
+    // it. We use a background queue (not main queue) to avoid deadlock in
+    // Node.js. The RAII wrapper will automatically unschedule in its
+    // destructor.
+    static dispatch_queue_t da_queue =
+        dispatch_queue_create("com.photostructure.fs-metadata.diskarbitration",
+                              DISPATCH_QUEUE_SERIAL);
+
+    session.scheduleOnQueue(da_queue);
 
     try {
       CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
@@ -239,16 +257,18 @@ private:
         DEBUG_LOG("[GetVolumeMetadataWorker] Failed to create disk reference");
         metadata.status = "partial";
         metadata.error = "Failed to create disk reference";
+        // RAII wrapper will automatically unschedule on function exit
         return;
       }
 
-      // Get disk description without scheduling on run loop
+      // Now safe to call DADiskCopyDescription with properly scheduled session
       CFReleaser<CFDictionaryRef> description(
           DADiskCopyDescription(disk.get()));
       if (!description.isValid()) {
         DEBUG_LOG("[GetVolumeMetadataWorker] Failed to get disk description");
         metadata.status = "partial";
         metadata.error = "Failed to get disk description";
+        // RAII wrapper will automatically unschedule on function exit
         return;
       }
 
@@ -264,6 +284,8 @@ private:
       metadata.status = "error";
       metadata.error = e.what();
     }
+
+    // RAII wrapper automatically unschedules and releases session here
   }
 
   void ProcessDiskDescription(CFDictionaryRef description) {
