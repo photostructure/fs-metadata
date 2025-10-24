@@ -1,8 +1,8 @@
 // src/windows/string.h
 
 #pragma once
-#include "windows_arch.h"
 #include "../common/debug_log.h"
+#include "windows_arch.h"
 #include <climits>
 #include <stdexcept>
 #include <string>
@@ -34,7 +34,8 @@ inline std::string WideToUtf8(const WCHAR *wide) {
   if (size > INT_MAX - 1 || size > MAX_STRING_CONVERSION_SIZE) {
     DEBUG_LOG("[WideToUtf8] Size too large: %d (max: %d)", size,
               MAX_STRING_CONVERSION_SIZE);
-    throw std::runtime_error("String conversion size exceeds reasonable limits");
+    throw std::runtime_error(
+        "String conversion size exceeds reasonable limits");
   }
 
   std::string result(static_cast<size_t>(size - 1), 0);

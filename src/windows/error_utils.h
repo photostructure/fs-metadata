@@ -1,7 +1,7 @@
 // src/windows/error_utils.h
 #pragma once
-#include "windows_arch.h"
 #include "../common/debug_log.h"
+#include "windows_arch.h"
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -70,14 +70,14 @@ private:
 
     if (size == 0 || !messageBuffer) {
       DWORD formatError = GetLastError();
-      DEBUG_LOG(
-          "[FormatWindowsError] FormatMessageA failed for error %lu: "
-          "FormatMessage error=%lu, size=%zu",
-          error, formatError, size);
+      DEBUG_LOG("[FormatWindowsError] FormatMessageA failed for error %lu: "
+                "FormatMessage error=%lu, size=%zu",
+                error, formatError, size);
       return operation + " failed with error code: " + std::to_string(error);
     }
 
-    // Now safe: guard will free messageBuffer even if string construction throws
+    // Now safe: guard will free messageBuffer even if string construction
+    // throws
     std::string errorMessage((LPSTR)messageBuffer, size);
 
     // Trim trailing newlines/carriage returns that Windows adds
