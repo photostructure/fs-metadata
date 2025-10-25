@@ -252,19 +252,21 @@ export async function testIsHiddenSetHiddenNoLeak(): Promise<MemoryTestResult> {
       );
 
       // Test setHidden to true
-      await setHidden(iterationDir, true);
-      const isHiddenAfterSet = await isHidden(iterationDir);
+      // On Linux, setHidden renames the file/dir by adding a dot prefix,
+      // so we need to capture the returned pathname
+      const hiddenPath = (await setHidden(iterationDir, true)).pathname;
+      const isHiddenAfterSet = await isHidden(hiddenPath);
       assert(
         isHiddenAfterSet === true,
-        `Expected ${iterationDir} to be hidden after setHidden(true)`,
+        `Expected ${hiddenPath} to be hidden after setHidden(true)`,
       );
 
       // Test setHidden to false
-      await setHidden(iterationDir, false);
-      const isHiddenAfterUnset = await isHidden(iterationDir);
+      const visiblePath = (await setHidden(hiddenPath, false)).pathname;
+      const isHiddenAfterUnset = await isHidden(visiblePath);
       assert(
         isHiddenAfterUnset === false,
-        `Expected ${iterationDir} to not be hidden after setHidden(false)`,
+        `Expected ${visiblePath} to not be hidden after setHidden(false)`,
       );
     });
 
