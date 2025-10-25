@@ -14,7 +14,13 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## [0.6.0] - 2025-06-09
+## 0.7.0 - 2025-10-24
+
+- Audit and address [several resource handling issues](./doc/SECURITY_AUDIT_2025.md)
+- Added support for Node.js v25
+- Updated dev dependencies
+
+## 0.6.0 - 2025-06-09
 
 ### Added
 
