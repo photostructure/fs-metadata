@@ -4,6 +4,7 @@
 #include "../common/debug_log.h"
 #include "windows_arch.h"
 #include <climits>
+#include <pathcch.h>
 #include <stdexcept>
 #include <string>
 
