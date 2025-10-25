@@ -52,6 +52,8 @@ try {
   );
   const args = ["--expose-gc", "--no-warnings", "-r", "tsx/cjs", runnerPath];
 
+  console.log(`Executing: ${nodeExe} ${args.join(" ")}`);
+
   execFileSync(nodeExe, args, {
     stdio: "inherit",
     env: {
@@ -61,9 +63,17 @@ try {
   console.log(color(colors.GREEN, "✓ JavaScript memory tests passed"));
 } catch (error: any) {
   console.log(color(colors.RED, "✗ JavaScript memory tests failed"));
-  if (error.message) {
-    console.error("Error:", error.message);
+  // Print full error details to help diagnose CI issues
+  console.error("Error details:");
+  console.error("  Message:", error.message);
+  if (error.stderr) {
+    console.error("  Stderr:", error.stderr.toString());
   }
+  if (error.stdout) {
+    console.error("  Stdout:", error.stdout.toString());
+  }
+  console.error("  Status:", error.status);
+  console.error("  Signal:", error.signal);
   exitCode = 1;
 }
 
