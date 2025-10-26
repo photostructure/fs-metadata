@@ -66,11 +66,6 @@
     "release": "release-it"
   },
   "release-it": {
-    "hooks": {
-      "before:init": [
-        "npm run lint"
-      ]
-    },
     "git": {
       "requireBranch": "main",
       "commitMessage": "release: ${version}",
