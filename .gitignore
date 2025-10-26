@@ -42,7 +42,6 @@ compile_commands*.json
 ehthumbs.db
 Thumbs.db
 
-# Config files written during publishing
-.npmrc
+# Temporary files from testing
 asan-output.log
 asan-out.txt

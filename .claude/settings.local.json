@@ -90,7 +90,9 @@
       "Read(//usr/include/glib-2.0/**)",
       "Read(//usr/include/**)",
       "WebFetch(domain:man7.org)",
-      "Bash(Select-String -Pattern \"(Error|FAIL|fatal|throw)\" -Context 3)"
+      "Bash(Select-String -Pattern \"(Error|FAIL|fatal|throw)\" -Context 3)",
+      "Bash(Select-String -Pattern \"(failure|success)\")",
+      "Bash(gh run rerun:*)"
     ],
     "deny": []
   },
