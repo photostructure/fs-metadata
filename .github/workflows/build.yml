@@ -73,8 +73,9 @@ jobs:
       # Run linting - the scripts handle platform differences
       - run: npm run lint
 
+  # This goes away in Fall 2027: https://github.blog/changelog/2025-09-19-github-actions-macos-13-runner-image-is-closing-down/#notice-of-macos-x86_64-intel-architecture-deprecation
   prebuild-mac-x64:
-    runs-on: macos-13-large # Intel x64 runner
+    runs-on: macos-15-intel # Intel x64 runner
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
@@ -87,9 +88,10 @@ jobs:
       - run: npm run build:native
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: prebuilds-macos-13-large
+          name: prebuilds-macos-15-intel
           path: prebuilds/
 
+  # macos-13 goes away November 2025: https://github.blog/changelog/2025-09-19-github-actions-macos-13-runner-image-is-closing-down
   prebuild-mac-arm64:
     runs-on: macos-14 # Apple Silicon ARM64 runner (default for macos-14)
     steps:
@@ -189,7 +191,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [20, 22, 24, 25]
-    runs-on: macos-13-large # Intel x64 runner
+    runs-on: macos-15-intel # Intel x64 runner
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
@@ -327,7 +329,8 @@ jobs:
         lint,
       ]
     permissions:
-      contents: write
+      id-token: write # Required for OIDC trusted publishing to npm
+      contents: write # Required for release-it to create tags/commits
       packages: write
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -340,6 +343,7 @@ jobs:
           path: ./prebuilds
           merge-multiple: true
 
+      # setup-node with registry-url is required for OIDC trusted publishing
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: lts/*
@@ -358,37 +362,7 @@ jobs:
 
       - run: npm run prepare-release
 
-      - name: Version and tag release
-        run: |
-          # Handle version bump based on input
-          if [ "${{ github.event.inputs.version }}" = "current" ]; then
-            # Use the version from package.json, stripping any pre-release suffix
-            RELEASE_VERSION=$(node -p "require('./package.json').version.replace(/-.*$/, '')")
-            npm version $RELEASE_VERSION --message "release: %s"
-          else
-            # Normal version bump (patch, minor, major)
-            npm version ${{ github.event.inputs.version }} --message "release: %s"
-          fi
-
-          # Get the new version for later use
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          # https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#environment-files
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish
-
-      - name: Create GitHub Release
+      - name: Release with release-it
+        run: npm run release -- --ci ${{ github.event.inputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Push the version commit and tag
-          git push origin main --follow-tags
-
-          # Create GitHub release
-          gh release create "v$NEW_VERSION" \
-            --title "Release v$NEW_VERSION" \
-            --generate-notes \
-            --verify-tag
