@@ -92,9 +92,13 @@
       "WebFetch(domain:man7.org)",
       "Bash(Select-String -Pattern \"(Error|FAIL|fatal|throw)\" -Context 3)",
       "Bash(Select-String -Pattern \"(failure|success)\")",
-      "Bash(gh run rerun:*)"
+      "Bash(gh run rerun:*)",
+      "WebFetch(domain:docs.npmjs.com)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "/home/mrm/src/exiftool-vendored.js"
+    ]
   },
   "enableAllProjectMcpServers": false
 }

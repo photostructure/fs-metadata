@@ -358,6 +358,9 @@ jobs:
 
       - run: ls -laR ./prebuilds
 
+      # Upgrade npm to support OIDC trusted publishing (requires npm >= 11.5.1)
+      - run: npm install -g npm@latest
+
       - run: npm ci
 
       - run: npm run prepare-release
