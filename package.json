@@ -70,8 +70,8 @@
       "requireBranch": "main",
       "commitMessage": "release: ${version}",
       "tagName": "v${version}",
-      "commitArgs": "-S",
-      "tagArgs": "-S"
+      "commitArgs": "--gpg-sign",
+      "tagArgs": "--sign"
     },
     "github": {
       "release": true
