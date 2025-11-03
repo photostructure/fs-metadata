@@ -96,9 +96,7 @@
       "WebFetch(domain:docs.npmjs.com)"
     ],
     "deny": [],
-    "additionalDirectories": [
-      "/home/mrm/src/exiftool-vendored.js"
-    ]
+    "additionalDirectories": ["/home/mrm/src/exiftool-vendored.js"]
   },
   "enableAllProjectMcpServers": false
 }
