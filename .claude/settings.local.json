@@ -93,7 +93,11 @@
       "Bash(Select-String -Pattern \"(Error|FAIL|fatal|throw)\" -Context 3)",
       "Bash(Select-String -Pattern \"(failure|success)\")",
       "Bash(gh run rerun:*)",
-      "WebFetch(domain:docs.npmjs.com)"
+      "WebFetch(domain:docs.npmjs.com)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(npx ncu)",
+      "WebFetch(domain:typescript-eslint.io)"
     ],
     "deny": [],
     "additionalDirectories": ["/home/mrm/src/exiftool-vendored.js"]
