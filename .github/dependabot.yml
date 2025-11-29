@@ -10,9 +10,25 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Limit concurrent PRs to reduce review burden
+    open-pull-requests-limit: 5
 
   # Maintain dependencies for npm
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    # Limit concurrent PRs
+    open-pull-requests-limit: 10
+    # Group minor/patch updates to reduce noise
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
