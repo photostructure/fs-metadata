@@ -6,6 +6,21 @@ For major changes, please open an issue first to discuss what you would like to 
 
 Please make sure to update tests and documentation as appropriate.
 
+## Development Setup
+
+This repository uses `ignore-scripts=true` in `.npmrc` as a security measure against [supply chain attacks](https://www.nodejs-security.com/blog/npm-ignore-scripts-best-practices-as-security-mitigation-for-malicious-packages). Since this is a native module, you need to explicitly enable scripts for the initial build:
+
+```bash
+# Clone the repository
+git clone https://github.com/photostructure/fs-metadata.git
+cd fs-metadata
+
+# Install with scripts enabled (required for native module build)
+npm install --ignore-scripts=false
+
+# Subsequent installs of new dependencies will have scripts disabled by default
+```
+
 ## Building from Source
 
 ### On Windows
