@@ -2,20 +2,23 @@
 // Thread-safe implementation with DiskArbitration mutex synchronization
 
 #include "../common/debug_log.h"
+#include "../common/fd_guard.h"
+#include "../common/path_security.h"
+#include "../common/volume_utils.h"
 #include "./fs_meta.h"
-#include "./path_security.h"
 #include "./raii_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
-#include <fcntl.h> // For open(), O_RDONLY, O_DIRECTORY
+#include <cstring> // For strlen()
+#include <fcntl.h> // For open(), O_RDONLY, O_DIRECTORY, O_CLOEXEC
 #include <memory>
 #include <mutex>
 #include <string>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/statvfs.h>
-#include <unistd.h> // For close()
+#include <unistd.h>
 
 namespace FSMeta {
 
@@ -55,17 +58,9 @@ static std::string CFStringToString(CFStringRef cfString) {
     return "";
   }
 
-  // Find actual string length by looking for null terminator
-  // This is safer than using strlen which could read past buffer
-  size_t actualLength = 0;
-  for (size_t i = 0; i < static_cast<size_t>(maxSize); ++i) {
-    if (result[i] == '\0') {
-      actualLength = i;
-      break;
-    }
-  }
-
-  result.resize(actualLength);
+  // CFStringGetCString guarantees null termination on success, so strlen is
+  // safe here. The buffer was sized with GetMaximumSizeForEncoding + 1.
+  result.resize(strlen(result.c_str()));
   return result;
 }
 
@@ -122,7 +117,8 @@ private:
     // Use file descriptors to prevent TOCTOU race conditions
     // Open the mount point directory with O_DIRECTORY to ensure it's a
     // directory
-    int fd = open(mountPoint.c_str(), O_RDONLY | O_DIRECTORY);
+    // O_CLOEXEC: Prevent fd leak to child processes on fork/exec
+    int fd = open(mountPoint.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (fd < 0) {
       int error = errno;
       DEBUG_LOG("[GetVolumeMetadataWorker] open failed: %s (%d)",
@@ -132,14 +128,7 @@ private:
     }
 
     // RAII wrapper for file descriptor to ensure it's always closed
-    struct FdGuard {
-      int fd;
-      ~FdGuard() {
-        if (fd >= 0) {
-          close(fd);
-        }
-      }
-    } fd_guard{fd};
+    FdGuard fd_guard(fd);
 
     struct statvfs vfs;
     struct statfs fs;
@@ -172,19 +161,17 @@ private:
     const uint64_t freeBlocks = static_cast<uint64_t>(vfs.f_bfree);
 
     // Check for overflow before multiplication
-    if (blockSize > 0) {
-      if (totalBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
-        SetError("Total volume size calculation would overflow");
-        return false;
-      }
-      if (availBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
-        SetError("Available space calculation would overflow");
-        return false;
-      }
-      if (freeBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
-        SetError("Free space calculation would overflow");
-        return false;
-      }
+    if (WouldOverflow(blockSize, totalBlocks)) {
+      SetError("Total volume size calculation would overflow");
+      return false;
+    }
+    if (WouldOverflow(blockSize, availBlocks)) {
+      SetError("Available space calculation would overflow");
+      return false;
+    }
+    if (WouldOverflow(blockSize, freeBlocks)) {
+      SetError("Free space calculation would overflow");
+      return false;
     }
 
     const uint64_t totalSize = blockSize * totalBlocks;
@@ -243,6 +230,12 @@ private:
     // it. We use a background queue (not main queue) to avoid deadlock in
     // Node.js. The RAII wrapper will automatically unschedule in its
     // destructor.
+    //
+    // NOTE: This static dispatch queue is intentionally never released.
+    // It's a singleton that lives for the process lifetime. The queue is
+    // lightweight (just a reference to GCD's internal structures), and
+    // releasing it on module unload could race with in-flight operations.
+    // This pattern is standard for long-lived queues in macOS applications.
     static dispatch_queue_t da_queue =
         dispatch_queue_create("com.photostructure.fs-metadata.diskarbitration",
                               DISPATCH_QUEUE_SERIAL);
@@ -327,14 +320,15 @@ private:
     CFURLRef url = (CFURLRef)CFDictionaryGetValue(
         description, kDADiskDescriptionVolumePathKey);
     if (!url) {
-      metadata.error = "Invalid URL";
+      metadata.status = "partial";
+      metadata.error = "Volume path not available in disk description";
       return;
     }
     CFReleaser<CFStringRef> urlString(
         CFURLCopyFileSystemPath(url, kCFURLPOSIXPathStyle));
     if (!urlString.isValid()) {
-      metadata.error = std::string("Invalid URL string: ") +
-                       CFStringToString(urlString.get());
+      metadata.status = "partial";
+      metadata.error = "Failed to get filesystem path from volume URL";
       return;
     }
 

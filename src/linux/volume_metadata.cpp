@@ -2,12 +2,14 @@
 #include "../common/volume_metadata.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
+#include "../common/fd_guard.h"
 #include "../common/metadata_worker.h"
+#include "../common/volume_utils.h"
 #include "blkid_cache.h"
 #include <fcntl.h> // for open(), O_DIRECTORY, O_RDONLY, O_CLOEXEC
 #include <memory>
 #include <sys/statvfs.h>
-#include <unistd.h> // for close()
+#include <unistd.h>
 
 #ifdef ENABLE_GIO
 #include "gio_volume_metadata.h"
@@ -54,14 +56,7 @@ public:
       }
 
       // RAII guard to ensure file descriptor is always closed
-      struct FdGuard {
-        int fd;
-        ~FdGuard() {
-          if (fd >= 0) {
-            close(fd);
-          }
-        }
-      } fd_guard{fd};
+      FdGuard fd_guard(fd);
 
       // Use fstatvfs on the file descriptor instead of statvfs on the path
       // The fd holds a reference to the filesystem, preventing TOCTOU issues
@@ -83,16 +78,14 @@ public:
       const uint64_t freeBlocks = static_cast<uint64_t>(vfs.f_bfree);
 
       // Check for overflow before multiplication
-      if (blockSize > 0) {
-        if (totalBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
-          throw FSException("Total volume size calculation would overflow");
-        }
-        if (availBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
-          throw FSException("Available space calculation would overflow");
-        }
-        if (freeBlocks > std::numeric_limits<uint64_t>::max() / blockSize) {
-          throw FSException("Free space calculation would overflow");
-        }
+      if (WouldOverflow(blockSize, totalBlocks)) {
+        throw FSException("Total volume size calculation would overflow");
+      }
+      if (WouldOverflow(blockSize, availBlocks)) {
+        throw FSException("Available space calculation would overflow");
+      }
+      if (WouldOverflow(blockSize, freeBlocks)) {
+        throw FSException("Free space calculation would overflow");
       }
 
       metadata.remote = false;
