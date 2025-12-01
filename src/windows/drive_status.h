@@ -4,13 +4,9 @@
 #include "security_utils.h"
 #include "thread_pool.h"
 #include "windows_arch.h"
-#include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <future>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace FSMeta {
@@ -83,7 +79,10 @@ private:
     searchPath += "*";
 
     WIN32_FIND_DATAA findData;
-    HandleGuard findHandle(FindFirstFileExA(
+    // Use FindHandleGuard - search handles MUST be closed with FindClose,
+    // not CloseHandle. See:
+    // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findclose
+    FindHandleGuard findHandle(FindFirstFileExA(
         searchPath.c_str(), FindExInfoBasic, &findData, FindExSearchNameMatch,
         nullptr,
         FIND_FIRST_EX_LARGE_FETCH | FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY));
@@ -96,69 +95,77 @@ private:
     }
 
     // Successfully opened - drive is healthy
-    FindClose(findHandle.release());
+    // FindHandleGuard destructor will call FindClose automatically
     DEBUG_LOG("[DriveStatusChecker] Drive %s is healthy", path.c_str());
     return DriveStatus::Healthy;
   }
 
 public:
-  static std::future<DriveStatus> CheckDriveAsync(const std::string &path,
-                                                  DWORD timeoutMs = 5000) {
+  // Submit a drive check to the thread pool and return a future.
+  // The caller is responsible for enforcing timeout via future.wait_for().
+  // This design avoids detached threads and race conditions.
+  static std::future<DriveStatus> CheckDriveAsync(const std::string &path) {
     auto promise = std::make_shared<std::promise<DriveStatus>>();
     auto future = promise->get_future();
 
-    // Use a shared state for timeout handling
-    auto state = std::make_shared<std::atomic<bool>>(false);
-
-    GetGlobalThreadPool().Submit([path, promise, state, timeoutMs]() {
-      // Set up timeout
-      auto startTime = std::chrono::steady_clock::now();
-
-      // Perform the check
-      DriveStatus status = CheckDriveInternal(path);
-
-      // Check if we've timed out
-      auto elapsed = std::chrono::steady_clock::now() - startTime;
-      if (elapsed > std::chrono::milliseconds(timeoutMs)) {
-        status = DriveStatus::Timeout;
-      }
-
-      // Only set the promise if we haven't been cancelled
-      if (!state->load()) {
+    GetGlobalThreadPool().Submit([path, promise]() {
+      try {
+        DriveStatus status = CheckDriveInternal(path);
         promise->set_value(status);
+      } catch (const std::exception &e) {
+        DEBUG_LOG("[DriveStatusChecker] Exception in CheckDriveInternal: %s",
+                  e.what());
+        // Set exception instead of value so caller can handle it
+        try {
+          promise->set_exception(std::current_exception());
+        } catch (...) {
+          // Promise may have been abandoned if caller timed out
+        }
+      } catch (...) {
+        DEBUG_LOG("[DriveStatusChecker] Unknown exception in CheckDriveInternal");
+        try {
+          promise->set_exception(std::current_exception());
+        } catch (...) {
+          // Promise may have been abandoned if caller timed out
+        }
       }
     });
 
-    // Handle timeout in the caller
-    if (timeoutMs != INFINITE) {
-      std::thread([promise, state, timeoutMs]() {
-        std::this_thread::sleep_for(std::chrono::milliseconds(timeoutMs));
-        if (!state->exchange(true)) {
-          try {
-            promise->set_value(DriveStatus::Timeout);
-          } catch (...) {
-            // Promise already satisfied
-          }
-        }
-      }).detach();
-    }
-
     return future;
+  }
+
+  // Overload that accepts timeoutMs for API compatibility (timeout is enforced
+  // in CheckDrive, not here)
+  static std::future<DriveStatus> CheckDriveAsync(const std::string &path,
+                                                  DWORD /*timeoutMs*/) {
+    return CheckDriveAsync(path);
   }
 
   static DriveStatus CheckDrive(const std::string &path,
                                 DWORD timeoutMs = 5000) {
     try {
-      auto future = CheckDriveAsync(path, timeoutMs);
+      auto future = CheckDriveAsync(path);
 
-      if (future.wait_for(std::chrono::milliseconds(timeoutMs)) ==
-          std::future_status::timeout) {
+      // Use wait_for to enforce timeout - no detached threads needed!
+      // The worker thread continues running but we return Timeout to caller.
+      // The promise will eventually be satisfied (or abandoned).
+      auto waitResult =
+          future.wait_for(std::chrono::milliseconds(timeoutMs));
+
+      if (waitResult == std::future_status::timeout) {
+        DEBUG_LOG("[DriveStatusChecker] Timeout waiting for drive %s",
+                  path.c_str());
         return DriveStatus::Timeout;
       }
 
+      // Future is ready - get the result (may throw if worker set exception)
       return future.get();
+    } catch (const std::exception &e) {
+      DEBUG_LOG("[DriveStatusChecker] Exception checking drive %s: %s",
+                path.c_str(), e.what());
+      return DriveStatus::Unknown;
     } catch (...) {
-      DEBUG_LOG("[DriveStatusChecker] Exception checking drive %s",
+      DEBUG_LOG("[DriveStatusChecker] Unknown exception checking drive %s",
                 path.c_str());
       return DriveStatus::Unknown;
     }
@@ -172,24 +179,42 @@ public:
     futures.reserve(paths.size());
 
     // Launch all checks concurrently
+    auto startTime = std::chrono::steady_clock::now();
     for (const auto &path : paths) {
-      futures.push_back(CheckDriveAsync(path, timeoutMs));
+      futures.push_back(CheckDriveAsync(path));
     }
 
-    // Collect results
+    // Collect results with timeout
     std::vector<DriveStatus> results;
     results.reserve(paths.size());
 
     for (size_t i = 0; i < futures.size(); ++i) {
       try {
-        if (futures[i].wait_for(std::chrono::milliseconds(timeoutMs)) ==
-            std::future_status::timeout) {
+        // Calculate remaining time for this future
+        auto elapsed = std::chrono::steady_clock::now() - startTime;
+        auto elapsedMs =
+            std::chrono::duration_cast<std::chrono::milliseconds>(elapsed)
+                .count();
+        auto remainingMs =
+            (elapsedMs < static_cast<long long>(timeoutMs))
+                ? static_cast<DWORD>(timeoutMs - elapsedMs)
+                : 0;
+
+        if (remainingMs == 0 ||
+            futures[i].wait_for(std::chrono::milliseconds(remainingMs)) ==
+                std::future_status::timeout) {
+          DEBUG_LOG("[DriveStatusChecker] Timeout waiting for drive %s",
+                    paths[i].c_str());
           results.push_back(DriveStatus::Timeout);
         } else {
           results.push_back(futures[i].get());
         }
+      } catch (const std::exception &e) {
+        DEBUG_LOG("[DriveStatusChecker] Exception getting result for drive %s: %s",
+                  paths[i].c_str(), e.what());
+        results.push_back(DriveStatus::Unknown);
       } catch (...) {
-        DEBUG_LOG("[DriveStatusChecker] Exception getting result for drive %s",
+        DEBUG_LOG("[DriveStatusChecker] Unknown exception for drive %s",
                   paths[i].c_str());
         results.push_back(DriveStatus::Unknown);
       }
