@@ -28,6 +28,10 @@ Security in case of vulnerabilities.
 - Added `noexcept` to all RAII destructors to prevent `std::terminate` during stack unwinding
 - Fixed `g_volume_monitor_get()` memory leak in Linux GIO metadata enrichment
 - Fixed exception safety in Linux GIO metadata loop using RAII smart pointers
+- Fixed Windows `FindFirstFileEx` handle leak by using `FindClose` instead of `CloseHandle`
+- Fixed Windows promise race condition and resource leak from detached timeout threads
+- Added `CreateEvent` error checking in Windows thread pool
+- Zero-initialized `VolumeInfo` and `DiskSpaceInfo` members to prevent undefined behavior on `ERROR_NOT_READY`
 
 ### Changed
 
