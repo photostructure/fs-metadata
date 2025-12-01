@@ -56,11 +56,8 @@ public:
   // This is safe to call from worker threads
   static void forEachMount(const MountCallback &callback);
 
-  // OPTIONAL: Try to get GVolumeMonitor for metadata enrichment
-  // Returns nullptr if unavailable (that's OK, not required)
-  // WARNING: Violates thread-safety when called from worker threads
-  // Only use for best-effort enrichment
-  static GVolumeMonitor *tryGetMonitor() noexcept;
+  // NOTE: tryGetMonitor() has been removed because GVolumeMonitor is NOT
+  // thread-safe. See: https://docs.gtk.org/gio/class.VolumeMonitor.html
 };
 
 // Note: GioResource<T> has been removed in favor of GObjectPtr<T> above,

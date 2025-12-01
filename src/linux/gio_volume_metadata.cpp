@@ -49,92 +49,22 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
       }
     }
 
-    // OPTIONAL ENHANCEMENT: Try to get rich metadata from GVolumeMonitor
-    // This may fail (thread safety violation), but that's OK - we have basic
-    // data
-    try {
-      GVolumeMonitor *raw_monitor = MountIterator::tryGetMonitor();
-      if (raw_monitor) {
-        // IMPORTANT: g_volume_monitor_get() returns an owned reference that
-        // MUST be unreffed. See:
-        // https://docs.gtk.org/gio/type_func.VolumeMonitor.get.html
-        // "The caller takes ownership and is responsible for freeing it."
-        GVolumeMonitorPtr monitor(raw_monitor);
-
-        DEBUG_LOG(
-            "[gio::addMountMetadata] attempting GVolumeMonitor enrichment");
-
-        // Try to find matching GMount for this path
-        GList *mounts = g_volume_monitor_get_mounts(monitor.get());
-        if (mounts) {
-          for (GList *l = mounts; l != nullptr; l = l->next) {
-            GMount *mount = G_MOUNT(l->data);
-            if (!mount || !G_IS_MOUNT(mount)) {
-              continue;
-            }
-
-            // Use RAII wrappers for exception safety - if std::string
-            // assignment throws std::bad_alloc, resources are still cleaned up
-            GFilePtr root(g_mount_get_root(mount));
-            if (root) {
-              GCharPtr path(g_file_get_path(root.get()));
-              if (path && mountPoint == path.get()) {
-                // Found matching mount - try to get rich metadata
-
-                // Try to get volume label
-                if (metadata.label.empty()) {
-                  GVolumePtr volume(g_mount_get_volume(mount));
-                  if (volume) {
-                    GCharPtr label(g_volume_get_name(volume.get()));
-                    if (label) {
-                      DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, "
-                                "label: %s} (from GVolume)",
-                                path.get(), label.get());
-                      metadata.label = label.get();
-                    }
-                  }
-                }
-
-                // Try to get mount name
-                if (metadata.mountName.empty()) {
-                  GCharPtr mount_name(g_mount_get_name(mount));
-                  if (mount_name) {
-                    metadata.mountName = mount_name.get();
-                  }
-                }
-
-                // Try to get URI
-                if (metadata.uri.empty()) {
-                  GFilePtr location(g_mount_get_default_location(mount));
-                  if (location) {
-                    GCharPtr uri(g_file_get_uri(location.get()));
-                    if (uri) {
-                      DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, uri: "
-                                "%s} (from GMount)",
-                                path.get(), uri.get());
-                      metadata.uri = uri.get();
-                    }
-                  }
-                }
-
-                break; // Found our mount, RAII handles cleanup
-              }
-              // path and root cleaned up by RAII
-            }
-          }
-
-          // Clean up mounts list - each GMount in the list must be unreffed
-          g_list_free_full(mounts,
-                           reinterpret_cast<GDestroyNotify>(g_object_unref));
-        }
-        // monitor cleaned up by GVolumeMonitorPtr destructor
-      }
-    } catch (const std::exception &e) {
-      DEBUG_LOG("[gio::addMountMetadata] GVolumeMonitor enrichment failed "
-                "(expected, not critical): %s",
-                e.what());
-      // Ignore - we have basic metadata from Unix mount API
-    }
+    // NOTE: GVolumeMonitor enrichment has been removed.
+    //
+    // According to GIO documentation:
+    // https://docs.gtk.org/gio/class.VolumeMonitor.html
+    // "GVolumeMonitor is not thread-default-context aware and so should not
+    // be used other than from the main thread, with no thread-default-context
+    // active."
+    //
+    // This function is called from Napi::AsyncWorker::Execute() which runs
+    // on a worker thread. Using GVolumeMonitor here causes race conditions
+    // leading to GLib-GObject-CRITICAL errors like:
+    //   "g_object_ref: assertion '!object_already_finalized' failed"
+    //
+    // The basic metadata (fstype, mountFrom) from g_unix_mounts_get() is
+    // sufficient and thread-safe. Rich metadata (label, mountName, uri) can
+    // be obtained from blkid or other thread-safe sources.
 
     return false; // Stop iteration, we found our mount
   });

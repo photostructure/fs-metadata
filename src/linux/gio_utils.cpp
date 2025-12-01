@@ -101,29 +101,13 @@ void MountIterator::forEachMount(const MountCallback &callback) {
   DEBUG_LOG("[gio::MountIterator::forEachMount] completed");
 }
 
-// OPTIONAL: Try to get GVolumeMonitor (may fail, that's OK)
-// This is best-effort enrichment and should NOT be required for basic operation
-GVolumeMonitor *MountIterator::tryGetMonitor() noexcept {
-  try {
-    // NOTE: This violates GVolumeMonitor thread-safety requirements when
-    // called from worker threads. We use it only for optional metadata
-    // enrichment. The primary path uses thread-safe g_unix_mounts_get().
-    //
-    // Future work: Consider removing this entirely or moving enrichment
-    // to main thread if needed.
-    GVolumeMonitor *monitor = g_volume_monitor_get();
-    if (!monitor) {
-      DEBUG_LOG("[gio::tryGetMonitor] g_volume_monitor_get() returned null");
-    }
-    return monitor; // May be null, caller must check
-  } catch (const std::exception &e) {
-    DEBUG_LOG("[gio::tryGetMonitor] Exception: %s", e.what());
-    return nullptr;
-  } catch (...) {
-    DEBUG_LOG("[gio::tryGetMonitor] Unknown exception");
-    return nullptr;
-  }
-}
+// NOTE: tryGetMonitor() has been removed.
+//
+// GVolumeMonitor is NOT thread-safe and must only be used from the main thread.
+// See: https://docs.gtk.org/gio/class.VolumeMonitor.html
+//
+// Since all our code runs on Napi::AsyncWorker threads, using GVolumeMonitor
+// causes race conditions leading to GLib-GObject-CRITICAL errors.
 
 } // namespace gio
 } // namespace FSMeta
