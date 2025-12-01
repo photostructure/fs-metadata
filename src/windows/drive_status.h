@@ -122,7 +122,8 @@ public:
           // Promise may have been abandoned if caller timed out
         }
       } catch (...) {
-        DEBUG_LOG("[DriveStatusChecker] Unknown exception in CheckDriveInternal");
+        DEBUG_LOG(
+            "[DriveStatusChecker] Unknown exception in CheckDriveInternal");
         try {
           promise->set_exception(std::current_exception());
         } catch (...) {
@@ -149,8 +150,7 @@ public:
       // Use wait_for to enforce timeout - no detached threads needed!
       // The worker thread continues running but we return Timeout to caller.
       // The promise will eventually be satisfied (or abandoned).
-      auto waitResult =
-          future.wait_for(std::chrono::milliseconds(timeoutMs));
+      auto waitResult = future.wait_for(std::chrono::milliseconds(timeoutMs));
 
       if (waitResult == std::future_status::timeout) {
         DEBUG_LOG("[DriveStatusChecker] Timeout waiting for drive %s",
@@ -195,10 +195,9 @@ public:
         auto elapsedMs =
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed)
                 .count();
-        auto remainingMs =
-            (elapsedMs < static_cast<long long>(timeoutMs))
-                ? static_cast<DWORD>(timeoutMs - elapsedMs)
-                : 0;
+        auto remainingMs = (elapsedMs < static_cast<long long>(timeoutMs))
+                               ? static_cast<DWORD>(timeoutMs - elapsedMs)
+                               : 0;
 
         if (remainingMs == 0 ||
             futures[i].wait_for(std::chrono::milliseconds(remainingMs)) ==
@@ -210,8 +209,9 @@ public:
           results.push_back(futures[i].get());
         }
       } catch (const std::exception &e) {
-        DEBUG_LOG("[DriveStatusChecker] Exception getting result for drive %s: %s",
-                  paths[i].c_str(), e.what());
+        DEBUG_LOG(
+            "[DriveStatusChecker] Exception getting result for drive %s: %s",
+            paths[i].c_str(), e.what());
         results.push_back(DriveStatus::Unknown);
       } catch (...) {
         DEBUG_LOG("[DriveStatusChecker] Unknown exception for drive %s",

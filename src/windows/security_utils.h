@@ -216,7 +216,8 @@ public:
 
 // RAII wrapper for search handles from FindFirstFile/FindFirstFileEx
 // These handles MUST be closed with FindClose, not CloseHandle.
-// See: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findclose
+// See:
+// https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findclose
 class FindHandleGuard {
   HANDLE handle;
 
