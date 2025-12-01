@@ -53,13 +53,19 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
     // This may fail (thread safety violation), but that's OK - we have basic
     // data
     try {
-      GVolumeMonitor *monitor = MountIterator::tryGetMonitor();
-      if (monitor) {
+      GVolumeMonitor *raw_monitor = MountIterator::tryGetMonitor();
+      if (raw_monitor) {
+        // IMPORTANT: g_volume_monitor_get() returns an owned reference that
+        // MUST be unreffed. See:
+        // https://docs.gtk.org/gio/type_func.VolumeMonitor.get.html
+        // "The caller takes ownership and is responsible for freeing it."
+        GVolumeMonitorPtr monitor(raw_monitor);
+
         DEBUG_LOG(
             "[gio::addMountMetadata] attempting GVolumeMonitor enrichment");
 
         // Try to find matching GMount for this path
-        GList *mounts = g_volume_monitor_get_mounts(monitor);
+        GList *mounts = g_volume_monitor_get_mounts(monitor.get());
         if (mounts) {
           for (GList *l = mounts; l != nullptr; l = l->next) {
             GMount *mount = G_MOUNT(l->data);
@@ -67,69 +73,61 @@ void addMountMetadata(const std::string &mountPoint, VolumeMetadata &metadata) {
               continue;
             }
 
-            GFile *root = g_mount_get_root(mount);
+            // Use RAII wrappers for exception safety - if std::string
+            // assignment throws std::bad_alloc, resources are still cleaned up
+            GFilePtr root(g_mount_get_root(mount));
             if (root) {
-              char *path = g_file_get_path(root);
-              if (path && mountPoint == path) {
+              GCharPtr path(g_file_get_path(root.get()));
+              if (path && mountPoint == path.get()) {
                 // Found matching mount - try to get rich metadata
 
                 // Try to get volume label
                 if (metadata.label.empty()) {
-                  GVolume *volume = g_mount_get_volume(mount);
+                  GVolumePtr volume(g_mount_get_volume(mount));
                   if (volume) {
-                    char *label = g_volume_get_name(volume);
+                    GCharPtr label(g_volume_get_name(volume.get()));
                     if (label) {
                       DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, "
                                 "label: %s} (from GVolume)",
-                                path, label);
-                      metadata.label = label;
-                      g_free(label);
+                                path.get(), label.get());
+                      metadata.label = label.get();
                     }
-                    g_object_unref(volume);
                   }
                 }
 
                 // Try to get mount name
                 if (metadata.mountName.empty()) {
-                  char *mount_name = g_mount_get_name(mount);
+                  GCharPtr mount_name(g_mount_get_name(mount));
                   if (mount_name) {
-                    metadata.mountName = mount_name;
-                    g_free(mount_name);
+                    metadata.mountName = mount_name.get();
                   }
                 }
 
                 // Try to get URI
                 if (metadata.uri.empty()) {
-                  GFile *location = g_mount_get_default_location(mount);
+                  GFilePtr location(g_mount_get_default_location(mount));
                   if (location) {
-                    char *uri = g_file_get_uri(location);
+                    GCharPtr uri(g_file_get_uri(location.get()));
                     if (uri) {
                       DEBUG_LOG("[gio::addMountMetadata] {mountPoint: %s, uri: "
                                 "%s} (from GMount)",
-                                path, uri);
-                      metadata.uri = uri;
-                      g_free(uri);
+                                path.get(), uri.get());
+                      metadata.uri = uri.get();
                     }
-                    g_object_unref(location);
                   }
                 }
 
-                g_free(path);
-                g_object_unref(root);
-                break; // Found our mount
+                break; // Found our mount, RAII handles cleanup
               }
-              if (path)
-                g_free(path);
-              g_object_unref(root);
+              // path and root cleaned up by RAII
             }
           }
 
-          // Clean up mounts list - this time correctly without double-free
+          // Clean up mounts list - each GMount in the list must be unreffed
           g_list_free_full(mounts,
                            reinterpret_cast<GDestroyNotify>(g_object_unref));
         }
-
-        // Note: Don't unref monitor - it's a singleton
+        // monitor cleaned up by GVolumeMonitorPtr destructor
       }
     } catch (const std::exception &e) {
       DEBUG_LOG("[gio::addMountMetadata] GVolumeMonitor enrichment failed "

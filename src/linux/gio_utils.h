@@ -18,7 +18,8 @@ template <typename T> struct GObjectDeleter {
   }
 };
 
-// Custom deleter for g_free
+// Custom deleter for g_free (used for strings from GIO APIs like
+// g_file_get_path)
 struct GFreeDeleter {
   void operator()(void *ptr) const {
     if (ptr) {
@@ -27,18 +28,18 @@ struct GFreeDeleter {
   }
 };
 
-// Add this before any existing smart pointer definitions
-struct GFileInfoDeleter {
-  void operator()(GFileInfo *ptr) {
-    if (ptr)
-      g_object_unref(ptr);
-  }
-};
-using GFileInfoPtr = std::unique_ptr<GFileInfo, GFileInfoDeleter>;
-
-// Smart pointer aliases
+// Smart pointer aliases for RAII management of GIO resources
+// These ensure proper cleanup even when exceptions occur
 template <typename T> using GObjectPtr = std::unique_ptr<T, GObjectDeleter<T>>;
 
+// Common GIO object types
+using GFilePtr = GObjectPtr<GFile>;
+using GMountPtr = GObjectPtr<GMount>;
+using GVolumePtr = GObjectPtr<GVolume>;
+using GVolumeMonitorPtr = GObjectPtr<GVolumeMonitor>;
+using GFileInfoPtr = GObjectPtr<GFileInfo>;
+
+// For strings allocated by GIO (g_file_get_path, g_file_get_uri, etc.)
 using GCharPtr = std::unique_ptr<char, GFreeDeleter>;
 
 namespace FSMeta {
@@ -62,30 +63,8 @@ public:
   static GVolumeMonitor *tryGetMonitor() noexcept;
 };
 
-// Helper class for scoped GIO resource management
-template <typename T> class GioResource {
-public:
-  explicit GioResource(T *resource) : resource_(resource) {}
-  ~GioResource() {
-    if (resource_) {
-      g_object_unref(resource_);
-    }
-  }
-
-  T *get() const { return resource_; }
-  T *release() {
-    T *temp = resource_;
-    resource_ = nullptr;
-    return temp;
-  }
-
-  // Prevent copying
-  GioResource(const GioResource &) = delete;
-  GioResource &operator=(const GioResource &) = delete;
-
-private:
-  T *resource_;
-};
+// Note: GioResource<T> has been removed in favor of GObjectPtr<T> above,
+// which provides equivalent RAII semantics with std::unique_ptr.
 
 } // namespace gio
 } // namespace FSMeta
