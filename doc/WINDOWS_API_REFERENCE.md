@@ -237,11 +237,28 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 
 ## Threading APIs
 
+### CreateEvent
+
+- **Docs**: https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventa
+- **Purpose**: Creates or opens a named or unnamed event object
+- **Return Value**: Returns `NULL` on failure (not `INVALID_HANDLE_VALUE`)
+- **Error Handling**: Always check return value; call `GetLastError()` on failure
+- **Cleanup**: Use `CloseHandle()` when done
+- **Pattern**:
+  ```cpp
+  HANDLE event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+  if (event == NULL) {
+    DWORD error = GetLastError();
+    throw std::runtime_error("CreateEvent failed: " + std::to_string(error));
+  }
+  ```
+
 ### CreateThread
 
 - **Docs**: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createthread
 - **Best Practice**: Always store handle for cleanup
 - **Never**: Never use `TerminateThread` - it can corrupt process state
+- **Never**: Never use `std::thread::detach()` for timeout handling - use `std::future::wait_for()` instead
 
 ### WaitForSingleObject / WaitForMultipleObjects
 
