@@ -85,12 +85,14 @@ inline std::string GetVolumeGUID(const std::string &mountPoint) {
 // RAII wrapper for volume information
 class VolumeInfo {
   static constexpr DWORD VOLUME_NAME_SIZE = MAX_PATH + 1; // 261 characters
-  char volumeName[VOLUME_NAME_SIZE];
-  char fstype[VOLUME_NAME_SIZE];
-  DWORD serialNumber;
-  DWORD maxComponentLen;
-  DWORD fsFlags;
-  bool valid;
+  // Initialize all members to prevent reading uninitialized memory
+  // if GetVolumeInformationA fails with ERROR_NOT_READY
+  char volumeName[VOLUME_NAME_SIZE] = {0};
+  char fstype[VOLUME_NAME_SIZE] = {0};
+  DWORD serialNumber = 0;
+  DWORD maxComponentLen = 0;
+  DWORD fsFlags = 0;
+  bool valid = false;
 
 public:
   explicit VolumeInfo(const std::string &mountPoint) {
@@ -111,10 +113,12 @@ public:
 
 // RAII wrapper for disk space information
 class DiskSpaceInfo {
-  ULARGE_INTEGER totalBytes;
-  ULARGE_INTEGER freeBytes;
-  ULARGE_INTEGER totalFreeBytes;
-  bool valid;
+  // Initialize all members to prevent reading uninitialized memory
+  // if GetDiskFreeSpaceExA fails with ERROR_NOT_READY
+  ULARGE_INTEGER totalBytes = {0};
+  ULARGE_INTEGER freeBytes = {0};
+  ULARGE_INTEGER totalFreeBytes = {0};
+  bool valid = false;
 
 public:
   explicit DiskSpaceInfo(const std::string &mountPoint) {
