@@ -26,6 +26,8 @@ Security in case of vulnerabilities.
 - Fixed logic bug attempting to convert invalid CFStringRef in `ProcessNetworkVolume`
 - Fixed inconsistent `status` field when DiskArbitration returns partial results
 - Added `noexcept` to all RAII destructors to prevent `std::terminate` during stack unwinding
+- Fixed `g_volume_monitor_get()` memory leak in Linux GIO metadata enrichment
+- Fixed exception safety in Linux GIO metadata loop using RAII smart pointers
 
 ### Changed
 
@@ -34,6 +36,8 @@ Security in case of vulnerabilities.
 - Moved `path_security.h` to `common/` (POSIX-portable)
 - Simplified CFString null-terminator handling using `strlen()`
 - Documented intentional static dispatch queue singleton pattern
+- Consolidated Linux GIO RAII helpers (`GFilePtr`, `GVolumePtr`, etc.) in `gio_utils.h`
+- Added move semantics to `BlkidCache` for proper resource transfer
 
 ## 0.7.1 - 2025-10-29
 
