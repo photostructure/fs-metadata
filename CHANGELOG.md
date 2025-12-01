@@ -14,6 +14,27 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 0.8.0 - 2025-12-01
+
+### Security
+
+- Fixed TOCTOU race condition in macOS hidden file operations by using `fstat()`/`fchflags()` with file descriptors instead of path-based `stat()`/`chflags()`
+
+### Fixed
+
+- Added `O_CLOEXEC` flag to `open()` calls to prevent fd leaks on fork/exec
+- Fixed logic bug attempting to convert invalid CFStringRef in `ProcessNetworkVolume`
+- Fixed inconsistent `status` field when DiskArbitration returns partial results
+- Added `noexcept` to all RAII destructors to prevent `std::terminate` during stack unwinding
+
+### Changed
+
+- Extracted shared `FdGuard` RAII class to `common/fd_guard.h`
+- Extracted shared `WouldOverflow()` utility to `common/volume_utils.h`
+- Moved `path_security.h` to `common/` (POSIX-portable)
+- Simplified CFString null-terminator handling using `strlen()`
+- Documented intentional static dispatch queue singleton pattern
+
 ## 0.7.1 - 2025-10-29
 
 - Audit and address [several resource handling issues](./doc/SECURITY_AUDIT_2025.md)
