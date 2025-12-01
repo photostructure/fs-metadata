@@ -16,15 +16,18 @@ Reference for Linux APIs used in fs-metadata, with links to official documentati
 
 **Critical**: GIO has different thread safety guarantees for different APIs:
 
-| API                      | Thread Safe? | Notes                                     |
-| ------------------------ | ------------ | ----------------------------------------- |
-| `g_unix_mounts_get()`    | Yes          | Uses `getmntent_r()` or internal `G_LOCK` |
-| `g_unix_mount_get_*()`   | Yes          | Safe on `GUnixMountEntry`                 |
-| `g_volume_monitor_get()` | **No**       | Main thread only                          |
+| API                      | Thread Safe? | Used? | Notes                                     |
+| ------------------------ | ------------ | ----- | ----------------------------------------- |
+| `g_unix_mounts_get()`    | Yes          | ✅    | Uses `getmntent_r()` or internal `G_LOCK` |
+| `g_unix_mount_get_*()`   | Yes          | ✅    | Safe on `GUnixMountEntry`                 |
+| `g_volume_monitor_get()` | **No**       | ❌    | Main thread only - **NOT USED**           |
 
 **GIO Threading Docs**: https://docs.gtk.org/gio/class.VolumeMonitor.html
 
 > "GVolumeMonitor is not thread-default-context aware and should not be used other than from the main thread."
+
+This codebase only uses thread-safe APIs (`g_unix_mounts_get()` and related functions)
+because all native code runs on `Napi::AsyncWorker` threads.
 
 ### g_unix_mounts_get
 
@@ -55,29 +58,38 @@ g_list_free_full(mounts, reinterpret_cast<GDestroyNotify>(g_unix_mount_free));
 
 **Note**: String returns are borrowed - do NOT `g_free()` them.
 
-### g_volume_monitor_get
+### g_volume_monitor_get (NOT USED)
+
+> ⚠️ **NOT USED IN THIS CODEBASE**: GVolumeMonitor is NOT thread-safe and has been
+> removed from fs-metadata. This section is retained for reference only.
 
 - **Docs**: https://docs.gtk.org/gio/type_func.VolumeMonitor.get.html
 - **Purpose**: Get system volume monitor for rich metadata
 - **Returns**: Owned `GVolumeMonitor*` reference
 - **Cleanup**: **Must** call `g_object_unref()` when done
 
-```cpp
-// IMPORTANT: Returns owned reference despite singleton-like behavior
-GVolumeMonitor *monitor = g_volume_monitor_get();
-// ... use monitor ...
-g_object_unref(monitor);  // Required!
+**Why Not Used**: GVolumeMonitor can only be safely used from the main thread.
+Node.js native addons use `Napi::AsyncWorker` which runs on libuv thread pool
+worker threads. Using GVolumeMonitor from these threads causes race conditions:
+
+```
+GLib-GObject-CRITICAL: g_object_ref: assertion '!object_already_finalized' failed
 ```
 
-**Thread Safety Warning**: Only call from main thread. In worker threads, use only for best-effort metadata enrichment wrapped in try-catch.
+The thread-safe `g_unix_mounts_get()` API provides sufficient metadata (fstype,
+mountFrom). Rich metadata (label, uri) is obtained from blkid instead.
 
-### g_volume_monitor_get_mounts
+### g_volume_monitor_get_mounts (NOT USED)
+
+> ⚠️ **NOT USED**: See above - GVolumeMonitor is not thread-safe.
 
 - **Docs**: https://docs.gtk.org/gio/method.VolumeMonitor.get_mounts.html
 - **Returns**: `GList*` of `GMount*` (caller owns list and references)
 - **Cleanup**: `g_list_free_full(mounts, g_object_unref)`
 
-### GMount / GVolume / GFile Functions
+### GMount / GVolume / GFile Functions (NOT USED)
+
+> ⚠️ **NOT USED**: These require GVolumeMonitor which is not thread-safe.
 
 | Function                         | Returns    | Ownership           |
 | -------------------------------- | ---------- | ------------------- |
@@ -227,22 +239,13 @@ template <typename T> using GObjectPtr = std::unique_ptr<T, GObjectDeleter<T>>;
 using GFilePtr = GObjectPtr<GFile>;
 using GMountPtr = GObjectPtr<GMount>;
 using GVolumePtr = GObjectPtr<GVolume>;
-using GVolumeMonitorPtr = GObjectPtr<GVolumeMonitor>;
+using GVolumeMonitorPtr = GObjectPtr<GVolumeMonitor>;  // Not currently used
 using GCharPtr = std::unique_ptr<char, GFreeDeleter>;
 ```
 
-**Usage**:
-
-```cpp
-GVolumeMonitorPtr monitor(g_volume_monitor_get());
-GFilePtr root(g_mount_get_root(mount));
-GCharPtr path(g_file_get_path(root.get()));
-
-if (path) {
-    metadata.mountPoint = path.get();  // Safe - RAII handles cleanup
-}
-// All resources automatically freed when scope exits
-```
+> **Note**: `GVolumeMonitorPtr`, `GMountPtr`, `GVolumePtr`, and `GFilePtr` are
+> defined but not currently used because GVolumeMonitor is not thread-safe.
+> They are retained for potential future use if a main-thread-only API is added.
 
 ### BlkidCache RAII
 
