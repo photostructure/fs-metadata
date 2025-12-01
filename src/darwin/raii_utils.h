@@ -18,8 +18,8 @@ private:
   T *resource_;
 
 public:
-  ResourceRAII() : resource_(nullptr) {}
-  ~ResourceRAII() {
+  ResourceRAII() noexcept : resource_(nullptr) {}
+  ~ResourceRAII() noexcept {
     if (resource_) {
       free(resource_);
     }
@@ -56,8 +56,8 @@ private:
   struct statfs *buffer_;
 
 public:
-  MountBufferRAII() : buffer_(nullptr) {}
-  ~MountBufferRAII() {
+  MountBufferRAII() noexcept : buffer_(nullptr) {}
+  ~MountBufferRAII() noexcept {
     if (buffer_) {
       free(buffer_);
     }
@@ -96,9 +96,9 @@ private:
 
 public:
   explicit CFReleaser(T ref = nullptr) noexcept : ref_(ref) {}
-  ~CFReleaser() { reset(); }
+  ~CFReleaser() noexcept { reset(); }
 
-  void reset(T ref = nullptr) {
+  void reset(T ref = nullptr) noexcept {
     if (ref_) {
       CFRelease(ref_);
     }
@@ -139,7 +139,7 @@ public:
   explicit DASessionRAII(DASessionRef session = nullptr) noexcept
       : session_(session), is_scheduled_(false) {}
 
-  ~DASessionRAII() { unschedule(); }
+  ~DASessionRAII() noexcept { unschedule(); }
 
   // Schedule the session on a dispatch queue
   void scheduleOnQueue(dispatch_queue_t queue) {
@@ -150,7 +150,7 @@ public:
   }
 
   // Unschedule the session (must be called before session is released)
-  void unschedule() {
+  void unschedule() noexcept {
     if (is_scheduled_ && session_.isValid()) {
       DASessionSetDispatchQueue(session_.get(), nullptr);
       is_scheduled_ = false;
