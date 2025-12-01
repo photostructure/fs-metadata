@@ -5,12 +5,28 @@ This document provides comprehensive documentation for all macOS APIs used in th
 ## Table of Contents
 
 1. [Core Foundation APIs](#core-foundation-apis)
+   - [CFString](#cfstring)
+   - [CFDictionary](#cfdictionary)
+   - [CFReleaser RAII Wrapper](#cfreleaser-raii-wrapper)
 2. [DiskArbitration Framework](#diskarbitration-framework)
+   - [DASession](#dasession)
+   - [DASessionSetDispatchQueue](#dasessionsetdispatchqueue)
+   - [DADisk](#dadisk)
 3. [File System APIs](#file-system-apis)
+   - [getmntinfo_r_np](#getmntinfo_r_np)
+   - [statfs64](#statfs64)
+   - [chflags and fchflags](#chflags-and-fchflags)
+   - [open() Flags (Darwin-Specific)](#open-flags-darwin-specific)
+   - [fstat, fstatfs, fstatvfs](#fstat-fstatfs-fstatvfs-toctou-safe-variants)
 4. [Security APIs](#security-apis)
+   - [faccessat](#faccessat)
+   - [realpath()](#realpath---path-canonicalization)
 5. [RAII Patterns and Memory Management](#raii-patterns-and-memory-management)
+   - [Memory Management Rules](#memory-management-rules)
 6. [Thread Safety Considerations](#thread-safety-considerations)
 7. [Error Handling Patterns](#error-handling-patterns)
+8. [Platform-Specific Considerations](#platform-specific-considerations)
+9. [References](#references)
 
 ## Core Foundation APIs
 
@@ -129,11 +145,83 @@ if (!session.get()) {
 
 **Apple Documentation**: [DiskArbitration Framework](https://developer.apple.com/documentation/diskarbitration)
 
+**DiskArbitration Programming Guide**: [Apple Archive](https://developer.apple.com/library/archive/documentation/DriversKernelHardware/Conceptual/DiskArbitrationProgGuide/Introduction/Introduction.html)
+
 **Important Notes**:
 
 - Must be protected by mutex for thread safety
 - Session should be short-lived
-- No need for run loop scheduling in synchronous operations
+- Requires scheduling on a dispatch queue or run loop before use
+
+### DASessionSetDispatchQueue
+
+**Purpose**: Schedule a DiskArbitration session on a dispatch queue for callbacks.
+
+**Apple's Documented Pattern**:
+
+1. Create session with `DASessionCreate()`
+2. Schedule on dispatch queue with `DASessionSetDispatchQueue()`
+3. Use the session for disk operations
+4. Unschedule by calling `DASessionSetDispatchQueue(session, NULL)`
+5. Release the session
+
+**Usage in Project**:
+
+```cpp
+// Create session
+DASessionRef session = DASessionCreate(kCFAllocatorDefault);
+if (!session) {
+  throw std::runtime_error("Failed to create DA session");
+}
+
+// Schedule on a serial queue (NOT main queue in Node.js context)
+// Static queue is intentional - singleton for process lifetime
+static dispatch_queue_t da_queue = dispatch_queue_create(
+    "com.example.diskarbitration", DISPATCH_QUEUE_SERIAL);
+DASessionSetDispatchQueue(session, da_queue);
+
+// Use session...
+DADiskRef disk = DADiskCreateFromBSDName(kCFAllocatorDefault, session, "disk1s1");
+CFDictionaryRef desc = DADiskCopyDescription(disk);
+
+// CRITICAL: Unschedule before release
+DASessionSetDispatchQueue(session, NULL);
+CFRelease(session);
+```
+
+**Why We Use a Static Dispatch Queue**:
+
+The dispatch queue is intentionally static (process lifetime) because:
+1. Creating/destroying queues is expensive
+2. Releasing while operations in-flight could race
+3. GCD queues are lightweight references to internal structures
+4. This pattern is standard for long-lived resources in macOS apps
+
+**RAII Wrapper for Safe Session Management**:
+
+```cpp
+class DASessionRAII {
+  CFReleaser<DASessionRef> session_;
+  bool is_scheduled_ = false;
+public:
+  explicit DASessionRAII(DASessionRef s) : session_(s) {}
+
+  void scheduleOnQueue(dispatch_queue_t queue) {
+    if (session_.isValid() && queue) {
+      DASessionSetDispatchQueue(session_.get(), queue);
+      is_scheduled_ = true;
+    }
+  }
+
+  ~DASessionRAII() noexcept {
+    // CRITICAL: Unschedule before CFRelease
+    if (is_scheduled_ && session_.isValid()) {
+      DASessionSetDispatchQueue(session_.get(), nullptr);
+    }
+    // CFReleaser handles the CFRelease
+  }
+};
+```
 
 ### DADisk
 
@@ -227,17 +315,27 @@ if (statfs64(path.c_str(), &buf) == 0) {
 - `f_bsize` - Block size
 - `f_fstypename` - File system type name
 
-### chflags
+### chflags and fchflags
 
 **Purpose**: Set file flags (including hidden attribute).
 
-**Usage in Project**:
+**IMPORTANT**: Prefer `fchflags()` over `chflags()` to prevent TOCTOU race conditions.
+
+**Secure Usage (TOCTOU-safe)**:
 
 ```cpp
-// Get current flags
+// Open file first to get a stable reference
+int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+if (fd < 0) {
+  SetError(CreateDetailedErrorMessage("open", errno));
+  return;
+}
+FdGuard fd_guard(fd);  // RAII for automatic close
+
+// Get current flags via file descriptor
 struct stat st;
-if (stat(path_.c_str(), &st) != 0) {
-  SetError(CreateDetailedErrorMessage("stat", errno));
+if (fstat(fd, &st) != 0) {
+  SetError(CreateDetailedErrorMessage("fstat", errno));
   return;
 }
 
@@ -249,19 +347,134 @@ if (hidden_) {
   flags &= ~UF_HIDDEN; // Clear hidden
 }
 
-// Apply new flags
-if (chflags(path_.c_str(), flags) != 0) {
-  SetError(CreateDetailedErrorMessage("chflags", errno));
+// Apply new flags via file descriptor (TOCTOU-safe)
+if (fchflags(fd, flags) != 0) {
+  SetError(CreateDetailedErrorMessage("fchflags", errno));
 }
+```
+
+**Legacy Usage (NOT recommended - TOCTOU vulnerable)**:
+
+```cpp
+// DON'T DO THIS - vulnerable to race conditions
+struct stat st;
+if (stat(path_.c_str(), &st) != 0) { /* ... */ }
+// WINDOW: File could be replaced here!
+if (chflags(path_.c_str(), flags) != 0) { /* ... */ }
 ```
 
 **Apple Documentation**: [chflags(2)](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/chflags.2.html)
 
+**FreeBSD Documentation** (macOS derives from BSD): [fchflags(2)](https://man.freebsd.org/cgi/man.cgi?query=fchflags&sektion=2)
+
+**Function Signatures**:
+
+```c
+int chflags(const char *path, u_int flags);   // Path-based (TOCTOU risk)
+int fchflags(int fd, u_int flags);            // FD-based (TOCTOU-safe)
+int lchflags(const char *path, u_int flags);  // Operates on symlink itself
+```
+
 **Common Flags**:
 
-- `UF_HIDDEN` - Hidden file flag
-- `UF_IMMUTABLE` - File cannot be changed
-- `SF_ARCHIVED` - File has been archived
+- `UF_HIDDEN` - Hidden file flag (user-settable)
+- `UF_IMMUTABLE` - File cannot be changed (user-settable)
+- `UF_APPEND` - File may only be appended to
+- `SF_ARCHIVED` - File has been archived (super-user only)
+- `SF_IMMUTABLE` - File cannot be changed (super-user only)
+
+**Error Codes for fchflags()**:
+
+- `EBADF` - Invalid file descriptor
+- `EINVAL` - fd refers to a socket, not a file
+- `EPERM` - Insufficient permissions to change flags
+- `EROFS` - File resides on read-only filesystem
+- `ENOTSUP` - Filesystem doesn't support file flags
+
+### open() Flags (Darwin-Specific)
+
+**Purpose**: Control file opening behavior for security and resource management.
+
+**Darwin XNU fcntl.h Source**: [apple/darwin-xnu fcntl.h](https://github.com/apple/darwin-xnu/blob/main/bsd/sys/fcntl.h)
+
+**Critical Flags**:
+
+| Flag | Value | Purpose |
+|------|-------|---------|
+| `O_CLOEXEC` | `0x01000000` | Close fd on exec(), prevents leaks to child processes |
+| `O_NOFOLLOW` | `0x00000100` | Fail with `ELOOP` if path is a symlink |
+| `O_SYMLINK` | `0x00200000` | Open the symlink itself, not its target |
+| `O_DIRECTORY` | `0x00100000` | Fail if not a directory |
+
+**O_CLOEXEC - Preventing File Descriptor Leaks**:
+
+```cpp
+// ALWAYS use O_CLOEXEC when opening files in a Node.js native module
+// This prevents fd leaks when Node.js forks child processes
+int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+```
+
+Without `O_CLOEXEC`, file descriptors leak to child processes created via `fork()`/`exec()`, potentially causing resource exhaustion or security issues.
+
+**O_NOFOLLOW vs O_SYMLINK**:
+
+```cpp
+// O_NOFOLLOW: Fail if target is a symlink (returns ELOOP)
+// Use this to prevent symlink attacks
+int fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+if (fd < 0 && errno == ELOOP) {
+  // Path is a symlink - handle appropriately
+}
+
+// O_SYMLINK: Open the symlink itself (not following it)
+// Use this when you need to operate on the symlink
+int fd = open(symlink_path.c_str(), O_RDONLY | O_SYMLINK | O_CLOEXEC);
+```
+
+**Reference**: [POSIX open()](https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html)
+
+### fstat, fstatfs, fstatvfs (TOCTOU-Safe Variants)
+
+**Purpose**: Get file/filesystem information via file descriptor to prevent TOCTOU races.
+
+**Why File Descriptor Variants are Safer**:
+
+The path-based functions (`stat()`, `statfs()`, `statvfs()`) are vulnerable to TOCTOU:
+1. You call `stat("/path/to/file")`
+2. Attacker replaces the file with a symlink to sensitive data
+3. You operate on the wrong file
+
+File descriptor variants operate on the already-opened inode, not the path.
+
+**Usage Pattern**:
+
+```cpp
+// 1. Open with security flags
+int fd = open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+if (fd < 0) { /* handle error */ }
+FdGuard guard(fd);
+
+// 2. Use fd-based functions - these operate on the same inode
+struct stat st;
+if (fstat(fd, &st) != 0) { /* handle error */ }
+
+struct statfs fs;
+if (fstatfs(fd, &fs) != 0) { /* handle error */ }
+
+struct statvfs vfs;
+if (fstatvfs(fd, &vfs) != 0) { /* handle error */ }
+```
+
+**Function Comparison**:
+
+| Path-based (TOCTOU risk) | FD-based (Safe) | Purpose |
+|--------------------------|-----------------|---------|
+| `stat(path, &st)` | `fstat(fd, &st)` | File metadata |
+| `statfs(path, &fs)` | `fstatfs(fd, &fs)` | Filesystem info (macOS) |
+| `statvfs(path, &vfs)` | `fstatvfs(fd, &vfs)` | Filesystem info (POSIX) |
+| `chflags(path, flags)` | `fchflags(fd, flags)` | Set file flags |
+
+**Reference**: [Apple Secure Coding Guide - Race Conditions](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html)
 
 ## Security APIs
 
@@ -284,19 +497,75 @@ bool accessible = faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
 - Prevents TOCTOU (Time-of-Check-Time-of-Use) attacks
 - More secure than deprecated `access()` function
 
-### Path Validation
+### realpath() - Path Canonicalization
 
-**Purpose**: Prevent directory traversal and null byte injection attacks.
+**Purpose**: Resolve symbolic links, eliminate `.` and `..` components, and validate path existence.
 
-**Implementation**:
+**Apple Documentation**: [realpath(3)](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/realpath.3.html)
+
+**CERT C Secure Coding**: [FIO02-C. Canonicalize path names](https://wiki.sei.cmu.edu/confluence/x/DtcxBQ)
+
+**Why realpath() is Essential for Security**:
+
+1. **Symlink Resolution**: Resolves all symbolic links to their targets
+2. **Path Normalization**: Eliminates `.`, `..`, and redundant slashes
+3. **Existence Validation**: Returns `NULL` if path doesn't exist
+4. **Prevents Directory Traversal**: `../../../etc/passwd` becomes `/etc/passwd`
+
+**Usage in Project**:
 
 ```cpp
-// Check for directory traversal
-if (path.find("..") != std::string::npos) {
-  throw std::invalid_argument("Path cannot contain '..'");
-}
+#include <sys/param.h>  // For PATH_MAX
+#include <unistd.h>     // For realpath()
 
-// Check for null bytes
+std::string ValidateAndCanonicalizePath(const std::string& path, std::string& error) {
+  // Security check: Reject paths with null bytes (injection attack)
+  if (path.find('\0') != std::string::npos) {
+    error = "Invalid path containing null byte";
+    return "";
+  }
+
+  // Canonicalize path using realpath()
+  char resolved_path[PATH_MAX];
+  if (realpath(path.c_str(), resolved_path) != nullptr) {
+    return std::string(resolved_path);
+  }
+
+  // realpath() failed
+  int err = errno;
+  if (err == ENOENT) {
+    error = "Path does not exist: " + path;
+  } else if (err == EACCES) {
+    error = "Permission denied: " + path;
+  } else {
+    error = "Path validation failed: " + std::string(strerror(err));
+  }
+  return "";
+}
+```
+
+**Important Notes**:
+
+- `realpath()` is POSIX-standard, works on macOS and Linux
+- The resolved path buffer must be at least `PATH_MAX` bytes
+- Returns `NULL` on error, check `errno` for details
+- **Limitation**: Still has TOCTOU risk between `realpath()` and subsequent operations - combine with fd-based APIs
+
+**Error Codes**:
+
+- `ENOENT` - Path component does not exist
+- `EACCES` - Permission denied for a path component
+- `ELOOP` - Too many symbolic links (possible symlink loop)
+- `ENAMETOOLONG` - Resulting path exceeds `PATH_MAX`
+
+### Path Validation (Legacy Approach)
+
+**Note**: Prefer `realpath()` over manual validation - it's more comprehensive.
+
+**Simple Null Byte Check** (still useful as first-line defense):
+
+```cpp
+// Check for null bytes (path injection attack)
 if (path.find('\0') != std::string::npos) {
   throw std::invalid_argument("Path cannot contain null bytes");
 }
@@ -332,20 +601,61 @@ public:
 
 ### Memory Management Rules
 
-1. **Core Foundation Create/Copy/Get Rule**:
-   - Functions with "Create" or "Copy" return owned objects (must release)
-   - Functions with "Get" return borrowed references (don't release)
-   - Always use CFReleaser for owned objects
+**Apple's Official Ownership Documentation**: [Memory Management Programming Guide for Core Foundation](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html)
 
-2. **Buffer Management**:
-   - Use RAII wrappers for malloc'd buffers
-   - Prefer stack allocation when size is known
-   - Use std::vector for dynamic arrays
+#### 1. Core Foundation Create/Copy/Get Rule
 
-3. **String Handling**:
-   - Convert CFString to std::string early
-   - Use std::string for all internal processing
-   - Convert back to CFString only when needed
+This is the fundamental rule for Core Foundation memory management:
+
+| Function Name Contains | You Own It? | Must Call CFRelease? |
+|------------------------|-------------|----------------------|
+| **Create** | Yes | Yes |
+| **Copy** | Yes | Yes |
+| **Get** | No | No (borrowed reference) |
+
+**Examples from DiskArbitration**:
+
+```cpp
+// DASessionCreate - you own it, must release
+DASessionRef session = DASessionCreate(kCFAllocatorDefault);
+// ... use session ...
+CFRelease(session);  // Required
+
+// DADiskCopyDescription - you own it, must release
+CFDictionaryRef desc = DADiskCopyDescription(disk);
+// ... use desc ...
+CFRelease(desc);  // Required
+
+// CFDictionaryGetValue - borrowed, do NOT release
+CFStringRef name = (CFStringRef)CFDictionaryGetValue(desc, kDADiskDescriptionVolumeNameKey);
+// ... use name ...
+// NO CFRelease(name) - it's owned by the dictionary!
+```
+
+**Using RAII to Enforce the Rule**:
+
+```cpp
+// CFReleaser automatically releases Create/Copy results
+CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
+CFReleaser<CFDictionaryRef> desc(DADiskCopyDescription(disk.get()));
+
+// Get results are NOT wrapped - they're borrowed
+CFStringRef name = (CFStringRef)CFDictionaryGetValue(desc.get(), key);
+```
+
+#### 2. Buffer Management
+
+- Use RAII wrappers for `malloc()`'d buffers (e.g., `getmntinfo_r_np()`)
+- Prefer stack allocation when size is known at compile time
+- Use `std::vector` for dynamic arrays in C++
+- **Never mix `malloc()`/`free()` with `new`/`delete`**
+
+#### 3. String Handling
+
+- Convert `CFStringRef` to `std::string` early in the call chain
+- Use `std::string` for all internal processing
+- Convert back to `CFStringRef` only at API boundaries
+- Use `CFStringGetCString()` with `kCFStringEncodingUTF8`
 
 ## Thread Safety Considerations
 
@@ -463,7 +773,31 @@ public:
 
 ## References
 
+### Apple Official Documentation
+
 - [Apple Developer Documentation](https://developer.apple.com/documentation/)
 - [Core Foundation Programming Guide](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFDesignConcepts/CFDesignConcepts.html)
+- [Core Foundation Memory Management](https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFMemoryMgmt/Concepts/Ownership.html)
 - [DiskArbitration Programming Guide](https://developer.apple.com/library/archive/documentation/DriversKernelHardware/Conceptual/DiskArbitrationProgGuide/Introduction/Introduction.html)
+- [DiskArbitration Framework Reference](https://developer.apple.com/documentation/diskarbitration)
 - [File System Programming Guide](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/Introduction/Introduction.html)
+- [Secure Coding Guide - Race Conditions](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html)
+
+### Darwin/XNU Source Code
+
+- [darwin-xnu fcntl.h](https://github.com/apple/darwin-xnu/blob/main/bsd/sys/fcntl.h) - Open flags (O_CLOEXEC, O_SYMLINK, etc.)
+
+### BSD/FreeBSD Documentation (macOS derives from BSD)
+
+- [fchflags(2)](https://man.freebsd.org/cgi/man.cgi?query=fchflags&sektion=2) - File descriptor-based flag modification
+- [chflags(2)](https://man.freebsd.org/cgi/man.cgi?query=chflags&sektion=2) - BSD file flags
+- [getmntinfo(3)](https://keith.github.io/xcode-man-pages/getmntinfo.3.html) - Mount information (includes `getmntinfo_r_np`)
+
+### POSIX Standards
+
+- [open()](https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html) - POSIX open specification
+- [access()](https://man7.org/linux/man-pages/man2/faccessat.2.html) - faccessat documentation
+
+### Security References
+
+- [CERT C FIO02-C](https://wiki.sei.cmu.edu/confluence/x/DtcxBQ) - Canonicalize path names originating from tainted sources
