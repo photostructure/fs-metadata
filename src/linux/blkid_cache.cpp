@@ -32,17 +32,11 @@ BlkidCache::~BlkidCache() {
     const std::lock_guard<std::mutex> lock(mutex_);
     if (cache_) { // Double-check after acquiring lock
       DEBUG_LOG("[BlkidCache] releasing cache");
-      try {
-        blkid_put_cache(cache_);
-        cache_ = nullptr; // Avoid double-release
-        DEBUG_LOG("[BlkidCache] cache released successfully");
-      } catch (const std::exception &e) {
-        DEBUG_LOG("[BlkidCache] error releasing cache: %s", e.what());
-        cache_ = nullptr; // Ensure it's nulled even on error
-        // Optional: Log error during cache cleanup
-        // std::cerr << "Error while releasing blkid cache: " << e.what()
-        //           << std::endl;
-      }
+      // Note: blkid_put_cache() is a C function that cannot throw C++
+      // exceptions, so no try-catch is needed here.
+      blkid_put_cache(cache_);
+      cache_ = nullptr;
+      DEBUG_LOG("[BlkidCache] cache released successfully");
     }
   }
 }

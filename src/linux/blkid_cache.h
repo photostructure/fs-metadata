@@ -21,8 +21,29 @@ public:
 
   operator bool() const { return cache_ != nullptr; }
 
+  // Prevent copying - each instance owns its cache
   BlkidCache(const BlkidCache &) = delete;
   BlkidCache &operator=(const BlkidCache &) = delete;
+
+  // Allow moving - transfers ownership of the cache
+  BlkidCache(BlkidCache &&other) noexcept : cache_(other.cache_) {
+    other.cache_ = nullptr;
+  }
+  BlkidCache &operator=(BlkidCache &&other) noexcept {
+    if (this != &other) {
+      // Release current cache if any (under lock)
+      if (cache_) {
+        const std::lock_guard<std::mutex> lock(mutex_);
+        if (cache_) {
+          blkid_put_cache(cache_);
+        }
+      }
+      // Take ownership from other
+      cache_ = other.cache_;
+      other.cache_ = nullptr;
+    }
+    return *this;
+  }
 };
 
 } // namespace FSMeta
