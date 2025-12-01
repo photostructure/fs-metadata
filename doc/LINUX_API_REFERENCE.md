@@ -16,11 +16,11 @@ Reference for Linux APIs used in fs-metadata, with links to official documentati
 
 **Critical**: GIO has different thread safety guarantees for different APIs:
 
-| API | Thread Safe? | Notes |
-|-----|--------------|-------|
-| `g_unix_mounts_get()` | Yes | Uses `getmntent_r()` or internal `G_LOCK` |
-| `g_unix_mount_get_*()` | Yes | Safe on `GUnixMountEntry` |
-| `g_volume_monitor_get()` | **No** | Main thread only |
+| API                      | Thread Safe? | Notes                                     |
+| ------------------------ | ------------ | ----------------------------------------- |
+| `g_unix_mounts_get()`    | Yes          | Uses `getmntent_r()` or internal `G_LOCK` |
+| `g_unix_mount_get_*()`   | Yes          | Safe on `GUnixMountEntry`                 |
+| `g_volume_monitor_get()` | **No**       | Main thread only                          |
 
 **GIO Threading Docs**: https://docs.gtk.org/gio/class.VolumeMonitor.html
 
@@ -79,25 +79,25 @@ g_object_unref(monitor);  // Required!
 
 ### GMount / GVolume / GFile Functions
 
-| Function | Returns | Ownership |
-|----------|---------|-----------|
-| `g_mount_get_root()` | `GFile*` | Caller owns, unref |
-| `g_mount_get_volume()` | `GVolume*` | Caller owns, unref |
-| `g_mount_get_name()` | `char*` | Caller owns, g_free |
-| `g_mount_get_default_location()` | `GFile*` | Caller owns, unref |
-| `g_file_get_path()` | `char*` | Caller owns, g_free |
-| `g_file_get_uri()` | `char*` | Caller owns, g_free |
-| `g_volume_get_name()` | `char*` | Caller owns, g_free |
+| Function                         | Returns    | Ownership           |
+| -------------------------------- | ---------- | ------------------- |
+| `g_mount_get_root()`             | `GFile*`   | Caller owns, unref  |
+| `g_mount_get_volume()`           | `GVolume*` | Caller owns, unref  |
+| `g_mount_get_name()`             | `char*`    | Caller owns, g_free |
+| `g_mount_get_default_location()` | `GFile*`   | Caller owns, unref  |
+| `g_file_get_path()`              | `char*`    | Caller owns, g_free |
+| `g_file_get_uri()`               | `char*`    | Caller owns, g_free |
+| `g_volume_get_name()`            | `char*`    | Caller owns, g_free |
 
 **Memory Management Docs**: https://docs.gtk.org/gobject/concepts.html#reference-counting
 
 ### GLib Memory Functions
 
-| Function | Purpose |
-|----------|---------|
-| `g_object_unref()` | Decrement GObject reference count |
-| `g_free()` | Free GLib-allocated memory |
-| `g_list_free()` | Free GList container only |
+| Function             | Purpose                               |
+| -------------------- | ------------------------------------- |
+| `g_object_unref()`   | Decrement GObject reference count     |
+| `g_free()`           | Free GLib-allocated memory            |
+| `g_list_free()`      | Free GList container only             |
 | `g_list_free_full()` | Free GList and elements with callback |
 
 **Docs**: https://docs.gtk.org/glib/func.free.html
@@ -173,6 +173,7 @@ close(fd);
 ```
 
 **Key Fields**:
+
 - `f_frsize` - Fragment size (preferred for calculations)
 - `f_bsize` - Block size (fallback)
 - `f_blocks` - Total blocks
@@ -183,12 +184,12 @@ close(fd);
 
 - **Docs**: https://man7.org/linux/man-pages/man2/open.2.html
 
-| Flag | Purpose |
-|------|---------|
-| `O_RDONLY` | Read-only access |
-| `O_DIRECTORY` | Fail if not a directory |
-| `O_CLOEXEC` | Close on exec (prevents fd leaks) |
-| `O_NOFOLLOW` | Fail if symlink (ELOOP) |
+| Flag          | Purpose                           |
+| ------------- | --------------------------------- |
+| `O_RDONLY`    | Read-only access                  |
+| `O_DIRECTORY` | Fail if not a directory           |
+| `O_CLOEXEC`   | Close on exec (prevents fd leaks) |
+| `O_NOFOLLOW`  | Fail if symlink (ELOOP)           |
 
 **Always use `O_CLOEXEC`** in Node.js native modules to prevent fd leaks to child processes.
 

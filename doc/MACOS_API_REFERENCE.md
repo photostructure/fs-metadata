@@ -192,6 +192,7 @@ CFRelease(session);
 **Why We Use a Static Dispatch Queue**:
 
 The dispatch queue is intentionally static (process lifetime) because:
+
 1. Creating/destroying queues is expensive
 2. Releasing while operations in-flight could race
 3. GCD queues are lightweight references to internal structures
@@ -399,12 +400,12 @@ int lchflags(const char *path, u_int flags);  // Operates on symlink itself
 
 **Critical Flags**:
 
-| Flag | Value | Purpose |
-|------|-------|---------|
-| `O_CLOEXEC` | `0x01000000` | Close fd on exec(), prevents leaks to child processes |
-| `O_NOFOLLOW` | `0x00000100` | Fail with `ELOOP` if path is a symlink |
-| `O_SYMLINK` | `0x00200000` | Open the symlink itself, not its target |
-| `O_DIRECTORY` | `0x00100000` | Fail if not a directory |
+| Flag          | Value        | Purpose                                               |
+| ------------- | ------------ | ----------------------------------------------------- |
+| `O_CLOEXEC`   | `0x01000000` | Close fd on exec(), prevents leaks to child processes |
+| `O_NOFOLLOW`  | `0x00000100` | Fail with `ELOOP` if path is a symlink                |
+| `O_SYMLINK`   | `0x00200000` | Open the symlink itself, not its target               |
+| `O_DIRECTORY` | `0x00100000` | Fail if not a directory                               |
 
 **O_CLOEXEC - Preventing File Descriptor Leaks**:
 
@@ -440,6 +441,7 @@ int fd = open(symlink_path.c_str(), O_RDONLY | O_SYMLINK | O_CLOEXEC);
 **Why File Descriptor Variants are Safer**:
 
 The path-based functions (`stat()`, `statfs()`, `statvfs()`) are vulnerable to TOCTOU:
+
 1. You call `stat("/path/to/file")`
 2. Attacker replaces the file with a symlink to sensitive data
 3. You operate on the wrong file
@@ -467,12 +469,12 @@ if (fstatvfs(fd, &vfs) != 0) { /* handle error */ }
 
 **Function Comparison**:
 
-| Path-based (TOCTOU risk) | FD-based (Safe) | Purpose |
-|--------------------------|-----------------|---------|
-| `stat(path, &st)` | `fstat(fd, &st)` | File metadata |
-| `statfs(path, &fs)` | `fstatfs(fd, &fs)` | Filesystem info (macOS) |
-| `statvfs(path, &vfs)` | `fstatvfs(fd, &vfs)` | Filesystem info (POSIX) |
-| `chflags(path, flags)` | `fchflags(fd, flags)` | Set file flags |
+| Path-based (TOCTOU risk) | FD-based (Safe)       | Purpose                 |
+| ------------------------ | --------------------- | ----------------------- |
+| `stat(path, &st)`        | `fstat(fd, &st)`      | File metadata           |
+| `statfs(path, &fs)`      | `fstatfs(fd, &fs)`    | Filesystem info (macOS) |
+| `statvfs(path, &vfs)`    | `fstatvfs(fd, &vfs)`  | Filesystem info (POSIX) |
+| `chflags(path, flags)`   | `fchflags(fd, flags)` | Set file flags          |
 
 **Reference**: [Apple Secure Coding Guide - Race Conditions](https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html)
 
@@ -607,11 +609,11 @@ public:
 
 This is the fundamental rule for Core Foundation memory management:
 
-| Function Name Contains | You Own It? | Must Call CFRelease? |
-|------------------------|-------------|----------------------|
-| **Create** | Yes | Yes |
-| **Copy** | Yes | Yes |
-| **Get** | No | No (borrowed reference) |
+| Function Name Contains | You Own It? | Must Call CFRelease?    |
+| ---------------------- | ----------- | ----------------------- |
+| **Create**             | Yes         | Yes                     |
+| **Copy**               | Yes         | Yes                     |
+| **Get**                | No          | No (borrowed reference) |
 
 **Examples from DiskArbitration**:
 
