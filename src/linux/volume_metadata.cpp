@@ -4,6 +4,7 @@
 #include "../common/error_utils.h"
 #include "../common/fd_guard.h"
 #include "../common/metadata_worker.h"
+#include "../common/path_security.h"
 #include "../common/volume_utils.h"
 #include "blkid_cache.h"
 #include <fcntl.h> // for open(), O_DIRECTORY, O_RDONLY, O_CLOEXEC
@@ -34,6 +35,18 @@ public:
       DEBUG_LOG("[LinuxMetadataWorker] starting statvfs for %s",
                 mountPoint.c_str());
 
+      // Validate and canonicalize mount point using realpath()
+      // This prevents directory traversal attacks and resolves symlinks
+      std::string error;
+      std::string validated_mount_point =
+          ValidatePathForRead(mountPoint, error);
+      if (validated_mount_point.empty()) {
+        throw FSException(error);
+      }
+
+      DEBUG_LOG("[LinuxMetadataWorker] Using validated mount point: %s",
+                validated_mount_point.c_str());
+
       // SECURITY: Use file descriptor-based approach to prevent TOCTOU race
       // condition
       //
@@ -47,12 +60,14 @@ public:
       // O_DIRECTORY: Ensures we're opening a directory, fails if not
       // O_RDONLY: Read-only access (sufficient for fstatvfs)
       // O_CLOEXEC: Close on exec (prevents fd leaks in multithreaded programs)
-      int fd = open(mountPoint.c_str(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+      int fd = open(validated_mount_point.c_str(),
+                    O_DIRECTORY | O_RDONLY | O_CLOEXEC);
       if (fd < 0) {
         int error = errno;
         DEBUG_LOG("[LinuxMetadataWorker] open failed for %s: %s (%d)",
-                  mountPoint.c_str(), strerror(error), error);
-        throw FSException(CreatePathErrorMessage("open", mountPoint, error));
+                  validated_mount_point.c_str(), strerror(error), error);
+        throw FSException(
+            CreatePathErrorMessage("open", validated_mount_point, error));
       }
 
       // RAII guard to ensure file descriptor is always closed
@@ -64,9 +79,9 @@ public:
       if (fstatvfs(fd, &vfs) != 0) {
         int error = errno;
         DEBUG_LOG("[LinuxMetadataWorker] fstatvfs failed for %s: %s (%d)",
-                  mountPoint.c_str(), strerror(error), error);
+                  validated_mount_point.c_str(), strerror(error), error);
         throw FSException(
-            CreatePathErrorMessage("fstatvfs", mountPoint, error));
+            CreatePathErrorMessage("fstatvfs", validated_mount_point, error));
       }
 
       // fd_guard will automatically close the file descriptor when this

@@ -1,12 +1,15 @@
-// src/darwin/path_security.h
-// Secure path validation for macOS using realpath()
-// Implements recommendations from Apple's Secure Coding Guide
+// src/common/path_security.h
+// Secure path validation using POSIX realpath()
+// Based on recommendations from Apple's Secure Coding Guide and CERT C
+// guidelines References:
+// -
 // https://developer.apple.com/library/archive/documentation/Security/Conceptual/SecureCodingGuide/Articles/RaceConditions.html
+// - https://wiki.sei.cmu.edu/confluence/x/DtcxBQ (FIO02-C)
 
 #pragma once
 
-#include "../common/debug_log.h"
-#include "../common/error_utils.h"
+#include "debug_log.h"
+#include "error_utils.h"
 #include <cerrno>
 #include <cstring>
 #include <string>
