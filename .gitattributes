@@ -1,0 +1,16 @@
+# Normalize all text files to LF
+* text=auto eol=lf
+
+# Ensure shell scripts use LF (even on Windows)
+*.sh text eol=lf
+
+# Windows batch files need CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.node binary
