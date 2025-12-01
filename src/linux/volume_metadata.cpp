@@ -116,11 +116,11 @@ public:
 #ifdef ENABLE_GIO
       try {
         DEBUG_LOG("[LinuxMetadataWorker] collecting GIO metadata for %s",
-                  mountPoint.c_str());
-        gio::addMountMetadata(mountPoint, metadata);
+                  validated_mount_point.c_str());
+        gio::addMountMetadata(validated_mount_point, metadata);
       } catch (const std::exception &e) {
         DEBUG_LOG("[LinuxMetadataWorker] GIO error for %s: %s",
-                  mountPoint.c_str(), e.what());
+                  validated_mount_point.c_str(), e.what());
         metadata.status = std::string("GIO warning: ") + e.what();
       }
 #endif
