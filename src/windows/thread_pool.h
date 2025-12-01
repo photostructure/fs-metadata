@@ -6,6 +6,8 @@
 #include <functional>
 #include <memory>
 #include <queue>
+#include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -16,20 +18,37 @@ class WorkQueue {
 private:
   std::queue<std::function<void()>> tasks;
   CRITICAL_SECTION cs;
-  HANDLE workAvailable;
+  HANDLE workAvailable = NULL;
   std::atomic<bool> shutdown{false};
+  bool initialized = false;
 
 public:
   WorkQueue() {
     InitializeCriticalSection(&cs);
+    // CreateEvent returns NULL on failure, not INVALID_HANDLE_VALUE.
+    // See:
+    // https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventa
     workAvailable = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+    if (workAvailable == NULL) {
+      DWORD error = GetLastError();
+      DeleteCriticalSection(&cs);
+      DEBUG_LOG("[WorkQueue] CreateEvent failed with error: %lu", error);
+      throw std::runtime_error("WorkQueue: CreateEvent failed with error " +
+                               std::to_string(error));
+    }
+    initialized = true;
   }
 
   ~WorkQueue() {
     shutdown = true;
-    SetEvent(workAvailable);
-    CloseHandle(workAvailable);
-    DeleteCriticalSection(&cs);
+    if (workAvailable != NULL) {
+      SetEvent(workAvailable);
+      CloseHandle(workAvailable);
+      workAvailable = NULL;
+    }
+    if (initialized) {
+      DeleteCriticalSection(&cs);
+    }
   }
 
   void Push(std::function<void()> task) {
