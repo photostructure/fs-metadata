@@ -2,7 +2,9 @@
 #include "hidden.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
-#include "path_security.h"
+#include "../common/fd_guard.h"
+#include "../common/path_security.h"
+#include <fcntl.h>  // for open(), O_RDONLY, O_CLOEXEC
 #include <string.h> // for strcmp
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -42,19 +44,35 @@ void GetHiddenWorker::Execute() {
   DEBUG_LOG("[GetHiddenWorker] Using validated path: %s",
             validated_path.c_str());
 
-  struct stat statbuf;
-  if (stat(validated_path.c_str(), &statbuf) != 0) {
+  // SECURITY: Use file descriptor-based approach to prevent TOCTOU race
+  // condition. Opening the file and using fstat() on the fd ensures we're
+  // checking the same file that realpath() validated.
+  // O_CLOEXEC: Prevent fd leak to child processes on fork/exec
+  // O_RDONLY: We only need to read the flags
+  int fd = open(validated_path.c_str(), O_RDONLY | O_CLOEXEC);
+  if (fd < 0) {
     int error = errno;
     if (error == ENOENT) {
       DEBUG_LOG("[GetHiddenWorker] path not found: %s", validated_path.c_str());
       SetError("Path not found: '" + validated_path + "'");
     } else {
-      DEBUG_LOG("[GetHiddenWorker] failed to stat path %s: %s (%d)",
+      DEBUG_LOG("[GetHiddenWorker] failed to open path %s: %s (%d)",
                 validated_path.c_str(), strerror(error), error);
-      SetError(CreatePathErrorMessage("stat", validated_path, error));
+      SetError(CreatePathErrorMessage("open", validated_path, error));
     }
     return;
   }
+  FdGuard fd_guard(fd);
+
+  struct stat statbuf;
+  if (fstat(fd, &statbuf) != 0) {
+    int error = errno;
+    DEBUG_LOG("[GetHiddenWorker] failed to fstat path %s: %s (%d)",
+              validated_path.c_str(), strerror(error), error);
+    SetError(CreatePathErrorMessage("fstat", validated_path, error));
+    return;
+  }
+
   is_hidden_ = (statbuf.st_flags & UF_HIDDEN) != 0;
   DEBUG_LOG("[GetHiddenWorker] path %s is %s", validated_path.c_str(),
             is_hidden_ ? "hidden" : "not hidden");
@@ -121,17 +139,32 @@ void SetHiddenWorker::Execute() {
   DEBUG_LOG("[SetHiddenWorker] Using validated path: %s",
             validated_path.c_str());
 
-  struct stat statbuf;
-  if (stat(validated_path.c_str(), &statbuf) != 0) {
+  // SECURITY: Use file descriptor-based approach to prevent TOCTOU race
+  // condition. Opening the file, reading flags with fstat(), and setting
+  // flags with fchflags() all operate on the same inode via the fd.
+  // O_CLOEXEC: Prevent fd leak to child processes on fork/exec
+  // O_RDONLY: fchflags() doesn't require write access to the file contents
+  int fd = open(validated_path.c_str(), O_RDONLY | O_CLOEXEC);
+  if (fd < 0) {
     int error = errno;
     if (error == ENOENT) {
       DEBUG_LOG("[SetHiddenWorker] path not found: %s", validated_path.c_str());
       SetError("Path not found: '" + validated_path + "'");
     } else {
-      DEBUG_LOG("[SetHiddenWorker] failed to stat path %s: %s (%d)",
+      DEBUG_LOG("[SetHiddenWorker] failed to open path %s: %s (%d)",
                 validated_path.c_str(), strerror(error), error);
-      SetError(CreatePathErrorMessage("stat", validated_path, error));
+      SetError(CreatePathErrorMessage("open", validated_path, error));
     }
+    return;
+  }
+  FdGuard fd_guard(fd);
+
+  struct stat statbuf;
+  if (fstat(fd, &statbuf) != 0) {
+    int error = errno;
+    DEBUG_LOG("[SetHiddenWorker] failed to fstat path %s: %s (%d)",
+              validated_path.c_str(), strerror(error), error);
+    SetError(CreatePathErrorMessage("fstat", validated_path, error));
     return;
   }
 
@@ -142,15 +175,15 @@ void SetHiddenWorker::Execute() {
     new_flags = statbuf.st_flags & ~UF_HIDDEN;
   }
 
-  if (chflags(validated_path.c_str(), new_flags) != 0) {
+  if (fchflags(fd, new_flags) != 0) {
     int error = errno;
     DEBUG_LOG("[SetHiddenWorker] failed to set flags for %s: %s (%d)",
               validated_path.c_str(), strerror(error), error);
 
-    // Check if this is an APFS filesystem issue
+    // Check if this is an APFS filesystem issue using fstatfs on the fd
     struct statfs fs;
     bool is_apfs = false;
-    if (statfs(validated_path.c_str(), &fs) == 0) {
+    if (fstatfs(fd, &fs) == 0) {
       is_apfs = (strcmp(fs.f_fstypename, "apfs") == 0);
       DEBUG_LOG("[SetHiddenWorker] filesystem type: %s", fs.f_fstypename);
     }
@@ -160,9 +193,9 @@ void SetHiddenWorker::Execute() {
       SetError("Setting hidden attribute failed on APFS filesystem. "
                "This is a known issue with some APFS volumes. "
                "Error: " +
-               CreatePathErrorMessage("chflags", validated_path, error));
+               CreatePathErrorMessage("fchflags", validated_path, error));
     } else {
-      SetError(CreatePathErrorMessage("chflags", validated_path, error));
+      SetError(CreatePathErrorMessage("fchflags", validated_path, error));
     }
     return;
   }
