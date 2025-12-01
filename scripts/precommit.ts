@@ -27,7 +27,10 @@ function run({
 run({ cmd: "npm install", desc: "Installing dependencies" });
 run({ cmd: "npm run update", desc: "Updating dependencies" });
 rmSync("package-lock.json", { force: true });
-run({ cmd: "npm install --ignore-scripts=false", desc: "Updating dependencies" });
+run({
+  cmd: "npm install --ignore-scripts=false",
+  desc: "Updating dependencies",
+});
 run({ cmd: "npm run clean", desc: "Start fresh" });
 run({ cmd: "npm run fmt", desc: "Formatting code" });
 run({ cmd: "npm run lint", desc: "Running linting checks" });
