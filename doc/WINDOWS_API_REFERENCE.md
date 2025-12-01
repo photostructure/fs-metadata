@@ -86,14 +86,30 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 }
 ```
 
-### FindFirstFileExA
+### FindFirstFileExA / FindClose
 
-- **Docs**: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfileexa
+- **Docs**:
+  - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfileexa
+  - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findclose
 - **Purpose**: Searches a directory for files/subdirectories
 - **Flags**:
   - `FIND_FIRST_EX_LARGE_FETCH`: Optimize for large directories
   - `FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY`: Skip reparse points
 - **Security**: Can follow symbolic links if not careful
+- **Critical**: Search handles **must** be closed with `FindClose()`, not `CloseHandle()`
+- **Return Value**: Returns `INVALID_HANDLE_VALUE` on failure (not `NULL`)
+- **RAII Pattern**:
+  ```cpp
+  class FindHandleGuard {
+    HANDLE handle;
+  public:
+    explicit FindHandleGuard(HANDLE h) : handle(h) {}
+    ~FindHandleGuard() {
+      if (handle != INVALID_HANDLE_VALUE) FindClose(handle);
+    }
+    explicit operator bool() const { return handle != INVALID_HANDLE_VALUE; }
+  };
+  ```
 
 ### GetFileAttributesW / SetFileAttributesW
 
