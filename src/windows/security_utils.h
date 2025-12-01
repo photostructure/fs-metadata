@@ -169,7 +169,8 @@ public:
   }
 };
 
-// RAII wrapper for HANDLE resources
+// RAII wrapper for HANDLE resources (uses CloseHandle)
+// For search handles from FindFirstFile*, use FindHandleGuard instead
 class HandleGuard {
   HANDLE handle;
 
@@ -211,6 +212,47 @@ public:
   explicit operator bool() const {
     return handle && handle != INVALID_HANDLE_VALUE;
   }
+};
+
+// RAII wrapper for search handles from FindFirstFile/FindFirstFileEx
+// These handles MUST be closed with FindClose, not CloseHandle.
+// See: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findclose
+class FindHandleGuard {
+  HANDLE handle;
+
+public:
+  explicit FindHandleGuard(HANDLE h) : handle(h) {}
+
+  ~FindHandleGuard() {
+    if (handle != INVALID_HANDLE_VALUE) {
+      FindClose(handle);
+    }
+  }
+
+  FindHandleGuard(FindHandleGuard &&other) noexcept : handle(other.handle) {
+    other.handle = INVALID_HANDLE_VALUE;
+  }
+
+  FindHandleGuard &operator=(FindHandleGuard &&other) noexcept {
+    if (this != &other) {
+      if (handle != INVALID_HANDLE_VALUE) {
+        FindClose(handle);
+      }
+      handle = other.handle;
+      other.handle = INVALID_HANDLE_VALUE;
+    }
+    return *this;
+  }
+
+  // Delete copy operations
+  FindHandleGuard(const FindHandleGuard &) = delete;
+  FindHandleGuard &operator=(const FindHandleGuard &) = delete;
+
+  HANDLE get() const { return handle; }
+
+  // Check if handle is valid (FindFirstFile returns INVALID_HANDLE_VALUE on
+  // failure, not NULL)
+  explicit operator bool() const { return handle != INVALID_HANDLE_VALUE; }
 };
 
 // RAII wrapper for critical sections
