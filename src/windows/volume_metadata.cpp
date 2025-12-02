@@ -19,12 +19,12 @@ namespace {
 class WNetConnection {
   std::string drivePath;
   std::unique_ptr<char[]> buffer;
-  DWORD bufferSize;
+  DWORD bufferSize = MAX_PATH;
   bool isValid = false;
 
 public:
   explicit WNetConnection(const std::string &path)
-      : drivePath(path.substr(0, 2)), bufferSize(MAX_PATH) {
+      : drivePath(path.substr(0, 2)) {
 
     // Allocate initial buffer
     buffer = std::make_unique<char[]>(bufferSize);
@@ -41,6 +41,7 @@ public:
     isValid = (result == NO_ERROR);
   }
 
+  ~WNetConnection() = default;
   WNetConnection(WNetConnection &&) noexcept = default;
   WNetConnection &operator=(WNetConnection &&) noexcept = default;
 
