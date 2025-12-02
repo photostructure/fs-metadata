@@ -54,7 +54,10 @@ describeIfLinuxGIO("Finding #6: GIO Thread Safety (RESOLVED)", () => {
     // Stress test: Run 50 concurrent requests
     // This verifies that g_unix_mounts_get() with internal G_LOCK
     // or getmntent_r() handles concurrent access correctly
-    const promises = Array.from({ length: 50 }, () => getVolumeMountPoints());
+    // Use 15s timeout to handle slow emulated environments (Alpine ARM64)
+    const promises = Array.from({ length: 50 }, () =>
+      getVolumeMountPoints({ timeoutMs: 15_000 }),
+    );
 
     const results = await Promise.all(promises);
 
