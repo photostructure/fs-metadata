@@ -124,7 +124,7 @@ public:
 
   // Check if process has required privileges
   static bool HasRequiredPrivileges() {
-    HANDLE token;
+    HANDLE token = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
       return false;
     }
@@ -287,6 +287,8 @@ public:
     // Delete copy/move
     Lock(const Lock &) = delete;
     Lock &operator=(const Lock &) = delete;
+    Lock(Lock &&) = delete;
+    Lock &operator=(Lock &&) = delete;
   };
 };
 

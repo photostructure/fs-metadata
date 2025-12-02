@@ -18,7 +18,7 @@ class WorkQueue {
 private:
   std::queue<std::function<void()>> tasks;
   CRITICAL_SECTION cs;
-  HANDLE workAvailable = NULL;
+  HANDLE workAvailable = nullptr;
   std::atomic<bool> shutdown{false};
   bool initialized = false;
 
@@ -29,7 +29,7 @@ public:
     // See:
     // https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createeventa
     workAvailable = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-    if (workAvailable == NULL) {
+    if (workAvailable == nullptr) {
       DWORD error = GetLastError();
       DeleteCriticalSection(&cs);
       DEBUG_LOG("[WorkQueue] CreateEvent failed with error: %lu", error);
@@ -41,15 +41,21 @@ public:
 
   ~WorkQueue() {
     shutdown = true;
-    if (workAvailable != NULL) {
+    if (workAvailable != nullptr) {
       SetEvent(workAvailable);
       CloseHandle(workAvailable);
-      workAvailable = NULL;
+      workAvailable = nullptr;
     }
     if (initialized) {
       DeleteCriticalSection(&cs);
     }
   }
+
+  // Delete copy/move operations - WorkQueue manages non-copyable resources
+  WorkQueue(const WorkQueue &) = delete;
+  WorkQueue &operator=(const WorkQueue &) = delete;
+  WorkQueue(WorkQueue &&) = delete;
+  WorkQueue &operator=(WorkQueue &&) = delete;
 
   void Push(std::function<void()> task) {
     EnterCriticalSection(&cs);
