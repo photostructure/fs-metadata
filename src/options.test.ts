@@ -61,7 +61,8 @@ describe("FS_METADATA_TIMEOUT_MS environment variable", () => {
   });
 
   it("should use default when env var is not set", () => {
-    const { FS_METADATA_TIMEOUT_MS: _, ...envWithoutVar } = process.env;
+    const envWithoutVar = { ...process.env };
+    delete envWithoutVar["FS_METADATA_TIMEOUT_MS"];
     const result = execSync(`npx tsx -e '${script}'`, { env: envWithoutVar });
     expect(result.toString().trim()).toBe("5000");
   });
