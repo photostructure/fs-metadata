@@ -16,6 +16,10 @@ Security in case of vulnerabilities.
 
 ## 0.8.0 - 2025-12-01
 
+### Added
+
+- `FS_METADATA_TIMEOUT_MS` environment variable for configuring operation timeout (see [gotchas.md](./doc/gotchas.md))
+
 ### Security
 
 - Fixed TOCTOU race condition in macOS hidden file operations by using `fstat()`/`fchflags()` with file descriptors instead of path-based `stat()`/`chflags()`
@@ -26,7 +30,7 @@ Security in case of vulnerabilities.
 - Fixed logic bug attempting to convert invalid CFStringRef in `ProcessNetworkVolume`
 - Fixed inconsistent `status` field when DiskArbitration returns partial results
 - Added `noexcept` to all RAII destructors to prevent `std::terminate` during stack unwinding
-- Fixed `g_volume_monitor_get()` memory leak in Linux GIO metadata enrichment
+- Removed `GVolumeMonitor` from Linux GIO metadata enrichment to fix thread safety issues
 - Fixed exception safety in Linux GIO metadata loop using RAII smart pointers
 - Fixed Windows `FindFirstFileEx` handle leak by using `FindClose` instead of `CloseHandle`
 - Fixed Windows promise race condition and resource leak from detached timeout threads
