@@ -197,4 +197,4 @@ git push origin main --follow-tags
 
 Never do inline imports like `const { mkdirSync } = await import("node:fs");` -- just use standard imports.
 
-Never include claude code messages in git commits
+**NEVER** add "Generated with Claude Code" or "Co-Authored-By: Claude" lines to git commit messages. Keep commits clean and professional.

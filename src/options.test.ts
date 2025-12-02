@@ -1,6 +1,10 @@
 // src/options.test.ts
 
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { _dirname } from "./dirname";
 import { OptionsDefault, optionsWithDefaults } from "./options";
 
 describe("options()", () => {
@@ -51,12 +55,17 @@ describe("options()", () => {
 
 describe("FS_METADATA_TIMEOUT_MS environment variable", () => {
   // These tests spawn subprocesses since the env var is parsed at module load time
-  // Using execFileSync with array args avoids shell quoting issues across platforms
+  // Using node + tsx CLI path directly avoids platform-specific npx resolution issues
+  // Use createRequire with pathToFileURL for cross-platform CJS/ESM compatibility
   const script = `import { TimeoutMsDefault } from "./src/options"; console.log(TimeoutMsDefault)`;
-  const args = ["tsx", "-e", script];
+  const nodeExe = process.execPath;
+  const thisFile = path.join(_dirname(), "options.test.ts");
+  const req = createRequire(pathToFileURL(thisFile).href);
+  const tsxCliPath = req.resolve("tsx/cli");
+  const args = [tsxCliPath, "-e", script];
 
   it("should use env var value when set to valid positive integer", () => {
-    const result = execFileSync("npx", args, {
+    const result = execFileSync(nodeExe, args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "12345" },
     });
     expect(result.toString().trim()).toBe("12345");
@@ -65,24 +74,24 @@ describe("FS_METADATA_TIMEOUT_MS environment variable", () => {
   it("should use default when env var is not set", () => {
     const envWithoutVar = { ...process.env };
     delete envWithoutVar["FS_METADATA_TIMEOUT_MS"];
-    const result = execFileSync("npx", args, { env: envWithoutVar });
+    const result = execFileSync(nodeExe, args, { env: envWithoutVar });
     expect(result.toString().trim()).toBe("5000");
   });
 
   it("should use default when env var is invalid", () => {
-    const result = execFileSync("npx", args, {
+    const result = execFileSync(nodeExe, args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "not-a-number" },
     });
     expect(result.toString().trim()).toBe("5000");
   });
 
   it("should use default when env var is zero or negative", () => {
-    let result = execFileSync("npx", args, {
+    let result = execFileSync(nodeExe, args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "0" },
     });
     expect(result.toString().trim()).toBe("5000");
 
-    result = execFileSync("npx", args, {
+    result = execFileSync(nodeExe, args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "-100" },
     });
     expect(result.toString().trim()).toBe("5000");
