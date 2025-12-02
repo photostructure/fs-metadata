@@ -1,6 +1,6 @@
 // src/options.test.ts
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { OptionsDefault, optionsWithDefaults } from "./options";
 
 describe("options()", () => {
@@ -51,10 +51,12 @@ describe("options()", () => {
 
 describe("FS_METADATA_TIMEOUT_MS environment variable", () => {
   // These tests spawn subprocesses since the env var is parsed at module load time
+  // Using execFileSync with array args avoids shell quoting issues across platforms
   const script = `import { TimeoutMsDefault } from "./src/options"; console.log(TimeoutMsDefault)`;
+  const args = ["tsx", "-e", script];
 
   it("should use env var value when set to valid positive integer", () => {
-    const result = execSync(`npx tsx -e '${script}'`, {
+    const result = execFileSync("npx", args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "12345" },
     });
     expect(result.toString().trim()).toBe("12345");
@@ -63,24 +65,24 @@ describe("FS_METADATA_TIMEOUT_MS environment variable", () => {
   it("should use default when env var is not set", () => {
     const envWithoutVar = { ...process.env };
     delete envWithoutVar["FS_METADATA_TIMEOUT_MS"];
-    const result = execSync(`npx tsx -e '${script}'`, { env: envWithoutVar });
+    const result = execFileSync("npx", args, { env: envWithoutVar });
     expect(result.toString().trim()).toBe("5000");
   });
 
   it("should use default when env var is invalid", () => {
-    const result = execSync(`npx tsx -e '${script}'`, {
+    const result = execFileSync("npx", args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "not-a-number" },
     });
     expect(result.toString().trim()).toBe("5000");
   });
 
   it("should use default when env var is zero or negative", () => {
-    let result = execSync(`npx tsx -e '${script}'`, {
+    let result = execFileSync("npx", args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "0" },
     });
     expect(result.toString().trim()).toBe("5000");
 
-    result = execSync(`npx tsx -e '${script}'`, {
+    result = execFileSync("npx", args, {
       env: { ...process.env, FS_METADATA_TIMEOUT_MS: "-100" },
     });
     expect(result.toString().trim()).toBe("5000");
