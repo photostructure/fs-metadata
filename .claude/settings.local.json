@@ -100,7 +100,10 @@
       "WebFetch(domain:typescript-eslint.io)"
     ],
     "deny": [],
-    "additionalDirectories": ["/home/mrm/src/exiftool-vendored.js"]
+    "additionalDirectories": [
+      "/home/mrm/src/exiftool-vendored.js",
+      "/home/mrm/src/node-sqlite"
+    ]
   },
   "enableAllProjectMcpServers": false
 }
