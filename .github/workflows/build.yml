@@ -189,73 +189,18 @@ jobs:
           name: prebuilds-linux-${{ matrix.arch }}-musl
           path: prebuilds/
 
-  test-mac-x64:
-    needs: [prebuild-mac-x64]
+  test-mac-win:
+    needs:
+      - prebuild-mac-x64
+      - prebuild-mac-arm64
+      - prebuild-win-x64
+      - prebuild-win-arm64
     strategy:
       fail-fast: false
       matrix:
+        os: [macos-15-intel, macos-14, windows-latest, windows-11-arm]
         node-version: [20, 22, 24, 25]
-    runs-on: macos-15-intel # Intel x64 runner, see https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories
-    steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          path: ./prebuilds
-          merge-multiple: true
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-      - run: npm ci
-      - run: npm run tests
-
-  test-mac-arm64:
-    needs: [prebuild-mac-arm64]
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20, 22, 24, 25]
-    runs-on: macos-14 # Apple Silicon ARM64 runner
-    steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          path: ./prebuilds
-          merge-multiple: true
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-      - run: npm ci
-      - run: npm run tests
-
-  test-win-x64:
-    needs: [prebuild-win-x64]
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20, 22, 24, 25]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          path: ./prebuilds
-          merge-multiple: true
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-      - run: npm ci
-      - run: npm run tests
-
-  test-win-arm64:
-    needs: [prebuild-win-arm64]
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20, 22, 24, 25]
-    runs-on: windows-11-arm
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
@@ -325,10 +270,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       [
-        test-mac-x64,
-        test-mac-arm64,
-        test-win-x64,
-        test-win-arm64,
+        test-mac-win,
         test-ubuntu,
         test-alpine,
         lint,
