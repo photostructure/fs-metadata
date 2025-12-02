@@ -1,5 +1,6 @@
 // src/options.test.ts
 
+import { execSync } from "node:child_process";
 import { OptionsDefault, optionsWithDefaults } from "./options";
 
 describe("options()", () => {
@@ -45,5 +46,42 @@ describe("options()", () => {
     const result = optionsWithDefaults(override);
     expect(result.systemPathPatterns).toEqual(override.systemPathPatterns);
     expect(result.systemFsTypes).toBe(OptionsDefault.systemFsTypes);
+  });
+});
+
+describe("FS_METADATA_TIMEOUT_MS environment variable", () => {
+  // These tests spawn subprocesses since the env var is parsed at module load time
+  const script = `import { TimeoutMsDefault } from "./src/options"; console.log(TimeoutMsDefault)`;
+
+  it("should use env var value when set to valid positive integer", () => {
+    const result = execSync(`npx tsx -e '${script}'`, {
+      env: { ...process.env, FS_METADATA_TIMEOUT_MS: "12345" },
+    });
+    expect(result.toString().trim()).toBe("12345");
+  });
+
+  it("should use default when env var is not set", () => {
+    const { FS_METADATA_TIMEOUT_MS: _, ...envWithoutVar } = process.env;
+    const result = execSync(`npx tsx -e '${script}'`, { env: envWithoutVar });
+    expect(result.toString().trim()).toBe("5000");
+  });
+
+  it("should use default when env var is invalid", () => {
+    const result = execSync(`npx tsx -e '${script}'`, {
+      env: { ...process.env, FS_METADATA_TIMEOUT_MS: "not-a-number" },
+    });
+    expect(result.toString().trim()).toBe("5000");
+  });
+
+  it("should use default when env var is zero or negative", () => {
+    let result = execSync(`npx tsx -e '${script}'`, {
+      env: { ...process.env, FS_METADATA_TIMEOUT_MS: "0" },
+    });
+    expect(result.toString().trim()).toBe("5000");
+
+    result = execSync(`npx tsx -e '${script}'`, {
+      env: { ...process.env, FS_METADATA_TIMEOUT_MS: "-100" },
+    });
+    expect(result.toString().trim()).toBe("5000");
   });
 });

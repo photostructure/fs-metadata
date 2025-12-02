@@ -4,6 +4,34 @@ This guide covers common issues, platform quirks, and important considerations w
 
 ## Timeout Issues
 
+### Configuring the Default Timeout
+
+The default timeout is 5000ms (5 seconds). You can override it in two ways:
+
+**1. Environment variable** (applies globally):
+
+```bash
+# Linux/macOS
+export FS_METADATA_TIMEOUT_MS=30000
+
+# Windows
+set FS_METADATA_TIMEOUT_MS=30000
+```
+
+**2. Per-call options** (takes precedence):
+
+```typescript
+const metadata = await getVolumeMetadata("/mnt/nas", {
+  timeoutMs: 30000, // 30 seconds
+});
+```
+
+The environment variable is useful for:
+
+- CI/CD pipelines with slow or emulated environments
+- Docker containers accessing remote volumes
+- Systems with many network mounts
+
 ### Network Volumes Can Hang
 
 **Problem**: Linux, macOS, and Windows can block system calls indefinitely when network filesystems are unhealthy.

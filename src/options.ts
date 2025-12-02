@@ -1,17 +1,33 @@
 // src/options.ts
 
 import { availableParallelism } from "node:os";
+import { env } from "node:process";
 import { compactValues, isObject } from "./object";
 import { isWindows } from "./platform";
 import type { Options } from "./types/options";
 
 /**
+ * Parse the `FS_METADATA_TIMEOUT_MS` environment variable.
+ *
+ * @returns The parsed timeout in milliseconds, or undefined if not set or invalid
+ */
+function parseEnvTimeoutMs(): number | undefined {
+  const value = env["FS_METADATA_TIMEOUT_MS"];
+  if (value == null) return undefined;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
  * Default timeout in milliseconds for {@link Options.timeoutMs}.
+ *
+ * This can be overridden by setting the `FS_METADATA_TIMEOUT_MS` environment
+ * variable to a positive integer.
  *
  * Note that this timeout may be insufficient for some devices, like spun-down
  * optical drives or network shares that need to spin up or reconnect.
  */
-export const TimeoutMsDefault = 5_000 as const;
+export const TimeoutMsDefault: number = parseEnvTimeoutMs() ?? 5_000;
 
 /**
  * System paths and globs that indicate system volumes
