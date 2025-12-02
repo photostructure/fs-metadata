@@ -56,7 +56,7 @@ console.log(metadata);
 ### Options
 
 - **Debug**: Set `NODE_DEBUG=fs-meta` for debug output
-- **Timeouts**: Configure [timeout duration](https://photostructure.github.io/fs-metadata/variables/TimeoutMsDefault.html) for slow devices
+- **Timeouts**: Configure [timeout duration](https://photostructure.github.io/fs-metadata/functions/getTimeoutMsDefault.html) for slow devices
   - Set `FS_METADATA_TIMEOUT_MS` environment variable to override the default (5000ms)
 - **System Volumes**: Control [system volume filtering](https://photostructure.github.io/fs-metadata/interfaces/Options.html)
 

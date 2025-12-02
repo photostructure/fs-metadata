@@ -12,7 +12,7 @@ export interface Options {
    *
    * Disable timeouts by setting this to 0.
    *
-   * @see {@link TimeoutMsDefault}.
+   * @see {@link getTimeoutMsDefault}.
    */
   timeoutMs: number;
 

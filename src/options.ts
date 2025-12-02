@@ -6,28 +6,25 @@ import { compactValues, isObject } from "./object";
 import { isWindows } from "./platform";
 import type { Options } from "./types/options";
 
-/**
- * Parse the `FS_METADATA_TIMEOUT_MS` environment variable.
- *
- * @returns The parsed timeout in milliseconds, or undefined if not set or invalid
- */
-function parseEnvTimeoutMs(): number | undefined {
-  const value = env["FS_METADATA_TIMEOUT_MS"];
-  if (value == null) return undefined;
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
+const DefaultTimeoutMs = 5_000;
 
 /**
- * Default timeout in milliseconds for {@link Options.timeoutMs}.
+ * Get the default timeout in milliseconds for {@link Options.timeoutMs}.
  *
  * This can be overridden by setting the `FS_METADATA_TIMEOUT_MS` environment
  * variable to a positive integer.
  *
  * Note that this timeout may be insufficient for some devices, like spun-down
  * optical drives or network shares that need to spin up or reconnect.
+ *
+ * @returns The timeout from env var if valid, otherwise 5000ms
  */
-export const TimeoutMsDefault: number = parseEnvTimeoutMs() ?? 5_000;
+export function getTimeoutMsDefault(): number {
+  const value = env["FS_METADATA_TIMEOUT_MS"];
+  if (value == null) return DefaultTimeoutMs;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DefaultTimeoutMs;
+}
 
 /**
  * System paths and globs that indicate system volumes
@@ -120,7 +117,7 @@ export const SkipNetworkVolumesDefault = false;
  * @see {@link optionsWithDefaults} for creating an options object with default values
  */
 export const OptionsDefault: Options = {
-  timeoutMs: TimeoutMsDefault,
+  timeoutMs: getTimeoutMsDefault(),
   maxConcurrency: availableParallelism(),
   systemPathPatterns: [...SystemPathPatternsDefault],
   systemFsTypes: [...SystemFsTypesDefault],

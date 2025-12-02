@@ -13,13 +13,13 @@ import {
   setHiddenImpl,
 } from "./hidden";
 import {
+  getTimeoutMsDefault,
   IncludeSystemVolumesDefault,
   LinuxMountTablePathsDefault,
   OptionsDefault,
   optionsWithDefaults,
   SystemFsTypesDefault,
   SystemPathPatternsDefault,
-  TimeoutMsDefault,
 } from "./options";
 import type { StringEnum, StringEnumKeys, StringEnumType } from "./string_enum";
 import type { SystemVolumeConfig } from "./system_volume";
@@ -118,7 +118,7 @@ export function getVolumeMetadata(
  * {@link https://nodejs.org/api/os.html#osavailableparallelism | os.availableParallelism()}
  * @param opts.timeoutMs - Maximum time to wait for
  * {@link getVolumeMountPointsImpl}, as well as **each** {@link getVolumeMetadataImpl}
- * to complete. Defaults to {@link TimeoutMsDefault}
+ * to complete. Defaults to {@link getTimeoutMsDefault}
  * @returns Promise that resolves to an array of either VolumeMetadata objects
  * or error objects containing the mount point and error
  * @throws Never - errors are caught and returned as part of the result array
@@ -186,12 +186,12 @@ export function setHidden(
 }
 
 export {
+  getTimeoutMsDefault,
   IncludeSystemVolumesDefault,
   LinuxMountTablePathsDefault,
   OptionsDefault,
   optionsWithDefaults,
   SystemFsTypesDefault,
   SystemPathPatternsDefault,
-  TimeoutMsDefault,
   VolumeHealthStatuses,
 };
