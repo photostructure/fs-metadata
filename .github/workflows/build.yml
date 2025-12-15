@@ -86,7 +86,7 @@ jobs:
       # not run node-gyp-build
       - run: npm ci --ignore-scripts
       - run: npm run build:native
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: prebuilds-macos-15-intel
           path: prebuilds/
@@ -104,7 +104,7 @@ jobs:
       # not run node-gyp-build
       - run: npm ci --ignore-scripts
       - run: npm run build:native
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: prebuilds-macos-14
           path: prebuilds/
@@ -121,7 +121,7 @@ jobs:
       # not run node-gyp-build
       - run: npm ci --ignore-scripts
       - run: npm run build:native
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: prebuilds-windows-latest
           path: prebuilds/
@@ -138,7 +138,7 @@ jobs:
       # not run node-gyp-build
       - run: npm ci --ignore-scripts
       - run: npm run build:native
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: prebuilds-windows-11-arm
           path: prebuilds/
@@ -159,7 +159,7 @@ jobs:
       # This ensures compatibility with Ubuntu 20.04+ and modern Node.js Docker images
       # Note: npm ci is run inside the container by the build:linux-glibc script
       - run: TARGET_ARCH=${{ matrix.arch }} npm run build:linux-glibc
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: prebuilds-linux-${{ matrix.arch }}-glibc
           path: prebuilds/
@@ -184,7 +184,7 @@ jobs:
           cd /tmp/project && \
           npm ci --ignore-scripts && \
           npm run build:native"
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: prebuilds-linux-${{ matrix.arch }}-musl
           path: prebuilds/
