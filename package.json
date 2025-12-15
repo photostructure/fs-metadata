@@ -118,7 +118,7 @@
     "@types/semver": "^7.7.1",
     "cross-env": "^10.1.0",
     "del-cli": "^7.0.0",
-    "eslint": "9.39.1",
+    "eslint": "9.39.2",
     "eslint-plugin-regexp": "^2.10.0",
     "eslint-plugin-security": "^3.0.1",
     "globals": "^16.5.0",
