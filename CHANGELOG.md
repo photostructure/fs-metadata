@@ -117,9 +117,9 @@ Security in case of vulnerabilities.
 
 - `Packaging`: Improved ESM/CJS support with common `__dirname` implementation thanks to `tsup` [shims](https://tsup.egoist.dev/#inject-cjs-and-esm-shims).
 
-  This change simplifies the implementation and improves inline jsdocs as the exported code and docs have been inlined.
+  This change simplifies the implementation and improves inline js docs as the exported code and docs have been inlined.
 
-- `Packaging`: Re-enabled test coverage assertions (after finding the magicks to get istanbul to see what the tests were exercising)
+- `Packaging`: Re-enabled test coverage assertions (after finding the magics to get istanbul to see what the tests were exercising)
 
 - `Packaging`: Added debuglog tests
 
