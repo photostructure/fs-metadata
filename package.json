@@ -62,26 +62,8 @@
     "update:actions": "pinact run -u || echo \"problem with pinact\"",
     "// precommit": "should be manually run by developers before they run `git commit`",
     "precommit": "npx --yes tsx scripts/precommit.ts",
-    "prepare-release": "npm run build:dist",
-    "release": "release-it"
+    "prepare-release": "npm run build:dist"
   },
-  "release-it": {
-    "git": {
-      "requireBranch": "main",
-      "commitMessage": "release: ${version}",
-      "tagName": "v${version}",
-      "commitArgs": "--gpg-sign",
-      "tagArgs": "--sign"
-    },
-    "github": {
-      "release": true
-    },
-    "npm": {
-      "publish": true,
-      "skipChecks": true
-    }
-  },
-  "# release-it.npm.skipChecks": "Required for OIDC Trusted Publishing - bypasses npm auth checks since OIDC handles authentication automatically. See: https://github.com/release-it/release-it/issues/1244 and https://docs.npmjs.com/trusted-publishers#supported-cicd-providers",
   "gypfile": true,
   "publishConfig": {
     "access": "public"
@@ -131,7 +113,6 @@
     "prebuildify": "^6.0.1",
     "prettier": "^3.7.4",
     "prettier-plugin-organize-imports": "4.3.0",
-    "release-it": "^19.2.2",
     "terser": "^5.44.1",
     "ts-jest": "^29.4.6",
     "tsup": "^8.5.1",
