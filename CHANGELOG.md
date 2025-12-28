@@ -14,6 +14,12 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 0.8.1 - 2025-12-28
+
+### Changed
+
+- Added container runtime paths to the default set of system paths. See SystemPathPatternsDefault
+
 ## 0.8.0 - 2025-12-01
 
 ### Added
