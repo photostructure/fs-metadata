@@ -47,6 +47,13 @@ export interface Options {
   linuxMountTablePaths: string[];
 
   /**
+   * Filesystem types that indicate network/remote volumes.
+   *
+   * @see {@link NetworkFsTypesDefault} for the default value
+   */
+  networkFsTypes: string[];
+
+  /**
    * Should system volumes be included in result arrays? Defaults to true on
    * Windows and false elsewhere.
    */

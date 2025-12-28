@@ -37,6 +37,7 @@ export const SystemPathPatternsDefault = [
   "/proc/**",
   "/run",
   "/run/credentials/**",
+  "/run/flatpak/**",
   "/run/lock",
   "/run/snapd/**",
   "/run/user/*/doc",
@@ -66,14 +67,23 @@ export const SystemPathPatternsDefault = [
   // - Rootless and rootful container storage
   "/run/containers/**",
   "/var/lib/containers/**",
+  //
+  // Kubernetes: https://kubernetes.io/docs/reference/node/kubelet-files/
+  // - kubelet stores pod data, device plugins, and seccomp profiles
+  "/var/lib/kubelet/**",
+  //
+  // LXC/LXD: https://linuxcontainers.org/
+  // - Linux container storage and configuration
+  "/var/lib/lxc/**",
+  "/var/lib/lxd/**",
 
-  // windows for linux:
+  // WSL (Windows Subsystem for Linux):
   "/mnt/wslg/distro",
   "/mnt/wslg/doc",
   "/mnt/wslg/versions.txt",
   "/usr/lib/wsl/drivers",
 
-  // MacOS stuff:
+  // macOS system paths:
   "/private/var/vm", // macOS swap
   "/System/Volumes/Hardware",
   "/System/Volumes/iSCPreboot",
@@ -83,14 +93,30 @@ export const SystemPathPatternsDefault = [
   "/System/Volumes/Update",
   "/System/Volumes/VM",
   "/System/Volumes/xarts",
+
+  // macOS per-volume metadata (Spotlight, FSEvents, versioning, Trash):
+  // https://eclecticlight.co/2021/01/28/spotlight-on-search-how-spotlight-works/
+  "**/.DocumentRevisions-V100",
+  "**/.fseventsd",
+  "**/.Spotlight-V100",
+  "**/.Trashes",
 ] as const;
 
 /**
- * Filesystem types that indicate system volumes
+ * Filesystem types that indicate system/virtual volumes.
+ *
+ * These are pseudo-filesystems that don't represent real storage devices.
+ * See /proc/filesystems for the full list supported by the running kernel.
+ *
+ * @see https://www.kernel.org/doc/html/latest/filesystems/ - Linux kernel filesystem docs
+ * @see https://man7.org/linux/man-pages/man5/proc_filesystems.5.html - /proc/filesystems
  */
 export const SystemFsTypesDefault = [
   "autofs",
   "binfmt_misc",
+  // BPF filesystem for persistent BPF objects
+  // https://docs.kernel.org/bpf/
+  "bpf",
   "cgroup",
   "cgroup2",
   "configfs",
@@ -99,24 +125,108 @@ export const SystemFsTypesDefault = [
   "devtmpfs",
   "efivarfs",
   "fusectl",
+  // LXC container filesystem virtualization
+  // https://linuxcontainers.org/lxcfs/
+  "fuse.lxcfs",
+  // XDG Desktop Portal for Flatpak sandboxed app file access
+  // https://flatpak.github.io/xdg-desktop-portal/
+  "fuse.portal",
   "fuse.snapfuse",
   "hugetlbfs",
   "mqueue",
   "none",
+  // Linux namespace filesystem (internal kernel use)
+  // https://man7.org/linux/man-pages/man7/namespaces.7.html
+  "nsfs",
   "proc",
   "pstore",
+  // RAM-based filesystem (predecessor to tmpfs)
+  // https://www.kernel.org/doc/html/latest/filesystems/ramfs-rootfs-initramfs.html
+  "ramfs",
   "rootfs",
+  // NFS RPC communication pipe filesystem
+  // https://man7.org/linux/man-pages/man8/rpc.gssd.8.html
+  "rpc_pipefs",
   "securityfs",
   "snap*",
   "squashfs",
   "sysfs",
   "tmpfs",
+  // Kernel function tracing filesystem
+  // https://www.kernel.org/doc/html/latest/trace/ftrace.html
+  "tracefs",
 ] as const;
 
 export const LinuxMountTablePathsDefault = [
   "/proc/self/mounts",
   "/proc/mounts",
   "/etc/mtab",
+] as const;
+
+/**
+ * Network/remote filesystem types.
+ *
+ * These filesystems require network connectivity and may have higher latency
+ * or availability concerns. Used by {@link Options.networkFsTypes}.
+ *
+ * Based on systemd's fstype_is_network() and common FUSE remote filesystems.
+ * @see https://github.com/systemd/systemd/blob/main/src/basic/mountpoint-util.c - fstype_is_network()
+ */
+export const NetworkFsTypesDefault = [
+  // Plan 9 filesystem (VM host-guest, also network)
+  // https://www.kernel.org/doc/html/latest/filesystems/9p.html
+  "9p",
+  // Apple Filing Protocol (legacy macOS/netatalk)
+  "afp",
+  // Andrew File System (distributed) - not to be confused with Apple's APFS
+  // https://www.openafs.org/
+  "afs",
+  // BeeGFS parallel filesystem (HPC)
+  // https://www.beegfs.io/
+  "beegfs",
+  // Ceph distributed filesystem
+  // https://docs.ceph.com/
+  "ceph",
+  // Windows/Samba shares (SMB/CIFS)
+  // https://www.samba.org/
+  "cifs",
+  // FTP filesystem mount
+  "ftp",
+  // Generic FUSE (often remote, treated conservatively)
+  "fuse",
+  // rclone cloud storage mount (Google Drive, S3, etc.)
+  // https://rclone.org/commands/rclone_mount/
+  "fuse.rclone",
+  // Amazon S3 FUSE mount
+  // https://github.com/s3fs-fuse/s3fs-fuse
+  "fuse.s3fs",
+  // SSH filesystem
+  // https://github.com/libfuse/sshfs
+  "fuse.sshfs",
+  // Red Hat Global File System (cluster)
+  "gfs",
+  "gfs2",
+  // GlusterFS distributed filesystem
+  // https://www.gluster.org/
+  "glusterfs",
+  // Lustre parallel filesystem (HPC)
+  // https://www.lustre.org/
+  "lustre",
+  // Novell NetWare (legacy)
+  "ncpfs",
+  "ncp",
+  // Network File System
+  // https://man7.org/linux/man-pages/man5/nfs.5.html
+  "nfs",
+  "nfs4",
+  // SMB filesystem
+  "smb",
+  "smbfs",
+  // SSH filesystem (non-FUSE variant)
+  "sshfs",
+  // WebDAV filesystem
+  // https://savannah.nongnu.org/projects/davfs2
+  "webdav",
 ] as const;
 
 /**
@@ -141,6 +251,7 @@ export const OptionsDefault: Options = {
   systemPathPatterns: [...SystemPathPatternsDefault],
   systemFsTypes: [...SystemFsTypesDefault],
   linuxMountTablePaths: [...LinuxMountTablePathsDefault],
+  networkFsTypes: [...NetworkFsTypesDefault],
   includeSystemVolumes: IncludeSystemVolumesDefault,
   skipNetworkVolumes: SkipNetworkVolumesDefault,
 } as const;

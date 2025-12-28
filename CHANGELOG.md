@@ -14,6 +14,19 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 0.9.0 - 2025-12-28
+
+### Added
+
+- New `networkFsTypes` option for configuring network filesystem detection
+- `NetworkFsTypesDefault` and `SkipNetworkVolumesDefault` exports
+
+### Changed
+
+- Expanded `SystemFsTypesDefault` with `bpf`, `tracefs`, `nsfs`, `ramfs`, `rpc_pipefs`, `fuse.lxcfs`, `fuse.portal`
+- Expanded `SystemPathPatternsDefault` with macOS metadata paths, kubelet, LXC/LXD, Flatpak paths
+- `isRemoteFsType()` and `extractRemoteInfo()` accept optional `networkFsTypes` parameter
+
 ## 0.8.1 - 2025-12-28
 
 ### Changed

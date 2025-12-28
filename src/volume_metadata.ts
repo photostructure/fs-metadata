@@ -109,14 +109,14 @@ async function _getVolumeMetadata(
   // Some OS implementations leave it up to us to extract remote info:
   const remoteInfo =
     mtabInfo ??
-    extractRemoteInfo(metadata.uri) ??
-    extractRemoteInfo(metadata.mountFrom) ??
+    extractRemoteInfo(metadata.uri, o.networkFsTypes) ??
+    extractRemoteInfo(metadata.mountFrom, o.networkFsTypes) ??
     (isWindows ? parseUNCPath(o.mountPoint) : undefined);
 
   debug("[getVolumeMetadata] extracted remote info: %o", remoteInfo);
 
   remote ||=
-    isRemoteFsType(metadata.fstype) ||
+    isRemoteFsType(metadata.fstype, o.networkFsTypes) ||
     (remoteInfo?.remote ?? metadata.remote ?? false);
 
   debug("[getVolumeMetadata] assembling: %o", {

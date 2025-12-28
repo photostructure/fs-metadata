@@ -1,6 +1,7 @@
 // src/linux/mtab.ts
 
 import { toInt } from "../number";
+import { NetworkFsTypesDefault } from "../options";
 import { normalizePosixPath } from "../path";
 import { extractRemoteInfo } from "../remote_info";
 import {
@@ -9,8 +10,9 @@ import {
   isBlank,
   toNotBlank,
 } from "../string";
-import { isSystemVolume, SystemVolumeConfig } from "../system_volume";
+import { isSystemVolume } from "../system_volume";
 import type { MountPoint } from "../types/mount_point";
+import type { Options } from "../types/options";
 import type { VolumeMetadata } from "../types/volume_metadata";
 
 /**
@@ -61,17 +63,22 @@ export type MtabVolumeMetadata = Omit<
   "size" | "used" | "available" | "label" | "uuid" | "status"
 >;
 
+export type MtabOptions = Partial<
+  Pick<Options, "systemPathPatterns" | "systemFsTypes" | "networkFsTypes">
+>;
+
 export function mountEntryToPartialVolumeMetadata(
   entry: MountEntry,
-  options: Partial<SystemVolumeConfig> = {},
+  options: MtabOptions = {},
 ): MtabVolumeMetadata {
+  const networkFsTypes = options.networkFsTypes ?? NetworkFsTypesDefault;
   return {
     mountPoint: entry.fs_file,
     fstype: entry.fs_vfstype,
     mountFrom: entry.fs_spec,
     isSystemVolume: isSystemVolume(entry.fs_file, entry.fs_vfstype, options),
     remote: false, // < default to false, but it may be overridden by extractRemoteInfo
-    ...extractRemoteInfo(entry.fs_spec),
+    ...extractRemoteInfo(entry.fs_spec, networkFsTypes),
   };
 }
 

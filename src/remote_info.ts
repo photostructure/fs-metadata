@@ -2,6 +2,7 @@
 
 import { debug } from "./debuglog";
 import { compactValues, isObject } from "./object";
+import { NetworkFsTypesDefault } from "./options";
 import { isWindows } from "./platform";
 import { isBlank, isNotBlank, toS } from "./string";
 import { RemoteInfo } from "./types/remote_info";
@@ -12,58 +13,44 @@ export function isRemoteInfo(obj: unknown): obj is RemoteInfo {
   return isNotBlank(remoteHost) && isNotBlank(remoteShare);
 }
 
-const NETWORK_FS_TYPE_ARRAY = [
-  "9p",
-  "afp",
-  "afs",
-  "beegfs",
-  "ceph",
-  "cifs",
-  "ftp",
-  "fuse",
-  "gfs2",
-  "glusterfs",
-  "lustre",
-  "ncpfs",
-  "nfs",
-  "nfs4",
-  "smb",
-  "smbfs",
-  "sshfs",
-  "webdav",
-] as const;
-
-type NetworkFsType = (typeof NETWORK_FS_TYPE_ARRAY)[number];
-
-const NETWORK_FS_TYPES = new Set<NetworkFsType>(NETWORK_FS_TYPE_ARRAY);
-
-const FS_TYPE_ALIASES = new Map<string, NetworkFsType>([
+/**
+ * Aliases that map variant filesystem type names to canonical names.
+ */
+const FS_TYPE_ALIASES = new Map<string, string>([
   ["nfs1", "nfs"],
   ["nfs2", "nfs"],
   ["nfs3", "nfs"],
-  ["nfs4", "nfs4"],
   ["fuse.sshfs", "sshfs"],
   ["sshfs.fuse", "sshfs"],
   ["davfs2", "webdav"],
   ["davfs", "webdav"],
   ["cifs.smb", "cifs"],
-  ["smbfs", "cifs"],
   ["cephfs", "ceph"],
   ["fuse.ceph", "ceph"],
   ["fuse.cephfs", "ceph"],
   ["rbd", "ceph"],
   ["fuse.glusterfs", "glusterfs"],
-] as const);
+]);
 
 export function normalizeFsType(fstype: string): string {
   const norm = toS(fstype).toLowerCase().replace(/:$/, "");
   return FS_TYPE_ALIASES.get(norm) ?? norm;
 }
 
-export function isRemoteFsType(fstype: string | undefined): boolean {
-  return (
-    isNotBlank(fstype) &&
-    NETWORK_FS_TYPES.has(normalizeFsType(fstype) as NetworkFsType)
+/**
+ * Check if a filesystem type indicates a remote/network volume.
+ *
+ * @param fstype - The filesystem type to check
+ * @param networkFsTypes - List of network filesystem types (defaults to {@link NetworkFsTypesDefault})
+ */
+export function isRemoteFsType(
+  fstype: string | undefined,
+  networkFsTypes: readonly string[] = NetworkFsTypesDefault,
+): boolean {
+  if (!isNotBlank(fstype)) return false;
+  const normalized = normalizeFsType(fstype);
+  return networkFsTypes.some(
+    (nft) => nft === normalized || normalized.startsWith(nft + "."),
   );
 }
 
@@ -75,8 +62,15 @@ export function parseURL(s: string): URL | undefined {
   }
 }
 
+/**
+ * Extract remote connection info from a filesystem spec string.
+ *
+ * @param fsSpec - The filesystem spec (e.g., "//host/share", "host:/path", URI)
+ * @param networkFsTypes - List of network filesystem types (defaults to {@link NetworkFsTypesDefault})
+ */
 export function extractRemoteInfo(
   fsSpec: string | undefined,
+  networkFsTypes: readonly string[] = NetworkFsTypesDefault,
 ): RemoteInfo | undefined {
   if (fsSpec == null || isBlank(fsSpec)) return;
 
@@ -132,7 +126,7 @@ export function extractRemoteInfo(
     if (parsed != null) {
       debug("[extractRemoteInfo] parsed URL: %o", parsed);
       const fstype = normalizeFsType(parsed.protocol);
-      if (!isRemoteFsType(fstype)) {
+      if (!isRemoteFsType(fstype, networkFsTypes)) {
         // don't set remoteUser, remoteHost, or remoteShare, it's not remote!
         return {
           uri: fsSpec,
