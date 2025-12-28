@@ -22,6 +22,38 @@ describe("isSystemVolume", () => {
     { mountPoint: "/sys/fs/cgroup", fstype: "cgroup2", expected: true },
     { mountPoint: "/sys/fs/bpf", fstype: "bpf", expected: true },
     { mountPoint: "/mnt/remote/nas/#snapshot", fstype: "cifs", expected: true },
+    // Container runtime paths (Docker, containerd, Podman)
+    {
+      mountPoint: "/run/docker/netns/180b04c7697a",
+      fstype: "nsfs",
+      expected: true,
+    },
+    {
+      mountPoint:
+        "/var/lib/docker/overlay2/abc123/merged",
+      fstype: "overlay",
+      expected: true,
+    },
+    {
+      mountPoint: "/run/containerd/io.containerd.runtime.v2.task/k8s.io/abc",
+      fstype: "tmpfs",
+      expected: true,
+    },
+    {
+      mountPoint: "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs",
+      fstype: "ext4",
+      expected: true,
+    },
+    {
+      mountPoint: "/run/containers/storage/overlay-containers",
+      fstype: "tmpfs",
+      expected: true,
+    },
+    {
+      mountPoint: "/var/lib/containers/storage/overlay",
+      fstype: "ext4",
+      expected: true,
+    },
   ]) {
     it(`should return ${expected} for ${mountPoint} (${fstype})`, () => {
       expect(isSystemVolume(mountPoint, fstype)).toBe(expected);

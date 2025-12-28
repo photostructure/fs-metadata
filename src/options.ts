@@ -48,6 +48,25 @@ export const SystemPathPatternsDefault = [
   // we aren't including /tmp/**, as some people temporarily mount volumes there, like /tmp/project.
   "**/#snapshot", // Synology and Kubernetes volume snapshots
 
+  // Container runtime paths - these are internal infrastructure paths that are
+  // inaccessible to non-root processes and should never be scanned.
+  //
+  // Docker: https://docs.docker.com/engine/storage/drivers/overlayfs-driver/
+  // - /var/lib/docker contains overlay2 filesystems, container layers, images
+  // - /run/docker contains runtime data like network namespaces
+  "/run/docker/**",
+  "/var/lib/docker/**",
+  //
+  // containerd: https://github.com/containerd/containerd/blob/main/docs/ops.md
+  // - Used by Kubernetes, Docker (as backend), and standalone
+  "/run/containerd/**",
+  "/var/lib/containerd/**",
+  //
+  // Podman/CRI-O: https://podman.io/docs/installation#storage
+  // - Rootless and rootful container storage
+  "/run/containers/**",
+  "/var/lib/containers/**",
+
   // windows for linux:
   "/mnt/wslg/distro",
   "/mnt/wslg/doc",
