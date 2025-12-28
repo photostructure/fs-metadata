@@ -29,8 +29,7 @@ describe("isSystemVolume", () => {
       expected: true,
     },
     {
-      mountPoint:
-        "/var/lib/docker/overlay2/abc123/merged",
+      mountPoint: "/var/lib/docker/overlay2/abc123/merged",
       fstype: "overlay",
       expected: true,
     },
