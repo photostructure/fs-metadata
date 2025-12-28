@@ -48,6 +48,7 @@ console.log(metadata);
 
 ## Documentation
 
+- [Security reporting](./SECURITY.md) - How to report security issues
 - [API Reference](https://photostructure.github.io/fs-metadata/modules.html)
 - [Examples](./doc/examples.md) - Common usage patterns and recipes
 - [Gotchas](./doc/gotchas.md) - Platform quirks, timeouts, and troubleshooting
@@ -59,3 +60,7 @@ console.log(metadata);
 - **Timeouts**: Configure [timeout duration](https://photostructure.github.io/fs-metadata/functions/getTimeoutMsDefault.html) for slow devices
   - Set `FS_METADATA_TIMEOUT_MS` environment variable to override the default (5000ms)
 - **System Volumes**: Control [system volume filtering](https://photostructure.github.io/fs-metadata/interfaces/Options.html)
+
+## Development
+
+Development of this library was assisted by AI coding tools. All changes are human-reviewed and tested.
