@@ -1,6 +1,6 @@
 ![PhotoStructure fs-metadata logo](https://raw.githubusercontent.com/photostructure/fs-metadata/main/doc/logo.svg)
 
-Cross-platform native Node.js module for filesystem metadata, mount points, and volume information.
+Cross-platform native Node.js module for filesystem metadata, mount points, and volume information. Built for and supported by [PhotoStructure](https://photostructure.com).
 
 [![npm version](https://img.shields.io/npm/v/@photostructure/fs-metadata.svg)](https://www.npmjs.com/package/@photostructure/fs-metadata)
 [![Build](https://github.com/photostructure/fs-metadata/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/photostructure/fs-metadata/actions/workflows/build.yml)
@@ -48,10 +48,10 @@ console.log(metadata);
 
 ## Documentation
 
-- 📖 [API Reference](https://photostructure.github.io/fs-metadata/modules.html)
-- 💡 [Examples](./doc/examples.md) - Common usage patterns and recipes
-- ⚠️ [Gotchas](./doc/gotchas.md) - Platform quirks, timeouts, and troubleshooting
-- 🔧 [Contributing](./CONTRIBUTING.md) - Build instructions and development guide
+- [API Reference](https://photostructure.github.io/fs-metadata/modules.html)
+- [Examples](./doc/examples.md) - Common usage patterns and recipes
+- [Gotchas](./doc/gotchas.md) - Platform quirks, timeouts, and troubleshooting
+- [Contributing](./CONTRIBUTING.md) - Build instructions and development guide
 
 ### Options
 
@@ -59,11 +59,3 @@ console.log(metadata);
 - **Timeouts**: Configure [timeout duration](https://photostructure.github.io/fs-metadata/functions/getTimeoutMsDefault.html) for slow devices
   - Set `FS_METADATA_TIMEOUT_MS` environment variable to override the default (5000ms)
 - **System Volumes**: Control [system volume filtering](https://photostructure.github.io/fs-metadata/interfaces/Options.html)
-
-## Support
-
-Built and supported by [PhotoStructure](https://photostructure.com)
-
-- [GitHub Issues](https://github.com/photostructure/fs-metadata/issues)
-- [Security Policy](./SECURITY.md)
-- [MIT License](./LICENSE.txt)
