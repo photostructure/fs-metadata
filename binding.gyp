@@ -31,11 +31,13 @@
               "-lblkid"
             ],
             "cflags": [
-              "-fPIC"
+              "-fPIC",
+              "-fstack-protector-strong"
             ],
             "cflags_cc": [
               "-fexceptions",
-              "-fPIC"
+              "-fPIC",
+              "-fstack-protector-strong"
             ],
             "conditions": [
               [
@@ -179,14 +181,19 @@
               "CLANG_CXX_LANGUAGE_STANDARD": "c++17",
               "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
               "CLANG_CXX_LIBRARY": "libc++",
-              "MACOSX_DEPLOYMENT_TARGET": "10.15"
+              "MACOSX_DEPLOYMENT_TARGET": "10.15",
+              "OTHER_CFLAGS": [
+                "-fstack-protector-strong"
+              ]
             },
             "cflags": [
               "-fexceptions",
-              "-fPIC"
+              "-fPIC",
+              "-fstack-protector-strong"
             ],
             "cflags_cc": [
-              "-fexceptions"
+              "-fexceptions",
+              "-fstack-protector-strong"
             ],
             "link_settings": {
               "libraries": [
