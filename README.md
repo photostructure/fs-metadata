@@ -7,7 +7,7 @@ Cross-platform native Node.js module for filesystem metadata, mount points, and 
 [![Node-API v9 Badge](https://raw.githubusercontent.com/nodejs/abi-stable-node/refs/heads/doc/assets/Node-API%20v9%20Badge.svg)](https://nodejs.org/dist/latest/docs/api/n-api.html#node-api-version-matrix)
 [![View on GitHub](https://img.shields.io/badge/View%20on-GitHub-blue)](https://github.com/photostructure/fs-metadata)
 
-## Quick Start
+## Quick start
 
 ```bash
 npm install @photostructure/fs-metadata
@@ -28,14 +28,14 @@ const metadata = await getVolumeMetadata("/");
 console.log(metadata);
 ```
 
-## Key Features
+## Features
 
-- **Volume Management**: List mount points, get volume metadata, space usage
-- **Hidden Files**: Get/set hidden attributes, recursive checks, cross-platform support
+- **Volume management**: List mount points, get volume metadata, space usage
+- **Hidden files**: Get/set hidden attributes, recursive checks, cross-platform support
 - **Performance**: Non-blocking async operations with timeout protection
-- **TypeScript**: Full type definitions with ESM and CommonJS support
+- **TypeScript**: Type definitions with ESM and CommonJS support
 
-## Supported Platforms
+## Supported platforms
 
 | Platform      | Architecture | Node.js | OS Version                |
 | ------------- | ------------ | ------- | ------------------------- |
