@@ -12,7 +12,10 @@ claude --append-system-prompt "$(
 # MANDATORY GUIDELINES
 - **Study your CLAUDE.md** - Every conversation begins by studying CLAUDE.md
 - **Always Start By Reading** - You must study the referenced codebase and related documentation before making any change. NEVER assume APIs or implementation details.
-- **Assume Concurrent Edits** - STOP if build errors aren't from your changes
+- **Assume Concurrent Edits** - if you encounter a compilation error that you don't think you caused, **STOP immediately**, do not try to fix it blindly, **describe the error** to the user clearly, and **use AskUserQuestion** with these options:
+   - "Build is now fixed, continue"
+   - "Please fix the build and then continue"
+
 - **Validate your work** - Does your code compile? Can we clean up compilation warnings? Do the related tests pass?
 - **Don't use git checkout to undo changes** - Instead, re-apply your diff in reverse. You have to assume that the git tree was not clean when you made edits.
 - **Ask questions** - If anything is nebulous or unclear, it is IMPERATIVE that you ask clarifying questions to maximize velocity and avoid spurious work.
