@@ -1,4 +1,4 @@
-![PhotoStructure fs-metadata logo](https://raw.githubusercontent.com/photostructure/fs-metadata/main/doc/logo.svg)
+<img src="https://raw.githubusercontent.com/photostructure/fs-metadata/main/doc/logo.svg" alt="PhotoStructure fs-metadata logo" width="200">
 
 Cross-platform native Node.js module for filesystem metadata, mount points, and volume information. Built for and supported by [PhotoStructure](https://photostructure.com).
 
