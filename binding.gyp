@@ -32,12 +32,18 @@
             ],
             "cflags": [
               "-fPIC",
-              "-fstack-protector-strong"
+              "-fstack-protector-strong",
+              "-D_FORTIFY_SOURCE=2",
+              "-Wformat-security",
+              "-fcf-protection=full"
             ],
             "cflags_cc": [
               "-fexceptions",
               "-fPIC",
-              "-fstack-protector-strong"
+              "-fstack-protector-strong",
+              "-D_FORTIFY_SOURCE=2",
+              "-Wformat-security",
+              "-fcf-protection=full"
             ],
             "conditions": [
               [
@@ -102,6 +108,8 @@
                       "AdditionalOptions": [
                         "/guard:cf",
                         "/DYNAMICBASE",
+                        "/HIGHENTROPYVA",
+                        "/NXCOMPAT",
                         "/CETCOMPAT"
                       ]
                     }
@@ -135,41 +143,15 @@
                     "VCLinkerTool": {
                       "AdditionalOptions": [
                         "/guard:cf",      # Control Flow Guard at link time
-                        "/DYNAMICBASE"    # ASLR (Address Space Layout Randomization)
-                        # NOTE: /CETCOMPAT omitted - Intel CET is x64-specific
+                        "/DYNAMICBASE",   # ASLR (Address Space Layout Randomization)
+                        "/NXCOMPAT"       # DEP (Data Execution Prevention)
+                        # NOTE: /HIGHENTROPYVA and /CETCOMPAT are x64-specific
                         #       ARM64 has equivalent hardware security features
                       ]
                     }
                   }
                 }
               ],
-              [
-                "target_arch=='ia32'",
-                {
-                  "defines": [
-                    "_M_IX86"
-                  ],
-                  "msvs_settings": {
-                    "VCCLCompilerTool": {
-                      "WarningLevel": 4,
-                      "AdditionalOptions": [
-                        "/Qspectre",
-                        "/guard:cf",
-                        "/ZH:SHA_256",
-                        "/sdl"
-                      ],
-                      "ExceptionHandling": 1,
-                      "RuntimeTypeInfo": "true"
-                    },
-                    "VCLinkerTool": {
-                      "AdditionalOptions": [
-                        "/guard:cf",
-                        "/DYNAMICBASE"
-                      ]
-                    }
-                  }
-                }
-              ]
             ]
           }
         ],
@@ -187,17 +169,23 @@
               "CLANG_CXX_LIBRARY": "libc++",
               "MACOSX_DEPLOYMENT_TARGET": "10.15",
               "OTHER_CFLAGS": [
-                "-fstack-protector-strong"
+                "-fstack-protector-strong",
+                "-D_FORTIFY_SOURCE=2",
+                "-Wformat-security"
               ]
             },
             "cflags": [
               "-fexceptions",
               "-fPIC",
-              "-fstack-protector-strong"
+              "-fstack-protector-strong",
+              "-D_FORTIFY_SOURCE=2",
+              "-Wformat-security"
             ],
             "cflags_cc": [
               "-fexceptions",
-              "-fstack-protector-strong"
+              "-fstack-protector-strong",
+              "-D_FORTIFY_SOURCE=2",
+              "-Wformat-security"
             ],
             "link_settings": {
               "libraries": [
