@@ -20,7 +20,8 @@ Security in case of vulnerabilities.
 
 - Windows: add `/NXCOMPAT` (DEP) and `/HIGHENTROPYVA` (x64 high-entropy ASLR) linker flags
 - Windows: add `WarningLevel: 4` as structured MSBuild property on x64 and ARM64 targets (avoids `/W` flag ordering conflicts with node-gyp defaults)
-- Linux/macOS: add `-D_FORTIFY_SOURCE=2`, `-Wformat-security`, and `-fcf-protection=full` (Linux only) compiler flags
+- Linux/macOS: add `-D_FORTIFY_SOURCE=2` and `-Wformat-security` compiler flags
+- Linux x64: add `-fcf-protection=full` (Intel CET); Linux ARM64: add `-mbranch-protection=standard` (PAC+BTI)
 
 ## 0.9.0 - 2025-12-28
 

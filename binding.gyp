@@ -34,18 +34,30 @@
               "-fPIC",
               "-fstack-protector-strong",
               "-D_FORTIFY_SOURCE=2",
-              "-Wformat-security",
-              "-fcf-protection=full"
+              "-Wformat-security"
             ],
             "cflags_cc": [
               "-fexceptions",
               "-fPIC",
               "-fstack-protector-strong",
               "-D_FORTIFY_SOURCE=2",
-              "-Wformat-security",
-              "-fcf-protection=full"
+              "-Wformat-security"
             ],
             "conditions": [
+              [
+                "target_arch=='x64'",
+                {
+                  "cflags": ["-fcf-protection=full"],
+                  "cflags_cc": ["-fcf-protection=full"]
+                }
+              ],
+              [
+                "target_arch=='arm64'",
+                {
+                  "cflags": ["-mbranch-protection=standard"],
+                  "cflags_cc": ["-mbranch-protection=standard"]
+                }
+              ],
               [
                 "enable_gio=='true'",
                 {
@@ -151,7 +163,7 @@
                     }
                   }
                 }
-              ],
+              ]
             ]
           }
         ],
