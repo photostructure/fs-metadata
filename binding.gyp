@@ -88,6 +88,7 @@
                   ],
                   "msvs_settings": {
                     "VCCLCompilerTool": {
+                      "WarningLevel": 4,
                       "AdditionalOptions": [
                         "/Qspectre",
                         "/guard:cf",
@@ -118,6 +119,7 @@
                   ],
                   "msvs_settings": {
                     "VCCLCompilerTool": {
+                      "WarningLevel": 4,
                       "AdditionalOptions": [
                         "/guard:cf",     # Control Flow Guard (supported on ARM64)
                         "/ZH:SHA_256",   # SHA-256 hash algorithm for checksums
@@ -149,7 +151,9 @@
                   ],
                   "msvs_settings": {
                     "VCCLCompilerTool": {
+                      "WarningLevel": 4,
                       "AdditionalOptions": [
+                        "/Qspectre",
                         "/guard:cf",
                         "/ZH:SHA_256",
                         "/sdl"
