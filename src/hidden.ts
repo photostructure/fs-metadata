@@ -54,6 +54,20 @@ export async function isHiddenImpl(
     throw new Error("Invalid pathname: " + JSON.stringify(pathname));
   }
   debug("Normalized path: %s", norm);
+
+  // Root directories are never meaningfully "hidden" on any platform.
+  // Windows sets FILE_ATTRIBUTE_HIDDEN + FILE_ATTRIBUTE_SYSTEM on root drives
+  // (e.g. C:\) as a protective measure, not user intent to hide the directory.
+  // Recovery partitions are hidden at the volume level via diskpart attributes
+  // (NODEFAULTDRIVELETTER / GPT type GUIDs), not file attributes, so any root
+  // directory reachable by path is safe to treat as non-hidden.
+  // See https://learn.microsoft.com/en-us/answers/questions/427448/how-to-properly-hide-a-recovery-partition
+  // and https://en.wikipedia.org/wiki/File_attribute
+  if (isRootDirectory(norm)) {
+    debug("Root directory, returning false");
+    return false;
+  }
+
   debug(
     "LocalSupport: dotPrefix=%s, systemFlag=%s",
     LocalSupport.dotPrefix,
@@ -160,6 +174,17 @@ export async function getHiddenMetadataImpl(
   if (norm == null) {
     throw new Error("Invalid pathname: " + JSON.stringify(pathname));
   }
+  // Root directories are never meaningfully "hidden" on any platform
+  // (see comment in isHiddenImpl for details).
+  if (isRootDirectory(norm)) {
+    return {
+      hidden: false,
+      dotPrefix: false,
+      systemFlag: false,
+      supported: LocalSupport,
+    };
+  }
+
   const dotPrefix = isPosixHidden(norm);
   const systemFlag = await isSystemHidden(norm, nativeFn);
   return {
