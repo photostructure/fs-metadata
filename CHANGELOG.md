@@ -14,6 +14,12 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 1.0.1 - 2026-03-01
+
+### Fixed
+
+- `isHidden()` and `getHiddenMetadata()` now return `false` for root directories on all platforms. Windows root drives (e.g. `C:\`) have `FILE_ATTRIBUTE_HIDDEN` set by default as a system quirk, not user intent.
+
 ## 1.0.0 - 2026-02-23
 
 ### Security
