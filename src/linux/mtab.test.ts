@@ -1,6 +1,7 @@
 // src/linux/mtab.test.ts
 import {
   formatMtab,
+  mountEntryToMountPoint,
   mountEntryToPartialVolumeMetadata,
   parseMtab,
 } from "./mtab";
@@ -125,6 +126,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           mountFrom: "/dev/sda1",
           mountPoint: "/",
           remote: false,
+          isReadOnly: false,
           isSystemVolume: false,
         },
         {
@@ -132,6 +134,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           mountFrom: "/dev/sda2",
           mountPoint: "/home",
           remote: false,
+          isReadOnly: false,
           isSystemVolume: false,
         },
         {
@@ -139,6 +142,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           mountFrom: "proc",
           mountPoint: "/proc",
           remote: false,
+          isReadOnly: false,
           isSystemVolume: true,
         },
         {
@@ -146,6 +150,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           mountFrom: "tmpfs",
           mountPoint: "/run",
           remote: false,
+          isReadOnly: false,
           isSystemVolume: true,
         },
         {
@@ -156,6 +161,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           remote: true,
           remoteHost: "nfs-server",
           remoteShare: "export",
+          isReadOnly: false,
           isSystemVolume: false,
         },
         {
@@ -166,6 +172,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           remote: true,
           remoteHost: "192.168.0.216",
           remoteShare: "mnt/HDD1",
+          isReadOnly: false,
           isSystemVolume: false,
         },
         {
@@ -175,6 +182,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           remote: true,
           remoteHost: "cifs-server",
           remoteShare: "share",
+          isReadOnly: false,
           isSystemVolume: false,
         },
         {
@@ -185,11 +193,13 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           remoteHost: "SERVER._smb._tcp.local",
           remoteShare: "share",
           remoteUser: "guest",
+          isReadOnly: false,
           isSystemVolume: false,
         },
         {
           fstype: "fuse.sshfs",
           isSystemVolume: false,
+          isReadOnly: false,
           mountFrom: "u3145678@u3141519.example.com:/var/hdd2",
           mountPoint: "/mnt/example.com",
           remote: true,
@@ -200,6 +210,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
         {
           fstype: "fuse",
           isSystemVolume: false,
+          isReadOnly: false,
           mountFrom: "sshfs#USER@HOST:REMOTE_PATH",
           mountPoint: "LOCAL_PATH",
           protocol: "sshfs",
@@ -211,6 +222,7 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
         {
           fstype: "davfs",
           isSystemVolume: false,
+          isReadOnly: false,
           mountFrom: "https://webdav.example.com/remote.php/webdav/",
           mountPoint: "/mnt/webdav",
           remote: false,
@@ -401,6 +413,55 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
       expect(entries[0]?.fs_file).toBe("/");
       expect(entries[1]?.fs_file).toBe("/home");
       expect(entries[2]?.fs_file).toBe("/var/log");
+    });
+  });
+
+  describe("mountEntryToMountPoint()", () => {
+    it("should set isReadOnly from mount options", () => {
+      expect(
+        mountEntryToMountPoint({
+          fs_spec: "/dev/sda1",
+          fs_file: "/",
+          fs_vfstype: "ext4",
+          fs_mntops: "rw,relatime",
+          fs_freq: 0,
+          fs_passno: 1,
+        }),
+      ).toEqual({
+        mountPoint: "/",
+        fstype: "ext4",
+        isReadOnly: false,
+      });
+
+      expect(
+        mountEntryToMountPoint({
+          fs_spec: "/dev/sda1",
+          fs_file: "/",
+          fs_vfstype: "ext4",
+          fs_mntops: "ro,relatime",
+          fs_freq: 0,
+          fs_passno: 1,
+        }),
+      ).toEqual({
+        mountPoint: "/",
+        fstype: "ext4",
+        isReadOnly: true,
+      });
+
+      expect(
+        mountEntryToMountPoint({
+          fs_spec: "/dev/sda1",
+          fs_file: "/mnt/iso",
+          fs_vfstype: "iso9660",
+          fs_mntops: undefined,
+          fs_freq: undefined,
+          fs_passno: undefined,
+        }),
+      ).toEqual({
+        mountPoint: "/mnt/iso",
+        fstype: "iso9660",
+        isReadOnly: false,
+      });
     });
   });
 

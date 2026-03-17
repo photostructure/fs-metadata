@@ -45,6 +45,10 @@ export interface MountEntry {
   fs_passno: number | undefined;
 }
 
+function isReadOnlyMount(fs_mntops: string | undefined): boolean {
+  return fs_mntops?.split(",").includes("ro") ?? false;
+}
+
 export function mountEntryToMountPoint(
   entry: MountEntry,
 ): MountPoint | undefined {
@@ -55,6 +59,7 @@ export function mountEntryToMountPoint(
     : {
         mountPoint,
         fstype,
+        isReadOnly: isReadOnlyMount(entry.fs_mntops),
       };
 }
 
@@ -77,6 +82,7 @@ export function mountEntryToPartialVolumeMetadata(
     fstype: entry.fs_vfstype,
     mountFrom: entry.fs_spec,
     isSystemVolume: isSystemVolume(entry.fs_file, entry.fs_vfstype, options),
+    isReadOnly: isReadOnlyMount(entry.fs_mntops),
     remote: false, // < default to false, but it may be overridden by extractRemoteInfo
     ...extractRemoteInfo(entry.fs_spec, networkFsTypes),
   };
