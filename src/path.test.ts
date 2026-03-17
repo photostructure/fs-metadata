@@ -1,6 +1,7 @@
 // src/path.test.ts
 
 import {
+  isAncestorOrSelf,
   isRootDirectory,
   normalizePath,
   normalizePosixPath,
@@ -94,6 +95,57 @@ describe("mount_point", () => {
     it("handles invalid paths", () => {
       expect(isRootDirectory("")).toBe(false);
       expect(isRootDirectory("   ")).toBe(false);
+    });
+  });
+
+  describe("isAncestorOrSelf", () => {
+    it("returns true for identical paths", () => {
+      expect(isAncestorOrSelf("/home/user", "/home/user")).toBe(true);
+    });
+
+    it("returns true when root is ancestor", () => {
+      if (isWindows) {
+        expect(isAncestorOrSelf("C:\\", "C:\\Users\\foo")).toBe(true);
+      } else {
+        expect(isAncestorOrSelf("/", "/home/user")).toBe(true);
+      }
+    });
+
+    it("returns true for direct parent", () => {
+      if (isWindows) {
+        expect(isAncestorOrSelf("C:\\Users", "C:\\Users\\foo")).toBe(true);
+      } else {
+        expect(isAncestorOrSelf("/home", "/home/user")).toBe(true);
+      }
+    });
+
+    it("returns false for non-ancestor with shared prefix", () => {
+      // "/home" must NOT match "/homeother"
+      if (isWindows) {
+        expect(isAncestorOrSelf("C:\\Users", "C:\\UsersOther\\foo")).toBe(
+          false,
+        );
+      } else {
+        expect(isAncestorOrSelf("/home", "/homeother")).toBe(false);
+      }
+    });
+
+    it("returns false for unrelated paths", () => {
+      if (isWindows) {
+        expect(isAncestorOrSelf("C:\\var", "C:\\Users\\foo")).toBe(false);
+      } else {
+        expect(isAncestorOrSelf("/var", "/home/user")).toBe(false);
+      }
+    });
+
+    it("returns true for deeply nested descendant", () => {
+      if (isWindows) {
+        expect(isAncestorOrSelf("C:\\Users", "C:\\Users\\foo\\bar\\baz")).toBe(
+          true,
+        );
+      } else {
+        expect(isAncestorOrSelf("/home", "/home/user/docs/file")).toBe(true);
+      }
     });
   });
 });

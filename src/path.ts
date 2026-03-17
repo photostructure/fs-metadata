@@ -1,6 +1,6 @@
 // src/path.ts
 
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { isWindows } from "./platform";
 import { isBlank } from "./string";
 
@@ -69,4 +69,19 @@ export function normalizeWindowsPath(mountPoint: string): string {
 export function isRootDirectory(path: string): boolean {
   const n = normalizePath(path);
   return n == null ? false : isWindows ? dirname(n) === n : n === "/";
+}
+
+/**
+ * @return true if `ancestor` is the same path as `descendant`, or is a parent
+ * directory of `descendant`. Both paths should be normalized/resolved.
+ */
+export function isAncestorOrSelf(
+  ancestor: string,
+  descendant: string,
+): boolean {
+  if (ancestor === descendant) return true;
+  // Root dirs already end with sep (e.g. "/" or "C:\"); others need sep
+  // appended to avoid "/home" matching "/homeother".
+  const prefix = isRootDirectory(ancestor) ? ancestor : ancestor + sep;
+  return descendant.startsWith(prefix);
 }
