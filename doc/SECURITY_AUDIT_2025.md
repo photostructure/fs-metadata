@@ -766,7 +766,7 @@ describe("Security: Path Validation", () => {
 ## Document Maintenance
 
 **Last Updated**: December 28, 2025
-**Next Review**: June 2026 (or after major dependency updates)
+**Next Review**: Completed March 2026 — see `doc/SECURITY_AUDIT_2026.md`
 
 **Change Log**:
 
