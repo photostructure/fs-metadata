@@ -44,17 +44,18 @@ Use `_dirname()` from `./dirname` instead of `__dirname` - works in both CommonJ
 
 Jest 30 doesn't support Node.js 23. Use Node.js 20, 22, or 24.
 
-## macOS System Volume Detection
+## System Volume Detection
 
-**IMPORTANT: Read `doc/macos-system-volume-detection.md` before modifying any system volume detection logic.** It documents the full flag matrix, the rationale for each detection approach, and a critical design decision about `MNT_DONTBROWSE` that was learned the hard way.
+**IMPORTANT: Read `doc/system-volume-detection.md` before modifying any system volume detection logic.** It documents the full detection strategy across all platforms, including flag matrices and rationale for each approach.
 
 Summary:
 
 - The root `/` is a sealed, read-only APFS snapshot whose **UUID changes on every OS update** — never use it for persistent identification.
-- **Primary detection** uses APFS volume roles via IOKit (`IOMedia` "Role" property, accessed through `DADiskCopyIOMedia()`). Roles like System, VM, Preboot, Recovery, Update, Hardware, xART → system volume. Data or absent role → user volume. See `src/darwin/system_volume.h`.
-- **Fallback** uses `MNT_SNAPSHOT` from `statfs` `f_flags` if DA session creation fails.
-- **Do NOT use `MNT_DONTBROWSE`** for system volume detection. It's set on `/System/Volumes/Data` — the primary user data volume (photos, documents, all user files). Marking it as a system volume would hide real user data.
-- Pseudo-filesystems like `devfs` (no IOMedia) are caught by TypeScript fstype/path heuristics.
+- **Primary detection** combines mount flags with APFS volume roles: `MNT_SNAPSHOT || (MNT_DONTBROWSE && hasApfsRole && role != "Data")`. See `ClassifyMacVolume()` in `src/darwin/system_volume.h`.
+- The APFS role string is exposed as `volumeRole` on `MountPoint` and `VolumeMetadata`.
+- **Fallback** uses `MNT_SNAPSHOT` only from `statfs` `f_flags` if DA session creation fails.
+- `MNT_DONTBROWSE` is safe to use **only when combined with a non-Data APFS role**. The Data volume (`/System/Volumes/Data`) has `MNT_DONTBROWSE` but role `"Data"`, so it is correctly excluded.
+- Pseudo-filesystems like `devfs` (no IOMedia, no APFS role) are caught by TypeScript fstype/path heuristics.
 
 ## Windows-Specific Issues
 
