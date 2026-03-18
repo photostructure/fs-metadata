@@ -83,23 +83,13 @@ export const SystemPathPatternsDefault = [
   "/mnt/wslg/versions.txt",
   "/usr/lib/wsl/drivers",
 
-  // macOS system paths:
-  "/private/var/vm", // macOS swap
-  "/System/Volumes/Hardware",
-  "/System/Volumes/iSCPreboot",
-  "/System/Volumes/Preboot",
-  "/System/Volumes/Recovery",
-  "/System/Volumes/Reserved",
-  "/System/Volumes/Update",
-  "/System/Volumes/VM",
-  "/System/Volumes/xarts",
-
-  // macOS per-volume metadata (Spotlight, FSEvents, versioning, Trash):
-  // https://eclecticlight.co/2021/01/28/spotlight-on-search-how-spotlight-works/
-  "**/.DocumentRevisions-V100",
-  "**/.fseventsd",
-  "**/.Spotlight-V100",
-  "**/.Trashes",
+  // macOS system volumes are detected natively via APFS volume roles
+  // (IOKit IOMedia "Role" property) with MNT_SNAPSHOT as a fallback.
+  // No path patterns needed. See src/darwin/system_volume.h.
+  //
+  // /private/var/vm is the macOS swap directory (not a mount point on most
+  // systems, but included for completeness if it appears as one).
+  "/private/var/vm",
 ] as const;
 
 /**

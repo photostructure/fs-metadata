@@ -60,13 +60,9 @@ export function assignSystemVolume(
 ) {
   const result = isSystemVolume(mp.mountPoint, mp.fstype, config);
 
-  if (isWindows) {
-    // native code actually knows the system drive and has more in-depth
-    // metadata information that we trust more than these heuristics
-    mp.isSystemVolume ??= result;
-  } else {
-    // macOS and Linux don't have a concept of an explicit "system drive" like
-    // Windows--always trust our heuristics
-    mp.isSystemVolume = result;
-  }
+  // Native code may have already marked this as a system volume (e.g.,
+  // Windows system drive detection, macOS MNT_SNAPSHOT for the sealed
+  // APFS system snapshot at /). Never downgrade a native true — only
+  // upgrade via path/fstype heuristics.
+  mp.isSystemVolume = mp.isSystemVolume || result;
 }

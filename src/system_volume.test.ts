@@ -119,15 +119,16 @@ describe("assignSystemVolume", () => {
     }
   });
 
-  it("should override isSystemVolume on non-Windows", () => {
-    if (!isWindows) {
-      const mp: MountPoint = {
-        mountPoint: "/home",
-        fstype: "ext4",
-        isSystemVolume: true,
-      };
-      assignSystemVolume(mp, {});
-      expect(mp.isSystemVolume).toBe(false);
-    }
+  it("should preserve native isSystemVolume=true on all platforms", () => {
+    // Native code may mark volumes as system (e.g., macOS MNT_SNAPSHOT,
+    // Windows system drive). assignSystemVolume should never downgrade
+    // a native true to false.
+    const mp: MountPoint = {
+      mountPoint: "/home",
+      fstype: "ext4",
+      isSystemVolume: true,
+    };
+    assignSystemVolume(mp, {});
+    expect(mp.isSystemVolume).toBe(true);
   });
 });
