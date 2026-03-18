@@ -114,8 +114,7 @@ export function getVolumeMetadata(
  *
  * Unlike {@link getVolumeMetadata}, this accepts any path — not just mount
  * points. Symlinks are resolved, and macOS APFS firmlinks (e.g. `/Users` →
- * `/System/Volumes/Data`) are handled correctly by comparing device IDs, which
- * is the same approach used by `df`.
+ * `/System/Volumes/Data`) are handled correctly, mirroring what `df` does.
  *
  * @param pathname Path to any file or directory
  * @param opts Optional filesystem operation settings
