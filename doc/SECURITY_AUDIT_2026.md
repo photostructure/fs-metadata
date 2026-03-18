@@ -183,23 +183,25 @@ A caller could theoretically provide a malicious pattern causing ReDoS.
 
 ---
 
-### Finding #6: Redundant `GetVolumeInformationW` Call (Windows, Efficiency) ✅ FIXED
+### Finding #6: Redundant `GetVolumeInformationW` Calls (Windows, Efficiency) ✅ FIXED
 
 **Severity**: 🟢 LOW → ✅ RESOLVED
 **CWE**: N/A (efficiency, not security)
-**File**: `src/windows/volume_mount_points.cpp` (lines 82-104), `src/windows/system_volume.h`
+**Files**: `src/windows/volume_mount_points.cpp`, `src/windows/volume_metadata.cpp`, `src/windows/system_volume.h`
 
-**Issue**: For each healthy Windows drive, `GetVolumeInformationW` was called twice:
-once in the mount points loop (for `fstype`/`isReadOnly`) and again inside
-`IsSystemVolume()` (for volume flags). `SafeStringToWide()` was also called twice
-for the same path.
+**Issue**: `GetVolumeInformationW` was called redundantly:
+- In `volume_mount_points.cpp`: once for `fstype`/`isReadOnly`, then again inside `IsSystemVolume()`
+- In `volume_metadata.cpp`: `IsSystemVolume()` queried the API, then `VolumeInfo` queried it again 5 lines later
 
 **Fix Applied**:
 
 1. Added `volumeFlags` parameter to `IsSystemVolume()` (default `0` for backward compat)
 2. When `volumeFlags != 0`, skips the redundant `GetVolumeInformationW` call
-3. Hoisted `SafeStringToWide()` result to a local variable
-4. `volume_mount_points.cpp` now passes pre-fetched `fsFlags` to `IsSystemVolume()`
+3. `volume_mount_points.cpp`: passes pre-fetched `fsFlags` to `IsSystemVolume()`, and
+   moves the `IsSystemVolume` call inside the healthy-drive block to prevent querying
+   dead drives (which would hang the worker thread, defeating async timeout protection)
+4. `volume_metadata.cpp`: reordered to create `VolumeInfo` first, then pass its flags
+   to `IsSystemVolume()` — eliminates the duplicate query
 
 ---
 
