@@ -86,11 +86,13 @@ public:
 
         if (statuses[i] == DriveStatus::Healthy) {
           WCHAR fsName[MAX_PATH + 1] = {0};
+          DWORD fsFlags = 0;
 
           if (GetVolumeInformationW(
                   SecurityUtils::SafeStringToWide(paths[i]).c_str(), nullptr, 0,
-                  nullptr, nullptr, nullptr, fsName, MAX_PATH)) {
+                  nullptr, nullptr, &fsFlags, fsName, MAX_PATH)) {
             mp.fstype = WideToUtf8(fsName);
+            mp.isReadOnly = (fsFlags & FILE_READ_ONLY_VOLUME) != 0;
             DEBUG_LOG("[GetVolumeMountPoints] drive %s filesystem: %s",
                       paths[i].c_str(), mp.fstype.c_str());
           }

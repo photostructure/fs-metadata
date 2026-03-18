@@ -40,9 +40,9 @@ struct VolumeMetadataOptions {
 struct VolumeMetadata {
   std::string label;
   std::string fstype;
-  double size;
-  double used;
-  double available;
+  double size = 0.0;
+  double used = 0.0;
+  double available = 0.0;
   std::string uuid;
   std::string mountFrom;
   std::string mountName;
@@ -52,6 +52,8 @@ struct VolumeMetadata {
   std::string remoteHost;
   std::string remoteShare;
   bool isSystemVolume = false;
+  bool isReadOnly = false;
+  std::string volumeRole;
   std::string error;
 
   Napi::Object ToObject(Napi::Env env) const {
@@ -120,6 +122,11 @@ struct VolumeMetadata {
     }
 
     result.Set("isSystemVolume", Napi::Boolean::New(env, isSystemVolume));
+    result.Set("isReadOnly", Napi::Boolean::New(env, isReadOnly));
+
+    if (!volumeRole.empty()) {
+      result.Set("volumeRole", Napi::String::New(env, volumeRole));
+    }
 
     return result;
   }

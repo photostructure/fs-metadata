@@ -110,6 +110,7 @@ public:
   const char *getVolumeName() const { return volumeName; }
   const char *getFileSystem() const { return fstype; }
   DWORD getSerialNumber() const { return serialNumber; }
+  DWORD getFlags() const { return fsFlags; }
 };
 
 // RAII wrapper for disk space information
@@ -176,6 +177,7 @@ private:
       if (volInfo.isValid()) {
         metadata.label = volInfo.getVolumeName();
         metadata.fstype = volInfo.getFileSystem();
+        metadata.isReadOnly = (volInfo.getFlags() & FILE_READ_ONLY_VOLUME) != 0;
         DEBUG_LOG("[GetVolumeMetadata] %s {label: %s, fstype: %s}",
                   mountPoint.c_str(), metadata.label.c_str(),
                   metadata.fstype.c_str());

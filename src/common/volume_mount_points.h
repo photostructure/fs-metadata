@@ -22,7 +22,9 @@ struct MountPoint {
   std::string mountPoint;
   std::string fstype;
   std::string status;
-  bool isSystemVolume = false; // Default to false
+  bool isSystemVolume = false;
+  bool isReadOnly = false;
+  std::string volumeRole;
   std::string error;
 
   Napi::Object ToObject(Napi::Env env) const {
@@ -38,6 +40,10 @@ struct MountPoint {
       obj.Set("status", status);
     }
     obj.Set("isSystemVolume", isSystemVolume);
+    obj.Set("isReadOnly", isReadOnly);
+    if (!volumeRole.empty()) {
+      obj.Set("volumeRole", volumeRole);
+    }
     obj.Set("error", error);
     return obj;
   }
