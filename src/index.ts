@@ -34,6 +34,7 @@ import type { VolumeHealthStatus } from "./volume_health_status";
 import { VolumeHealthStatuses } from "./volume_health_status";
 import {
   getAllVolumeMetadataImpl,
+  getVolumeMetadataForPathImpl,
   getVolumeMetadataImpl,
 } from "./volume_metadata";
 import type { GetVolumeMountPointOptions } from "./volume_mount_points";
@@ -104,6 +105,28 @@ export function getVolumeMetadata(
 ): Promise<VolumeMetadata> {
   return getVolumeMetadataImpl(
     { ...optionsWithDefaults(opts), mountPoint },
+    nativeFn,
+  );
+}
+
+/**
+ * Get metadata for the volume that contains the given file or directory path.
+ *
+ * Unlike {@link getVolumeMetadata}, this accepts any path — not just mount
+ * points. Symlinks are resolved, and macOS APFS firmlinks (e.g. `/Users` →
+ * `/System/Volumes/Data`) are handled correctly by comparing device IDs, which
+ * is the same approach used by `df`.
+ *
+ * @param pathname Path to any file or directory
+ * @param opts Optional filesystem operation settings
+ */
+export function getVolumeMetadataForPath(
+  pathname: string,
+  opts?: Partial<Pick<Options, "timeoutMs" | "linuxMountTablePaths">>,
+): Promise<VolumeMetadata> {
+  return getVolumeMetadataForPathImpl(
+    pathname,
+    optionsWithDefaults(opts),
     nativeFn,
   );
 }

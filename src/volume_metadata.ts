@@ -1,8 +1,11 @@
 // src/volume_metadata.ts
 
+import { realpath } from "node:fs/promises";
+import { dirname } from "node:path";
 import { mapConcurrent, withTimeout } from "./async";
 import { debug } from "./debuglog";
 import { WrappedError } from "./error";
+import { statAsync } from "./fs";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk";
 import { getLinuxMtabMetadata } from "./linux/mount_points";
 import {
@@ -11,8 +14,8 @@ import {
 } from "./linux/mtab";
 import { compactValues } from "./object";
 import { IncludeSystemVolumesDefault, optionsWithDefaults } from "./options";
-import { normalizePath } from "./path";
-import { isLinux, isWindows } from "./platform";
+import { isAncestorOrSelf, normalizePath } from "./path";
+import { isLinux, isMacOS, isWindows } from "./platform";
 import { extractRemoteInfo, isRemoteFsType } from "./remote_info";
 import { isBlank, isNotBlank } from "./string";
 import { assignSystemVolume } from "./system_volume";
@@ -151,6 +154,98 @@ async function _getVolumeMetadata(
 
   debug("[getVolumeMetadata] final result for %s: %o", o.mountPoint, result);
   return compactValues(result) as VolumeMetadata;
+}
+
+/**
+ * Get volume metadata for an arbitrary file or directory path.
+ *
+ * Unlike {@link getVolumeMetadataImpl}, this accepts any path — not just mount
+ * points. It resolves symlinks and correctly handles macOS APFS firmlinks
+ * (e.g. `/Users` → `/System/Volumes/Data`), mirroring what `df` does.
+ *
+ * On macOS, the native `fstatfs()` call returns `f_mntonname` (the canonical
+ * mount point), exposed here as `mountName`. This is used to resolve firmlinks
+ * without `stat().dev`, which does NOT follow firmlinks.
+ *
+ * On Linux and Windows, `stat().dev` device IDs are reliable (no firmlinks),
+ * so mount point discovery uses device ID + path prefix matching.
+ */
+export async function getVolumeMetadataForPathImpl(
+  pathname: string,
+  opts: Options,
+  nativeFn: NativeBindingsFn,
+): Promise<VolumeMetadata> {
+  if (isBlank(pathname)) {
+    throw new TypeError("Invalid pathname: got " + JSON.stringify(pathname));
+  }
+
+  // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
+  // realpath(), but fstatfs() follows them — handled below.
+  const resolved = await realpath(pathname);
+
+  // getVolumeMetadataImpl requires a directory path, not a file.
+  const resolvedStat = await statAsync(resolved);
+  const dir = resolvedStat.isDirectory() ? resolved : dirname(resolved);
+
+  if (isMacOS) {
+    // On macOS, native fstatfs() sets mountName = f_mntonname, which is the
+    // canonical mount point even through APFS firmlinks. Probe the dir to get
+    // it, then re-query with the canonical mount point so the result has
+    // mountPoint set correctly.
+    const probe = await getVolumeMetadataImpl(
+      { ...opts, mountPoint: dir },
+      nativeFn,
+    );
+    const canonicalMountPoint = isNotBlank(probe.mountName)
+      ? probe.mountName
+      : dir;
+    if (canonicalMountPoint === dir) return probe;
+    return getVolumeMetadataImpl(
+      { ...opts, mountPoint: canonicalMountPoint },
+      nativeFn,
+    );
+  }
+
+  // Linux/Windows: stat().dev is reliable (no firmlinks). Find the mount point
+  // by comparing device IDs, using path prefix as a tiebreaker for bind mounts
+  // or GIO mounts that share the same device id.
+  const targetDev = resolvedStat.dev;
+  const mountPoints = await getVolumeMountPointsImpl(
+    { ...opts, includeSystemVolumes: true },
+    nativeFn,
+  );
+
+  const prefixMatches: string[] = [];
+  const deviceMatches: string[] = [];
+
+  await Promise.all(
+    mountPoints.map(async ({ mountPoint }) => {
+      try {
+        const mpDev = (await statAsync(mountPoint)).dev;
+        if (mpDev !== targetDev) return;
+        if (isAncestorOrSelf(mountPoint, resolved)) {
+          prefixMatches.push(mountPoint);
+        } else {
+          deviceMatches.push(mountPoint);
+        }
+      } catch {
+        // skip inaccessible mount points
+      }
+    }),
+  );
+
+  // Longest prefix match wins; fall back to device-only match.
+  const candidates = prefixMatches.length > 0 ? prefixMatches : deviceMatches;
+  if (candidates.length === 0) {
+    throw new Error(
+      "No mount point found for path: " + JSON.stringify(pathname),
+    );
+  }
+  const mountPoint = candidates.reduce((a, b) =>
+    a.length >= b.length ? a : b,
+  );
+
+  return getVolumeMetadataImpl({ ...opts, mountPoint }, nativeFn);
 }
 
 export async function getAllVolumeMetadataImpl(

@@ -2,9 +2,11 @@
 
 import { join } from "node:path";
 import { compact, times } from "./array";
+import { _dirname } from "./dirname";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
+  getVolumeMetadataForPath,
   getVolumeMountPoints,
   VolumeHealthStatuses,
 } from "./index";
@@ -32,10 +34,15 @@ describe("Volume Metadata", () => {
       expect(metadata.fstype).toMatch(/^(ntfs|refs)$/i);
     } else if (isMacOS) {
       expect(metadata.fstype).toMatch(/^(apfs|hfs)$/i);
+      // macOS root is a sealed, read-only APFS system snapshot (MNT_SNAPSHOT)
+      expect(metadata.isReadOnly).toBe(true);
+      expect(metadata.isSystemVolume).toBe(true);
     } else if (isLinux) {
       // We expect "overlay" for Docker containers
       expect(metadata.fstype).toMatch(/^(ext[234]|xfs|btrfs|zfs|overlay)$/i);
     }
+
+    expect(typeof metadata.isReadOnly).toBe("boolean");
   });
 });
 describe("Volume Metadata errors", () => {
@@ -229,6 +236,63 @@ describe("Error Handling", () => {
       );
     }
   });
+});
+
+describe("getVolumeMetadataForPath()", () => {
+  const thisDir = _dirname();
+  const thisFile = join(thisDir, "volume_metadata.test.ts");
+
+  it("returns valid metadata for __dirname", async () => {
+    const metadata = await getVolumeMetadataForPath(thisDir);
+    assertMetadata(metadata);
+  });
+
+  it("returns valid metadata for a file path", async () => {
+    const metadata = await getVolumeMetadataForPath(thisFile);
+    assertMetadata(metadata);
+  });
+
+  it("returns valid metadata for the system drive", async () => {
+    const metadata = await getVolumeMetadataForPath(rootPath);
+    assertMetadata(metadata);
+  });
+
+  it("returns a mountPoint that matches a known volume", async () => {
+    const metadata = await getVolumeMetadataForPath(thisDir);
+    const mountPoints = await getVolumeMountPoints({
+      includeSystemVolumes: true,
+    });
+    const known = mountPoints.map((mp) => mp.mountPoint);
+    expect(known).toContain(metadata.mountPoint);
+  });
+
+  it("throws TypeError for null pathname", async () => {
+    await expect(
+      getVolumeMetadataForPath(null as unknown as string),
+    ).rejects.toThrow(/Invalid pathname/);
+  });
+
+  it("throws TypeError for empty pathname", async () => {
+    await expect(getVolumeMetadataForPath("")).rejects.toThrow(
+      /Invalid pathname/,
+    );
+  });
+
+  it("throws for a non-existent path", async () => {
+    await expect(
+      getVolumeMetadataForPath(join(rootPath, "nonexistent-path-xyz-123")),
+    ).rejects.toThrow();
+  });
+
+  if (isMacOS) {
+    it("resolves APFS firmlinks (/Users should not resolve to /)", async () => {
+      // /Users is a firmlink to /System/Volumes/Data/Users on macOS Catalina+
+      const metadata = await getVolumeMetadataForPath("/Users");
+      assertMetadata(metadata);
+      // Firmlink resolution: /Users should resolve to the Data volume, not /
+      expect(metadata.mountPoint).not.toBe("/");
+    });
+  }
 });
 
 describe("Network Filesystems", () => {

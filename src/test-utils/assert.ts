@@ -46,6 +46,10 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
       expect(metadata.uuid).toMatch(/^[0-9a-z-]{8,}$/i);
     }
 
+    if (metadata.isReadOnly !== undefined) {
+      expect(typeof metadata.isReadOnly).toBe("boolean");
+    }
+
     if (metadata.remote !== undefined) {
       expect(typeof metadata.remote).toBe("boolean");
 
