@@ -14,6 +14,44 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 1.1.0 - 2026-03-16
+
+### Added
+
+- New `getVolumeMetadataForPath(pathname)` function: given any file or directory path, returns the `VolumeMetadata` for the volume that contains it. Mirrors the behavior of `df pathname`:
+  - Resolves POSIX symlinks via `realpath()`
+  - On **macOS**: uses `fstatfs()` `f_mntonname` to correctly resolve APFS firmlinks (e.g. `/Users` → `/System/Volumes/Data`) — `stat().dev` does not follow firmlinks and would give the wrong result
+  - On **Linux**: uses `stat().dev` device ID matching with path-prefix disambiguation for bind mounts and GIO mounts that share a device ID. Also works correctly in Docker containers, where `/proc/self/mounts` reflects the container's mount namespace.
+  - On **Windows**: uses device ID and path-prefix matching against logical drives
+
+- New `isReadOnly` field on `MountPoint` (and by extension `VolumeMetadata`) indicating whether a volume is mounted read-only. This is useful for identifying volumes with unstable UUIDs, like the macOS APFS system snapshot at `/`, whose UUID changes on every OS update. Available on all platforms:
+  - **macOS**: reads `MNT_RDONLY` from `statfs` flags
+  - **Linux**: parses `ro` from mount options in `/proc/mounts`
+  - **Windows**: checks `FILE_READ_ONLY_VOLUME` from `GetVolumeInformation`
+
+### Changed
+
+- **macOS `isSystemVolume` detection now uses APFS volume roles via IOKit** instead of path pattern heuristics. Each APFS volume has a role (System, Data, VM, Preboot, Recovery, etc.) stored in its superblock. We read this via `DADiskCopyIOMedia()` → `IORegistryEntryCreateCFProperty("Role")`, with a `MNT_SNAPSHOT` fallback if DiskArbitration is unavailable. This is factual (Apple assigns the roles), not heuristic, and correctly distinguishes:
+  - `/` (System role) → `isSystemVolume: true` — sealed OS snapshot, unstable UUID
+  - `/System/Volumes/Data` (Data role) → `isSystemVolume: false` — primary user data volume
+  - `/System/Volumes/VM`, `Preboot`, `Update`, `Hardware`, `xarts`, etc. → `isSystemVolume: true`
+  - See [`doc/system-volume-detection.md`](./doc/system-volume-detection.md) for full details
+
+### Security
+
+- macOS: RAII wrapper (`IOObjectGuard`) for IOKit objects in APFS volume role detection, preventing Mach port resource leaks if exceptions occur during `GetApfsVolumeRole()`
+- macOS: DiskArbitration operations in `getVolumeMountPoints()` now serialize through the same `g_diskArbitrationMutex` used by `getVolumeMetadata()`, preventing potential data races when both APIs are called concurrently
+- See [`doc/SECURITY_AUDIT_2026.md`](./doc/SECURITY_AUDIT_2026.md) for full audit details
+
+### Fixed
+
+- Zero-initialized `VolumeMetadata` size/used/available fields to prevent uninitialized values when volume info retrieval fails early
+- Windows: eliminated redundant `GetVolumeInformationW` call per drive in `getVolumeMountPoints()`
+
+### Removed
+
+- Removed macOS `/System/Volumes/*` path patterns from `SystemPathPatternsDefault` — these are now handled natively via APFS volume roles. The Spotlight, FSEvents, and Trashes glob patterns (`**/.Spotlight-V100`, `**/.fseventsd`, etc.) were also removed as they matched directories within volumes, not mount points.
+
 ## 1.0.1 - 2026-03-01
 
 ### Fixed
