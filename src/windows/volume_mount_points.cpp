@@ -84,23 +84,25 @@ public:
         mp.mountPoint = paths[i];
         mp.status = DriveStatusToString(statuses[i]);
 
+        std::wstring widePath = SecurityUtils::SafeStringToWide(paths[i]);
+        DWORD fsFlags = 0;
+
         if (statuses[i] == DriveStatus::Healthy) {
           WCHAR fsName[MAX_PATH + 1] = {0};
-          DWORD fsFlags = 0;
 
-          if (GetVolumeInformationW(
-                  SecurityUtils::SafeStringToWide(paths[i]).c_str(), nullptr, 0,
-                  nullptr, nullptr, &fsFlags, fsName, MAX_PATH)) {
+          if (GetVolumeInformationW(widePath.c_str(), nullptr, 0, nullptr,
+                                    nullptr, &fsFlags, fsName, MAX_PATH)) {
             mp.fstype = WideToUtf8(fsName);
             mp.isReadOnly = (fsFlags & FILE_READ_ONLY_VOLUME) != 0;
             DEBUG_LOG("[GetVolumeMountPoints] drive %s filesystem: %s",
                       paths[i].c_str(), mp.fstype.c_str());
           }
-        }
 
-        // Check if this is a system volume
-        mp.isSystemVolume =
-            IsSystemVolume(SecurityUtils::SafeStringToWide(paths[i]));
+          // Only check system volume for healthy drives — IsSystemVolume
+          // may call GetVolumeInformationW, which hangs on dead drives and
+          // would defeat the async timeout protection from CheckDriveStatus.
+          mp.isSystemVolume = IsSystemVolume(widePath, fsFlags);
+        }
         mountPoints_.push_back(std::move(mp));
       }
 

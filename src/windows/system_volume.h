@@ -18,7 +18,12 @@
 
 namespace FSMeta {
 
-inline bool IsSystemVolume(const std::wstring &drive) {
+// Check if a drive is a system volume using SHGetFolderPathW (Windows dir)
+// and optionally FILE_SUPPORTS_SYSTEM_PATHS/FILES volume flags.
+//
+// volumeFlags: if non-zero, uses pre-fetched flags to avoid a redundant
+// GetVolumeInformationW call. Pass 0 to have this function query flags itself.
+inline bool IsSystemVolume(const std::wstring &drive, DWORD volumeFlags = 0) {
   WCHAR systemRoot[MAX_PATH];
   if (SUCCEEDED(
           SHGetFolderPathW(nullptr, CSIDL_WINDOWS, nullptr, 0, systemRoot))) {
@@ -33,22 +38,22 @@ inline bool IsSystemVolume(const std::wstring &drive) {
   }
 
   // Modern volume properties check
-  DWORD volumeFlags = 0;
-  wchar_t fileSystemName[MAX_PATH + 1] = {0};
-
-  if (GetVolumeInformationW(drive.c_str(), nullptr, 0, nullptr, nullptr,
-                            &volumeFlags, fileSystemName, MAX_PATH)) {
-
-    // Check for modern system volume indicators
-    if ((volumeFlags & FILE_SUPPORTS_SYSTEM_PATHS) ||
-        (volumeFlags & FILE_SUPPORTS_SYSTEM_FILES)) {
-      DEBUG_LOG("[IsSystemVolume] %ls has system volume flags (0x%08X)",
-                drive.c_str(), volumeFlags);
-      return true;
+  if (volumeFlags == 0) {
+    wchar_t fileSystemName[MAX_PATH + 1] = {0};
+    if (!GetVolumeInformationW(drive.c_str(), nullptr, 0, nullptr, nullptr,
+                               &volumeFlags, fileSystemName, MAX_PATH)) {
+      DEBUG_LOG("[IsSystemVolume] %ls GetVolumeInformationW failed: %lu",
+                drive.c_str(), GetLastError());
+      DEBUG_LOG("[IsSystemVolume] %ls is not a system volume", drive.c_str());
+      return false;
     }
-  } else {
-    DEBUG_LOG("[IsSystemVolume] %ls GetVolumeInformationW failed: %lu",
-              drive.c_str(), GetLastError());
+  }
+
+  if ((volumeFlags & FILE_SUPPORTS_SYSTEM_PATHS) ||
+      (volumeFlags & FILE_SUPPORTS_SYSTEM_FILES)) {
+    DEBUG_LOG("[IsSystemVolume] %ls has system volume flags (0x%08X)",
+              drive.c_str(), volumeFlags);
+    return true;
   }
 
   DEBUG_LOG("[IsSystemVolume] %ls is not a system volume", drive.c_str());

@@ -166,13 +166,8 @@ private:
         return; // Don't try to get additional info for non-healthy drives
       }
 
-      std::wstring widePath = SecurityUtils::SafeStringToWide(mountPoint);
-      metadata.isSystemVolume = IsSystemVolume(widePath.c_str());
-
-      DEBUG_LOG("[GetVolumeMetadata] %s {isSystemVolume: %s}",
-                mountPoint.c_str(), metadata.isSystemVolume ? "true" : "false");
-
-      // Get volume information
+      // Get volume information first so we can reuse its flags for
+      // IsSystemVolume, avoiding a redundant GetVolumeInformationW call.
       VolumeInfo volInfo(mountPoint);
       if (volInfo.isValid()) {
         metadata.label = volInfo.getVolumeName();
@@ -208,6 +203,15 @@ private:
               metadata.available / 1e9);
         }
       }
+
+      // Check system volume using pre-fetched flags from VolumeInfo to
+      // avoid a redundant GetVolumeInformationW call.
+      std::wstring widePath = SecurityUtils::SafeStringToWide(mountPoint);
+      metadata.isSystemVolume =
+          IsSystemVolume(widePath, volInfo.isValid() ? volInfo.getFlags() : 0);
+
+      DEBUG_LOG("[GetVolumeMetadata] %s {isSystemVolume: %s}",
+                mountPoint.c_str(), metadata.isSystemVolume ? "true" : "false");
 
       // Check if drive is remote
       metadata.remote = (GetDriveTypeA(mountPoint.c_str()) == DRIVE_REMOTE);
