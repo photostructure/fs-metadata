@@ -2,7 +2,7 @@
 
 import { times, uniq } from "./array";
 import { getVolumeMountPoints } from "./index";
-import { isWindows } from "./platform";
+import { isMacOS, isWindows } from "./platform";
 import { sortByLocale } from "./string";
 import type { MountPoint } from "./types/mount_point";
 
@@ -18,6 +18,11 @@ describe("Filesystem Metadata", () => {
       // Platform-specific root checks
       if (isWindows) {
         expect(mountPoints).toContain("C:\\");
+      } else if (isMacOS) {
+        // "/" is classified as a system volume (sealed APFS snapshot via
+        // MNT_SNAPSHOT) and filtered from default results. The user data
+        // volume at /System/Volumes/Data should always be present.
+        expect(mountPoints).toContain("/System/Volumes/Data");
       } else {
         expect(mountPoints).toContain("/");
       }
@@ -59,15 +64,21 @@ describe("Filesystem Metadata", () => {
         );
         // this is a non-exhaustive list of filesystems to validate that at
         // least one of these both exists and is marked as a system volume:
-        for (const mountPoint of [
+        // Non-exhaustive list: at least one of these must exist and be
+        // marked as a system volume on the current platform.
+        const expectedSystemMountPoints = [
           "/boot",
           "/proc",
           "/sys",
           "/dev/shm",
           "/snap",
           "/run/lock",
-          "/System/Volumes/VM",
-        ]) {
+        ];
+        if (isMacOS) {
+          // macOS "/" is a sealed APFS system snapshot (MNT_SNAPSHOT)
+          expectedSystemMountPoints.push("/", "/System/Volumes/VM");
+        }
+        for (const mountPoint of expectedSystemMountPoints) {
           const fs = allMountPoints.find((ea) => ea.mountPoint === mountPoint);
           if (fs != null) {
             if (fs.isSystemVolume) {
@@ -87,6 +98,17 @@ describe("Filesystem Metadata", () => {
         expect(systemVolumesInDefaultList).toEqual([]);
       });
     }
+
+    it("should have isReadOnly as a boolean on all mount points", async () => {
+      const arr = await getVolumeMountPoints({ includeSystemVolumes: true });
+      for (const mp of arr) {
+        expect(typeof mp.isReadOnly).toBe("boolean");
+      }
+      if (isMacOS) {
+        const root = arr.find((ea) => ea.mountPoint === "/");
+        expect(root?.isReadOnly).toBe(true);
+      }
+    });
 
     it("should return unique, sorted mount points", async () => {
       const arr = await getVolumeMountPoints();
