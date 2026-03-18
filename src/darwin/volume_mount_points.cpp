@@ -2,8 +2,10 @@
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
+#include "./da_mutex.h"
 #include "./fs_meta.h"
 #include "./raii_utils.h"
+#include "./system_volume.h"
 #include <chrono>
 #include <future>
 #include <sys/mount.h>
@@ -48,27 +50,58 @@ public:
         }
       }
 
-      // Process mount points in batches to limit concurrent threads
-      const size_t maxConcurrentChecks = 4; // Limit concurrent access checks
+      // Classify all mount points under the DA mutex, then release the
+      // lock before launching async accessibility checks. This serializes
+      // DiskArbitration + IOKit operations with getVolumeMetadata workers.
+      std::vector<MountPoint> allMountPoints;
+      {
+        std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
 
-      for (size_t i = 0; i < static_cast<size_t>(count);
-           i += maxConcurrentChecks) {
-        std::vector<std::future<std::pair<std::string, bool>>> futures;
-        std::vector<MountPoint> batchMountPoints;
+        DASessionRAII session(DASessionCreate(kCFAllocatorDefault));
+        if (session.isValid()) {
+          static dispatch_queue_t da_queue = dispatch_queue_create(
+              "com.photostructure.fs-metadata.mountpoints",
+              DISPATCH_QUEUE_SERIAL);
+          session.scheduleOnQueue(da_queue);
+        }
 
-        // Create batch of mount points and launch their checks
-        for (size_t j = i;
-             j < static_cast<size_t>(count) && j < i + maxConcurrentChecks;
-             j++) {
+        for (int j = 0; j < count; j++) {
           MountPoint mp;
           mp.mountPoint = mntbuf.get()[j].f_mntonname;
           mp.fstype = mntbuf.get()[j].f_fstypename;
-          mp.error = ""; // Initialize error field
+          mp.isReadOnly = (mntbuf.get()[j].f_flags & MNT_RDONLY) != 0;
+
+          auto classification =
+              session.isValid()
+                  ? ClassifyMacVolume(mntbuf.get()[j].f_mntfromname,
+                                      mntbuf.get()[j].f_flags, session.get())
+                  : ClassifyMacVolumeByFlags(mntbuf.get()[j].f_flags);
+          mp.isSystemVolume = classification.isSystemVolume;
+          mp.volumeRole = classification.role;
+          mp.error = "";
+          allMountPoints.push_back(std::move(mp));
+        }
+        // DA session RAII unschedules and releases here under the lock
+      }
+
+      // Process mount points in batches to limit concurrent threads
+      const size_t maxConcurrentChecks = 4; // Limit concurrent access checks
+
+      for (size_t i = 0; i < allMountPoints.size();
+           i += maxConcurrentChecks) {
+        std::vector<std::future<std::pair<std::string, bool>>> futures;
+        std::vector<MountPoint *> batchPtrs;
+
+        // Launch async accessibility checks (no DA operations here)
+        for (size_t j = i;
+             j < allMountPoints.size() && j < i + maxConcurrentChecks;
+             j++) {
+          auto &mp = allMountPoints[j];
 
           DEBUG_LOG("[GetVolumeMountPointsWorker] Checking mount point: %s",
                     mp.mountPoint.c_str());
 
-          batchMountPoints.push_back(mp);
+          batchPtrs.push_back(&mp);
 
           // Launch async check
           futures.push_back(
@@ -86,7 +119,7 @@ public:
 
         // Process results for this batch
         for (size_t k = 0; k < futures.size(); k++) {
-          auto &mp = batchMountPoints[k];
+          auto &mp = *batchPtrs[k];
           try {
             auto status =
                 futures[k].wait_for(std::chrono::milliseconds(timeoutMs_));
@@ -131,10 +164,11 @@ public:
             mp.error = std::string("Mount point check failed: ") + e.what();
             DEBUG_LOG("[GetVolumeMountPointsWorker] Exception: %s", e.what());
           }
-
-          mountPoints_.push_back(std::move(mp));
         }
       }
+
+      // Move all classified + accessibility-checked mount points to results
+      mountPoints_ = std::move(allMountPoints);
     } catch (const std::exception &e) {
       SetError(std::string("Failed to process mount points: ") + e.what());
       DEBUG_LOG("[GetVolumeMountPointsWorker] Exception: %s", e.what());

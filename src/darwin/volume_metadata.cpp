@@ -5,8 +5,10 @@
 #include "../common/fd_guard.h"
 #include "../common/path_security.h"
 #include "../common/volume_utils.h"
+#include "./da_mutex.h"
 #include "./fs_meta.h"
 #include "./raii_utils.h"
+#include "./system_volume.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
@@ -22,8 +24,8 @@
 
 namespace FSMeta {
 
-// Global mutex for DiskArbitration operations
-static std::mutex g_diskArbitrationMutex;
+// Global mutex for DiskArbitration operations (declared in da_mutex.h)
+std::mutex g_diskArbitrationMutex;
 
 // Helper function to convert CFString to std::string
 static std::string CFStringToString(CFStringRef cfString) {
@@ -109,6 +111,7 @@ public:
 
 private:
   VolumeMetadataOptions options_;
+  uint32_t f_flags_ = 0;
 
   bool GetBasicVolumeInfo() {
     DEBUG_LOG("[GetVolumeMetadataWorker] Getting basic volume info for: %s",
@@ -186,6 +189,12 @@ private:
     metadata.fstype = fs.f_fstypename;
     metadata.mountFrom = fs.f_mntfromname;
     metadata.mountName = fs.f_mntonname;
+    metadata.isReadOnly = (fs.f_flags & MNT_RDONLY) != 0;
+    // Store flags for ClassifyMacVolume in GetDiskArbitrationInfoSafe()
+    f_flags_ = fs.f_flags;
+    // Preliminary flag-only check; upgraded by ClassifyMacVolume
+    auto flagResult = ClassifyMacVolumeByFlags(fs.f_flags);
+    metadata.isSystemVolume = flagResult.isSystemVolume;
     metadata.status = "ready";
 
     DEBUG_LOG("[GetVolumeMetadataWorker] Volume info - size: %.0f, available: "
@@ -243,6 +252,13 @@ private:
     session.scheduleOnQueue(da_queue);
 
     try {
+      // Classify volume using mount flags + APFS role
+      auto classification = ClassifyMacVolume(metadata.mountFrom.c_str(),
+                                              f_flags_, session.get());
+      metadata.isSystemVolume =
+          metadata.isSystemVolume || classification.isSystemVolume;
+      metadata.volumeRole = classification.role;
+
       CFReleaser<DADiskRef> disk(DADiskCreateFromBSDName(
           kCFAllocatorDefault, session.get(), metadata.mountFrom.c_str()));
 
