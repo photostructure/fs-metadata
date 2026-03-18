@@ -12,6 +12,7 @@
   "projectDocuments": [
     "doc/examples.md",
     "doc/gotchas.md",
+    "doc/system-volume-detection.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "LICENSE.txt"
