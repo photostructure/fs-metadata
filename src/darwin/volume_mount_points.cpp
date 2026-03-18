@@ -87,15 +87,13 @@ public:
       // Process mount points in batches to limit concurrent threads
       const size_t maxConcurrentChecks = 4; // Limit concurrent access checks
 
-      for (size_t i = 0; i < allMountPoints.size();
-           i += maxConcurrentChecks) {
+      for (size_t i = 0; i < allMountPoints.size(); i += maxConcurrentChecks) {
         std::vector<std::future<std::pair<std::string, bool>>> futures;
         std::vector<MountPoint *> batchPtrs;
 
         // Launch async accessibility checks (no DA operations here)
         for (size_t j = i;
-             j < allMountPoints.size() && j < i + maxConcurrentChecks;
-             j++) {
+             j < allMountPoints.size() && j < i + maxConcurrentChecks; j++) {
           auto &mp = allMountPoints[j];
 
           DEBUG_LOG("[GetVolumeMountPointsWorker] Checking mount point: %s",

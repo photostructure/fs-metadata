@@ -2,6 +2,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <DiskArbitration/DiskArbitration.h>
+#include <IOKit/IOKitLib.h>
 #include <sys/mount.h>
 
 // RAII (Resource Acquisition Is Initialization) utilities for macOS APIs.
@@ -122,6 +123,44 @@ public:
       reset();
       ref_ = other.ref_;
       other.ref_ = nullptr;
+    }
+    return *this;
+  }
+};
+
+// RAII wrapper for IOKit io_object_t handles (io_service_t,
+// io_registry_entry_t). IOKit objects must be released with IOObjectRelease(),
+// not CFRelease().
+class IOObjectGuard {
+private:
+  io_object_t obj_;
+
+public:
+  explicit IOObjectGuard(io_object_t obj = 0) noexcept : obj_(obj) {}
+  ~IOObjectGuard() noexcept {
+    if (obj_) {
+      IOObjectRelease(obj_);
+    }
+  }
+
+  io_object_t get() const noexcept { return obj_; }
+  bool isValid() const noexcept { return obj_ != 0; }
+
+  // Prevent copying
+  IOObjectGuard(const IOObjectGuard &) = delete;
+  IOObjectGuard &operator=(const IOObjectGuard &) = delete;
+
+  // Allow moving
+  IOObjectGuard(IOObjectGuard &&other) noexcept : obj_(other.obj_) {
+    other.obj_ = 0;
+  }
+  IOObjectGuard &operator=(IOObjectGuard &&other) noexcept {
+    if (this != &other) {
+      if (obj_) {
+        IOObjectRelease(obj_);
+      }
+      obj_ = other.obj_;
+      other.obj_ = 0;
     }
     return *this;
   }
