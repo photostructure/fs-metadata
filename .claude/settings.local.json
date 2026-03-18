@@ -97,7 +97,12 @@
       "Bash(gh issue list:*)",
       "Bash(gh issue view:*)",
       "Bash(npx ncu)",
-      "WebFetch(domain:typescript-eslint.io)"
+      "Bash(diskutil info:*)",
+      "WebFetch(domain:photostructure.com)",
+      "Bash(node -e \":*)",
+      "Skill(replan)",
+      "Skill(replan:*)",
+      "Bash(clang -E -dD -x c /dev/null)"
     ],
     "deny": [],
     "additionalDirectories": [
