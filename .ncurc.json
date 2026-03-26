@@ -1,6 +1,8 @@
 {
   "reject": [
     "why-eslint: https://github.com/typescript-eslint/typescript-eslint/issues/11732",
-    "eslint"
+    "eslint",
+    "why-typescript: typescript-eslint does not yet support TypeScript 6 (peer dep requires <6.0.0)",
+    "typescript"
   ]
 }
