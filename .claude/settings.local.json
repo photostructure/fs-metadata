@@ -102,7 +102,9 @@
       "Bash(node -e \":*)",
       "Skill(replan)",
       "Skill(replan:*)",
-      "Bash(clang -E -dD -x c /dev/null)"
+      "Bash(clang -E -dD -x c /dev/null)",
+      "Bash(npm view:*)",
+      "Bash(npm search:*)"
     ],
     "deny": [],
     "additionalDirectories": [
