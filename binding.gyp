@@ -171,6 +171,7 @@
           "OS=='mac'",
           {
             "sources": [
+              "src/darwin/get_mount_point.cpp",
               "src/darwin/volume_mount_points.cpp",
               "src/darwin/volume_metadata.cpp",
               "src/darwin/hidden.cpp"

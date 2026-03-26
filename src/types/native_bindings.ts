@@ -54,6 +54,13 @@ export interface NativeBindings {
    * subsequent parsing and extraction logic.
    */
   getVolumeMetadata(options: GetVolumeMetadataOptions): Promise<VolumeMetadata>;
+
+  /**
+   * macOS only: lightweight mount point lookup using fstatfs().
+   * Returns the f_mntonname for the given directory path without fetching
+   * full volume metadata (no DiskArbitration, no IOKit, no space calculation).
+   */
+  getMountPoint?(path: string): Promise<string>;
 }
 
 export type GetVolumeMetadataOptions = {

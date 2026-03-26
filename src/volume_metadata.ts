@@ -1,5 +1,6 @@
 // src/volume_metadata.ts
 
+import type { Stats } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { dirname } from "node:path";
 import { mapConcurrent, withTimeout } from "./async";
@@ -209,6 +210,30 @@ export async function getVolumeMetadataForPathImpl(
   // Linux/Windows: stat().dev is reliable (no firmlinks). Find the mount point
   // by comparing device IDs, using path prefix as a tiebreaker for bind mounts
   // or GIO mounts that share the same device id.
+  const mountPoint = await findMountPointByDeviceId(
+    resolved,
+    resolvedStat,
+    opts,
+    nativeFn,
+  );
+
+  return getVolumeMetadataImpl({ ...opts, mountPoint }, nativeFn);
+}
+
+/**
+ * Find the mount point for a resolved path using device ID matching.
+ * Used on Linux and Windows where stat().dev is reliable (no firmlinks).
+ *
+ * Compares device IDs of mount points against the target path's device ID,
+ * using path prefix as a tiebreaker for bind mounts or GIO mounts that share
+ * the same device id. The longest prefix match wins.
+ */
+export async function findMountPointByDeviceId(
+  resolved: string,
+  resolvedStat: Stats,
+  opts: Options,
+  nativeFn: NativeBindingsFn,
+): Promise<string> {
   const targetDev = resolvedStat.dev;
   const mountPoints = await getVolumeMountPointsImpl(
     { ...opts, includeSystemVolumes: true },
@@ -234,18 +259,13 @@ export async function getVolumeMetadataForPathImpl(
     }),
   );
 
-  // Longest prefix match wins; fall back to device-only match.
   const candidates = prefixMatches.length > 0 ? prefixMatches : deviceMatches;
   if (candidates.length === 0) {
     throw new Error(
-      "No mount point found for path: " + JSON.stringify(pathname),
+      "No mount point found for path: " + JSON.stringify(resolved),
     );
   }
-  const mountPoint = candidates.reduce((a, b) =>
-    a.length >= b.length ? a : b,
-  );
-
-  return getVolumeMetadataImpl({ ...opts, mountPoint }, nativeFn);
+  return candidates.reduce((a, b) => (a.length >= b.length ? a : b));
 }
 
 export async function getAllVolumeMetadataImpl(

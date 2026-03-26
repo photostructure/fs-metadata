@@ -8,6 +8,7 @@
 #include "windows/hidden.h"
 #elif defined(__APPLE__)
 #include "darwin/fs_meta.h"
+#include "darwin/get_mount_point.h"
 #include "darwin/hidden.h"
 #elif defined(__linux__)
 #include "common/volume_metadata.h"
@@ -60,6 +61,12 @@ Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
   return FSMeta::GetVolumeMetadata(info);
 }
 
+#if defined(__APPLE__)
+Napi::Value GetMountPointForPath(const Napi::CallbackInfo &info) {
+  return FSMeta::GetMountPoint(info);
+}
+#endif
+
 #if defined(_WIN32) || defined(__APPLE__)
 Napi::Value GetHiddenAttribute(const Napi::CallbackInfo &info) {
   return FSMeta::GetHiddenAttribute(info);
@@ -80,6 +87,10 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 #endif
 
   exports.Set("getVolumeMetadata", Napi::Function::New(env, GetVolumeMetadata));
+
+#if defined(__APPLE__)
+  exports.Set("getMountPoint", Napi::Function::New(env, GetMountPointForPath));
+#endif
 
 #ifdef ENABLE_GIO
   exports.Set("getGioMountPoints", Napi::Function::New(env, GetGioMountPoints));

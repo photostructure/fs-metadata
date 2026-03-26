@@ -12,6 +12,7 @@ import {
   isHiddenRecursiveImpl,
   setHiddenImpl,
 } from "./hidden";
+import { getMountPointForPathImpl } from "./mount_point_for_path";
 import {
   getTimeoutMsDefault,
   IncludeSystemVolumesDefault,
@@ -124,6 +125,32 @@ export function getVolumeMetadataForPath(
   opts?: Partial<Pick<Options, "timeoutMs" | "linuxMountTablePaths">>,
 ): Promise<VolumeMetadata> {
   return getVolumeMetadataForPathImpl(
+    pathname,
+    optionsWithDefaults(opts),
+    nativeFn,
+  );
+}
+
+/**
+ * Get the mount point path for an arbitrary file or directory path.
+ *
+ * This is a lightweight alternative to {@link getVolumeMetadataForPath} when
+ * you only need the mount point string. On macOS it uses a single fstatfs()
+ * call (no DiskArbitration, IOKit, or space calculations). On Linux/Windows
+ * it uses device ID matching against the mount table.
+ *
+ * Symlinks are resolved, and macOS APFS firmlinks (e.g. `/Users` →
+ * `/System/Volumes/Data`) are handled correctly.
+ *
+ * @param pathname Path to any file or directory
+ * @param opts Optional settings (timeoutMs, linuxMountTablePaths)
+ * @returns The mount point path (e.g., "/", "/System/Volumes/Data", "C:\\")
+ */
+export function getMountPointForPath(
+  pathname: string,
+  opts?: Partial<Pick<Options, "timeoutMs" | "linuxMountTablePaths">>,
+): Promise<string> {
+  return getMountPointForPathImpl(
     pathname,
     optionsWithDefaults(opts),
     nativeFn,

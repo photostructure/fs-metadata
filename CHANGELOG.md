@@ -14,6 +14,12 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 1.2.0 - 2026-03-26
+
+### Added
+
+- New `getMountPointForPath(pathname)` function: a lightweight alternative to `getVolumeMetadataForPath()` that returns only the mount point string without fetching full volume metadata (size, UUID, label, etc.). On macOS, uses a single `fstatfs()` call — no DiskArbitration, IOKit, or space calculations. On Linux/Windows, uses the same device-ID matching logic. Handles symlinks and APFS firmlinks correctly.
+
 ## 1.1.0 - 2026-03-16
 
 ### Added
