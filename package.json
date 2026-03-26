@@ -91,7 +91,7 @@
     "cross-platform"
   ],
   "dependencies": {
-    "node-addon-api": "^8.6.0",
+    "node-addon-api": "^8.7.0",
     "node-gyp-build": "^4.8.4"
   },
   "devDependencies": {
@@ -108,7 +108,7 @@
     "jest-environment-node": "^30.3.0",
     "jest-extended": "^7.0.0",
     "node-gyp": "^12.2.0",
-    "npm-check-updates": "^19.6.5",
+    "npm-check-updates": "^19.6.6",
     "npm-run-all2": "8.0.4",
     "prebuildify": "^6.0.1",
     "prettier": "^3.8.1",
@@ -117,8 +117,8 @@
     "ts-jest": "^29.4.6",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
-    "typedoc": "^0.28.17",
+    "typedoc": "^0.28.18",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.1"
+    "typescript-eslint": "^8.57.2"
   }
 }
