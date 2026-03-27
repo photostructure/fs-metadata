@@ -190,6 +190,7 @@ A caller could theoretically provide a malicious pattern causing ReDoS.
 **Files**: `src/windows/volume_mount_points.cpp`, `src/windows/volume_metadata.cpp`, `src/windows/system_volume.h`
 
 **Issue**: `GetVolumeInformationW` was called redundantly:
+
 - In `volume_mount_points.cpp`: once for `fstype`/`isReadOnly`, then again inside `IsSystemVolume()`
 - In `volume_metadata.cpp`: `IsSystemVolume()` queried the API, then `VolumeInfo` queried it again 5 lines later
 
