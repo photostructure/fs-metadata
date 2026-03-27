@@ -71,4 +71,32 @@ describe("getMountPointForPath()", () => {
       expect(mountPoint).not.toBe("/");
     });
   }
+
+  if (!isMacOS) {
+    // mountPoints option is only used on Linux/Windows (macOS uses native fstatfs)
+    describe("with mountPoints option", () => {
+      it("uses pre-fetched mount points instead of querying the system", async () => {
+        const mountPoints = await getVolumeMountPoints({
+          includeSystemVolumes: true,
+        });
+        const mountPoint = await getMountPointForPath(thisDir, { mountPoints });
+        expect(typeof mountPoint).toBe("string");
+        expect(mountPoint.length).toBeGreaterThan(0);
+        // Should match what we get without the option
+        const expected = await getMountPointForPath(thisDir);
+        expect(mountPoint).toBe(expected);
+      });
+
+      it("works for getVolumeMetadataForPath too", async () => {
+        const mountPoints = await getVolumeMountPoints({
+          includeSystemVolumes: true,
+        });
+        const metadata = await getVolumeMetadataForPath(thisDir, {
+          mountPoints,
+        });
+        const expected = await getVolumeMetadataForPath(thisDir);
+        expect(metadata.mountPoint).toBe(expected.mountPoint);
+      });
+    });
+  }
 });

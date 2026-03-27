@@ -14,6 +14,12 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 1.3.0 - 2026-03-26
+
+### Added
+
+- New optional `mountPoints` field on `Options`: pass pre-fetched mount points to `getMountPointForPath()` and `getVolumeMetadataForPath()` to avoid redundant system queries when resolving multiple paths. Obtain via `getVolumeMountPoints({ includeSystemVolumes: true })`.
+
 ## 1.2.0 - 2026-03-26
 
 ### Added

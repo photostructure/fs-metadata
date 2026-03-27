@@ -122,7 +122,9 @@ export function getVolumeMetadata(
  */
 export function getVolumeMetadataForPath(
   pathname: string,
-  opts?: Partial<Pick<Options, "timeoutMs" | "linuxMountTablePaths">>,
+  opts?: Partial<
+    Pick<Options, "timeoutMs" | "linuxMountTablePaths" | "mountPoints">
+  >,
 ): Promise<VolumeMetadata> {
   return getVolumeMetadataForPathImpl(
     pathname,
@@ -148,7 +150,9 @@ export function getVolumeMetadataForPath(
  */
 export function getMountPointForPath(
   pathname: string,
-  opts?: Partial<Pick<Options, "timeoutMs" | "linuxMountTablePaths">>,
+  opts?: Partial<
+    Pick<Options, "timeoutMs" | "linuxMountTablePaths" | "mountPoints">
+  >,
 ): Promise<string> {
   return getMountPointForPathImpl(
     pathname,

@@ -1,5 +1,7 @@
 // src/types/options.ts
 
+import type { MountPoint } from "./mount_point";
+
 /**
  * Configuration options for filesystem operations.
  *
@@ -7,6 +9,18 @@
  * @see {@link OptionsDefault} for the default values
  */
 export interface Options {
+  /**
+   * Pre-fetched mount points to use instead of querying the system.
+   *
+   * When provided, functions like {@link getMountPointForPath} and
+   * {@link getVolumeMetadataForPath} will use these mount points for device ID
+   * matching instead of calling {@link getVolumeMountPoints} internally. This
+   * avoids redundant system queries when resolving multiple paths.
+   *
+   * Obtain via `getVolumeMountPoints({ includeSystemVolumes: true })` — system
+   * volumes must be included for device ID matching to work correctly.
+   */
+  mountPoints?: MountPoint[];
   /**
    * Timeout in milliseconds for filesystem operations.
    *

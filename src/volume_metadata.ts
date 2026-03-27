@@ -235,10 +235,12 @@ export async function findMountPointByDeviceId(
   nativeFn: NativeBindingsFn,
 ): Promise<string> {
   const targetDev = resolvedStat.dev;
-  const mountPoints = await getVolumeMountPointsImpl(
-    { ...opts, includeSystemVolumes: true },
-    nativeFn,
-  );
+  const mountPoints =
+    opts.mountPoints ??
+    (await getVolumeMountPointsImpl(
+      { ...opts, includeSystemVolumes: true },
+      nativeFn,
+    ));
 
   const prefixMatches: string[] = [];
   const deviceMatches: string[] = [];
