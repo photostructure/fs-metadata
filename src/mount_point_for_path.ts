@@ -48,7 +48,7 @@ export async function getMountPointForPathImpl(
     throw new Error("getMountPoint native function unavailable");
   }
 
-  // Linux/Windows: device ID matching + path prefix tiebreaker
+  // Linux/Windows: device ID filtering + longest ancestor path matching
   debug("[getMountPointForPath] using device matching for %s", resolved);
   return findMountPointByDeviceId(resolved, resolvedStat, opts, nativeFn);
 }

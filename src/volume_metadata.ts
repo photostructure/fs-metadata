@@ -221,12 +221,18 @@ export async function getVolumeMetadataForPathImpl(
 }
 
 /**
- * Find the mount point for a resolved path using device ID matching.
+ * Find the mount point for a resolved path using device ID + path ancestry.
  * Used on Linux and Windows where stat().dev is reliable (no firmlinks).
  *
- * Compares device IDs of mount points against the target path's device ID,
- * using path prefix as a tiebreaker for bind mounts or GIO mounts that share
- * the same device id. The longest prefix match wins.
+ * Device ID filters out unrelated filesystems. Among same-device mount points,
+ * ancestor-path matches (mount point is a parent of `resolved`) are strongly
+ * preferred over device-only matches — GIO/GVFS/FUSE mounts on Linux can
+ * share the same device ID across unrelated volumes (e.g. multiple SMB shares
+ * under /run/user/*/gvfs/), so device ID alone is ambiguous. The longest
+ * ancestor wins.
+ *
+ * The device-only fallback (`deviceMatches`) exists for bind mounts where the
+ * canonical mount point may not be a path ancestor of the target.
  */
 export async function findMountPointByDeviceId(
   resolved: string,
@@ -261,6 +267,8 @@ export async function findMountPointByDeviceId(
     }),
   );
 
+  // Prefer ancestor matches — they're unambiguous. Fall back to device-only
+  // matches only when the mount point isn't an ancestor (e.g. bind mounts).
   const candidates = prefixMatches.length > 0 ? prefixMatches : deviceMatches;
   if (candidates.length === 0) {
     throw new Error(
