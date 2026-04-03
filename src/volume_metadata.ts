@@ -228,7 +228,7 @@ export async function getVolumeMetadataForPathImpl(
  * ancestor-path matches (mount point is a parent of `resolved`) are strongly
  * preferred over device-only matches — GIO/GVFS/FUSE mounts on Linux can
  * share the same device ID across unrelated volumes (e.g. multiple SMB shares
- * under /run/user/*/gvfs/), so device ID alone is ambiguous. The longest
+ * under /run/user/.../gvfs/), so device ID alone is ambiguous. The longest
  * ancestor wins.
  *
  * The device-only fallback (`deviceMatches`) exists for bind mounts where the
