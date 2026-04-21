@@ -31,15 +31,6 @@ leak:__libc_start
 leak:start_thread
 leak:pthread_create
 
-# GLib/GIO allocations (for Linux builds with GIO support)
-leak:g_malloc
-leak:g_slice_alloc
-leak:g_object_new
-leak:g_type_create_instance
-leak:gio_init
-leak:g_io_module_load
-leak:g_thread_pool_new
-
 # libuv allocations
 leak:uv_
 leak:uv__work_submit

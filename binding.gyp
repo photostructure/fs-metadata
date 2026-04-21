@@ -1,7 +1,4 @@
 {
-  "variables": {
-    "enable_gio%": "false"
-  },
   "targets": [
     {
       "target_name": "fs_metadata",
@@ -56,25 +53,6 @@
                 {
                   "cflags": ["-mbranch-protection=standard"],
                   "cflags_cc": ["-mbranch-protection=standard"]
-                }
-              ],
-              [
-                "enable_gio=='true'",
-                {
-                  "sources": [
-                    "src/linux/gio_utils.cpp",
-                    "src/linux/gio_mount_points.cpp",
-                    "src/linux/gio_volume_metadata.cpp"
-                  ],
-                  "defines": [
-                    "ENABLE_GIO=1"
-                  ],
-                  "libraries": [
-                    "<!@(pkg-config --libs gio-unix-2.0)"
-                  ],
-                  "cflags": [
-                    "<!@(pkg-config --cflags gio-unix-2.0)"
-                  ]
                 }
               ]
             ]

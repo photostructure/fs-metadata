@@ -49,7 +49,7 @@ jobs:
             build-mode: none
     steps:
       - run: sudo apt-get update
-      - run: sudo apt-get install -y build-essential libglib2.0-dev libblkid-dev uuid-dev
+      - run: sudo apt-get install -y build-essential libblkid-dev uuid-dev
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

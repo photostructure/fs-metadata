@@ -88,7 +88,7 @@ docker cp . "$CONTAINER_NAME:/tmp/project"
 docker exec "$CONTAINER_NAME" sh -c "
   cd /tmp/project && \
   apt-get update -qq && \
-  apt-get install -y -qq build-essential python3 libglib2.0-dev libblkid-dev uuid-dev git && \
+  apt-get install -y -qq build-essential python3 libblkid-dev uuid-dev git && \
   # Verify versions
   echo 'Python version:' && python3 --version && \
   echo 'GCC version:' && gcc --version | head -1 && \
@@ -100,7 +100,6 @@ docker exec "$CONTAINER_NAME" sh -c "
 # Copy artifacts back
 docker cp "$CONTAINER_NAME:/tmp/project/prebuilds" . 2>/dev/null || true
 docker cp "$CONTAINER_NAME:/tmp/project/build" . 2>/dev/null || true
-docker cp "$CONTAINER_NAME:/tmp/project/config.gypi" . 2>/dev/null || true
 
 # Fix ownership (docker cp preserves container's root ownership)
 if [ -d prebuilds ]; then
@@ -108,9 +107,6 @@ if [ -d prebuilds ]; then
 fi
 if [ -d build ]; then
   chown -R "$(id -u):$(id -g)" build
-fi
-if [ -f config.gypi ]; then
-  chown "$(id -u):$(id -g)" config.gypi
 fi
 
 # Clean up container

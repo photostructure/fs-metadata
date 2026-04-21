@@ -17,10 +17,7 @@ docs/
 # build/ contains the ingredients for prebuilds/ -- we don't need it.
 build/
 
-# This is rebuilt by scripts/configure.js:
-config.gypi
-
-# include scripts directory (for configure.cjs)
+# include scripts directory
 !scripts/
 !scripts/*js
 

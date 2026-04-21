@@ -142,12 +142,10 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 
 - [x] Review BlkidCache RAII wrapper - Already excellent
 - [x] Check blkid_get_tag_value free() calls - Correctly using free()
-- [x] Verify GIO integration memory management - Proper smart pointers
 - [x] Validate statvfs error handling - Already comprehensive
 - [x] **Added**: Input validation for empty mount points
 - **Platform APIs verified**:
   - libblkid API availability
-  - GIO optional dependency handling
   - statvfs behavior
 
 #### `src/linux/blkid_cache.cpp` ✅
@@ -159,38 +157,8 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 - **Platform APIs verified**:
   - libblkid cache APIs - Proper use of blkid_get_cache/blkid_put_cache
 
-#### `src/linux/gio_utils.cpp` (if GIO enabled) ✅
-
-- [x] Review g_object_unref patterns - Already using GioResource RAII
-- [x] Check GError cleanup - Not used in this file (GError-free patterns)
-- [x] Verify GMount/GVolume reference counting - Proper ref/unref pairs
-- [x] **Added**: Exception handling in forEachMount callback
-- [x] **Added**: Null checks for root.get() before G_IS_FILE
-- [x] **Added**: const-correctness for GioResource and callback results
-- **Platform APIs verified**:
-  - GLib/GIO APIs (GNOME) - Proper memory management patterns
-  - GVfs mount integration
-
-#### `src/linux/gio_mount_points.cpp` (if GIO enabled) ✅
-
-- [x] Review g_volume_monitor lifecycle - Correct usage (singleton pattern)
-- [x] Check GList cleanup patterns - Using g_list_free_full correctly
-- [x] Verify string ownership - Proper GCharPtr smart pointers
-- [x] **Added**: const-correctness for local variables (GCharPtr, GFileInfoPtr, etc.)
-- **Platform APIs verified**:
-  - GVolumeMonitor APIs - Reference counting rules
-  - Mount enumeration
-
-#### `src/linux/gio_volume_metadata.cpp` (if GIO enabled) ✅
-
-- [x] Review g_drive object management - Using GObjectPtr smart pointers
-- [x] Check g_icon handling - No GIcon usage in this file
-- [x] Verify string ownership - Proper GCharPtr usage
-- [x] **Added**: Defensive null checks for GObjectPtr::get()
-- [x] **Added**: Null checks for string getters
-- [x] **Added**: const-correctness for all GCharPtr and GObjectPtr locals
-- **Platform APIs verified**:
-  - GDrive/GVolume metadata APIs - Ownership transfer rules
+> **Note**: GIO/GLib integration was removed in favor of `/proc/self/mounts`
+> parsing in TypeScript. See CHANGELOG.md for details.
 
 ## Testing Strategy
 
@@ -237,7 +205,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
    - ✅ WNetConnection: Handle ERROR_MORE_DATA with dynamic buffer resize
    - ✅ GetVolumeInformation: Use MAX_PATH+1 instead of BUFFER_SIZE
 3. ~~**High**: CoreFoundation reference counting in macOS code~~ ✅ Completed - CFReleaser RAII wrapper
-4. ~~**High**: GIO object lifecycle management~~ ✅ Completed - Using smart pointers throughout
+4. ~~**High**: GIO object lifecycle management~~ ✅ N/A - GIO integration removed entirely (see CHANGELOG)
 5. ~~**Medium**: Security - Add comprehensive path validation~~ ✅ Completed
    - ✅ Check for ".." in all platforms (Windows/Darwin have it, Linux doesn't have hidden file support)
    - Validate against null bytes and special characters (remaining)
@@ -358,6 +326,5 @@ The Darwin/macOS implementation demonstrates excellent resource management with 
 ### Linux
 
 - libblkid: Use free() for blkid_get_tag_value results, blkid_put_cache() for cache
-- GLib/GIO: Use g_object_unref() or g_clear_object(), match allocation functions
 - Key Documentation: libblkid man pages, GNOME Developer Documentation
 - **Review Status**: ✅ All files properly reviewed and use smart pointers

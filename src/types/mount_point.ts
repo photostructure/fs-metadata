@@ -29,7 +29,7 @@ export interface MountPoint {
    * verifyVolume`.
    *
    * If there are non-critical errors while extracting metadata, those error
-   * messages may be added to this field (say, from blkid or gio).
+   * messages may be added to this field (say, from blkid).
    *
    * @see {@link VolumeHealthStatuses} for values returned by Windows.
    */

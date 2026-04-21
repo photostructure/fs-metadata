@@ -51,7 +51,7 @@ async function _getVolumeMountPoints(
         );
         return points;
       })()
-    : getLinuxMountPoints(nativeFn, o));
+    : getLinuxMountPoints(o));
 
   debug("[getVolumeMountPoints] raw mount points: %o", raw);
 

@@ -14,6 +14,37 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 1.4.0 - 2026-04-20
+
+### Removed
+
+- **Linux GIO/GLib integration removed.** The optional `enable_gio` build-time
+  flag, the `getGioMountPoints` native binding, and the entire `src/linux/gio_*`
+  source tree have been deleted. The Linux mount-points and volume-metadata
+  paths now use `/proc/self/mounts` parsing exclusively.
+
+  Background: GIO was originally added to surface auto-mounted volumes (USB
+  sticks, external SSDs) that appeared to be missing from `/proc/mounts`. The
+  earlier mount-table read order has since been fixed, and direct verification
+  on Ubuntu 24 confirmed that udisks2-mounted devices (`/media/$USER/...`) are
+  fully visible via `/proc/self/mounts` without GIO. The remaining GIO code
+  path was a thin wrapper around `g_unix_mounts_get()` (which itself reads
+  `/proc/self/mountinfo`) — functionally redundant with the existing mtab
+  parser. The GVolumeMonitor enrichment path that originally justified GIO had
+  already been removed for thread-safety reasons in an earlier release.
+
+  Net effect: smaller native module, no `libglib2.0-dev` build dependency, no
+  `libgio` runtime dependency, simpler Linux build matrix. No public API
+  changes — `getVolumeMountPoints()` and `getVolumeMetadata()` return the same
+  data as before.
+
+### Changed
+
+- Linux build no longer requires `libglib2.0-dev`. Only `libblkid-dev` (and
+  `uuid-dev` for the dev environment) is needed when compiling from source.
+- `scripts/setup-native.mjs` removed — its only purpose was GIO autodetection.
+  `npm run build` and `npm run build:native` no longer invoke it.
+
 ## 1.3.0 - 2026-03-26
 
 ### Added

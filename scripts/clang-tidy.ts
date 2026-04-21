@@ -140,8 +140,6 @@ async function generateWindowsCompileCommands(): Promise<boolean> {
   console.log("Generating compile_commands.json for Windows...");
 
   try {
-    execSync("npm run setup:native", { stdio: "inherit" });
-
     const nodeVersion = process.version.slice(1);
 
     // Try multiple possible locations for node-gyp headers
@@ -293,7 +291,7 @@ async function generateUnixCompileCommands(): Promise<void> {
     process.exit(1);
   }
 
-  execSync("npm run setup:native && bear -- npm run node-gyp-rebuild", {
+  execSync("bear -- npm run node-gyp-rebuild", {
     stdio: "inherit",
   });
 

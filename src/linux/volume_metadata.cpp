@@ -12,10 +12,6 @@
 #include <sys/statvfs.h>
 #include <unistd.h>
 
-#ifdef ENABLE_GIO
-#include "gio_volume_metadata.h"
-#endif
-
 namespace FSMeta {
 
 class LinuxMetadataWorker : public MetadataWorkerBase {
@@ -112,18 +108,6 @@ public:
       DEBUG_LOG("[LinuxMetadataWorker] %s {size: %.3f GB, available: %.3f GB}",
                 mountPoint.c_str(), metadata.size / 1e9,
                 metadata.available / 1e9);
-
-#ifdef ENABLE_GIO
-      try {
-        DEBUG_LOG("[LinuxMetadataWorker] collecting GIO metadata for %s",
-                  validated_mount_point.c_str());
-        gio::addMountMetadata(validated_mount_point, metadata);
-      } catch (const std::exception &e) {
-        DEBUG_LOG("[LinuxMetadataWorker] GIO error for %s: %s",
-                  validated_mount_point.c_str(), e.what());
-        metadata.status = std::string("GIO warning: ") + e.what();
-      }
-#endif
 
       if (!options_.device.empty()) {
         DEBUG_LOG("[LinuxMetadataWorker] getting blkid info for device %s",

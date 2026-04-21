@@ -4,115 +4,10 @@ Reference for Linux APIs used in fs-metadata, with links to official documentati
 
 ## Table of Contents
 
-1. [GIO/GLib APIs](#gioglib-apis)
-2. [libblkid APIs](#libblkid-apis)
-3. [POSIX File System APIs](#posix-file-system-apis)
-4. [RAII Patterns](#raii-patterns)
-5. [References](#references)
-
-## GIO/GLib APIs
-
-### Thread Safety Overview
-
-**Critical**: GIO has different thread safety guarantees for different APIs:
-
-| API                      | Thread Safe? | Used? | Notes                                     |
-| ------------------------ | ------------ | ----- | ----------------------------------------- |
-| `g_unix_mounts_get()`    | Yes          | ✅    | Uses `getmntent_r()` or internal `G_LOCK` |
-| `g_unix_mount_get_*()`   | Yes          | ✅    | Safe on `GUnixMountEntry`                 |
-| `g_volume_monitor_get()` | **No**       | ❌    | Main thread only - **NOT USED**           |
-
-**GIO Threading Docs**: https://docs.gtk.org/gio/class.VolumeMonitor.html
-
-> "GVolumeMonitor is not thread-default-context aware and should not be used other than from the main thread."
-
-This codebase only uses thread-safe APIs (`g_unix_mounts_get()` and related functions)
-because all native code runs on `Napi::AsyncWorker` threads.
-
-### g_unix_mounts_get
-
-- **Docs**: https://docs.gtk.org/gio/func.unix_mounts_get.html
-- **Purpose**: Thread-safe enumeration of mounted filesystems
-- **Returns**: `GList*` of `GUnixMountEntry*` (caller owns both)
-- **Cleanup**: `g_list_free_full(list, (GDestroyNotify)g_unix_mount_free)`
-
-```cpp
-GList *mounts = g_unix_mounts_get(nullptr);
-for (GList *l = mounts; l != nullptr; l = l->next) {
-    GUnixMountEntry *entry = static_cast<GUnixMountEntry*>(l->data);
-    const char *path = g_unix_mount_get_mount_path(entry);
-    const char *fstype = g_unix_mount_get_fs_type(entry);
-}
-g_list_free_full(mounts, reinterpret_cast<GDestroyNotify>(g_unix_mount_free));
-```
-
-**Source**: https://gitlab.gnome.org/GNOME/glib/-/blob/main/gio/gunixmounts.c
-
-### GUnixMountEntry Functions
-
-- **Docs**: https://docs.gtk.org/gio-unix/struct.MountEntry.html
-- `g_unix_mount_get_mount_path()` - Returns `const char*` (borrowed)
-- `g_unix_mount_get_fs_type()` - Returns `const char*` (borrowed)
-- `g_unix_mount_get_device_path()` - Returns `const char*` (borrowed)
-- `g_unix_mount_free()` - Free a single entry
-
-**Note**: String returns are borrowed - do NOT `g_free()` them.
-
-### g_volume_monitor_get (NOT USED)
-
-> ⚠️ **NOT USED IN THIS CODEBASE**: GVolumeMonitor is NOT thread-safe and has been
-> removed from fs-metadata. This section is retained for reference only.
-
-- **Docs**: https://docs.gtk.org/gio/type_func.VolumeMonitor.get.html
-- **Purpose**: Get system volume monitor for rich metadata
-- **Returns**: Owned `GVolumeMonitor*` reference
-- **Cleanup**: **Must** call `g_object_unref()` when done
-
-**Why Not Used**: GVolumeMonitor can only be safely used from the main thread.
-Node.js native addons use `Napi::AsyncWorker` which runs on libuv thread pool
-worker threads. Using GVolumeMonitor from these threads causes race conditions:
-
-```
-GLib-GObject-CRITICAL: g_object_ref: assertion '!object_already_finalized' failed
-```
-
-The thread-safe `g_unix_mounts_get()` API provides sufficient metadata (fstype,
-mountFrom). Rich metadata (label, uri) is obtained from blkid instead.
-
-### g_volume_monitor_get_mounts (NOT USED)
-
-> ⚠️ **NOT USED**: See above - GVolumeMonitor is not thread-safe.
-
-- **Docs**: https://docs.gtk.org/gio/method.VolumeMonitor.get_mounts.html
-- **Returns**: `GList*` of `GMount*` (caller owns list and references)
-- **Cleanup**: `g_list_free_full(mounts, g_object_unref)`
-
-### GMount / GVolume / GFile Functions (NOT USED)
-
-> ⚠️ **NOT USED**: These require GVolumeMonitor which is not thread-safe.
-
-| Function                         | Returns    | Ownership           |
-| -------------------------------- | ---------- | ------------------- |
-| `g_mount_get_root()`             | `GFile*`   | Caller owns, unref  |
-| `g_mount_get_volume()`           | `GVolume*` | Caller owns, unref  |
-| `g_mount_get_name()`             | `char*`    | Caller owns, g_free |
-| `g_mount_get_default_location()` | `GFile*`   | Caller owns, unref  |
-| `g_file_get_path()`              | `char*`    | Caller owns, g_free |
-| `g_file_get_uri()`               | `char*`    | Caller owns, g_free |
-| `g_volume_get_name()`            | `char*`    | Caller owns, g_free |
-
-**Memory Management Docs**: https://docs.gtk.org/gobject/concepts.html#reference-counting
-
-### GLib Memory Functions
-
-| Function             | Purpose                               |
-| -------------------- | ------------------------------------- |
-| `g_object_unref()`   | Decrement GObject reference count     |
-| `g_free()`           | Free GLib-allocated memory            |
-| `g_list_free()`      | Free GList container only             |
-| `g_list_free_full()` | Free GList and elements with callback |
-
-**Docs**: https://docs.gtk.org/glib/func.free.html
+1. [libblkid APIs](#libblkid-apis)
+2. [POSIX File System APIs](#posix-file-system-apis)
+3. [RAII Patterns](#raii-patterns)
+4. [References](#references)
 
 ## libblkid APIs
 
@@ -221,32 +116,6 @@ if (fd < 0) {
 
 ## RAII Patterns
 
-### GIO Smart Pointers (gio_utils.h)
-
-```cpp
-// Custom deleters
-template <typename T> struct GObjectDeleter {
-    void operator()(T *ptr) const { if (ptr) g_object_unref(ptr); }
-};
-
-struct GFreeDeleter {
-    void operator()(void *ptr) const { if (ptr) g_free(ptr); }
-};
-
-// Smart pointer aliases
-template <typename T> using GObjectPtr = std::unique_ptr<T, GObjectDeleter<T>>;
-
-using GFilePtr = GObjectPtr<GFile>;
-using GMountPtr = GObjectPtr<GMount>;
-using GVolumePtr = GObjectPtr<GVolume>;
-using GVolumeMonitorPtr = GObjectPtr<GVolumeMonitor>;  // Not currently used
-using GCharPtr = std::unique_ptr<char, GFreeDeleter>;
-```
-
-> **Note**: `GVolumeMonitorPtr`, `GMountPtr`, `GVolumePtr`, and `GFilePtr` are
-> defined but not currently used because GVolumeMonitor is not thread-safe.
-> They are retained for potential future use if a main-thread-only API is added.
-
 ### BlkidCache RAII
 
 ```cpp
@@ -284,18 +153,6 @@ FdGuard guard{fd};
 ```
 
 ## References
-
-### GIO/GLib Official Documentation
-
-- [GIO Reference](https://docs.gtk.org/gio/)
-- [GLib Reference](https://docs.gtk.org/glib/)
-- [GObject Memory Management](https://docs.gtk.org/gobject/concepts.html#reference-counting)
-- [GVolumeMonitor](https://docs.gtk.org/gio/class.VolumeMonitor.html)
-- [Unix Mounts](https://docs.gtk.org/gio-unix/struct.MountEntry.html)
-
-### GLib Source Code
-
-- [gunixmounts.c](https://gitlab.gnome.org/GNOME/glib/-/blob/main/gio/gunixmounts.c) - Thread-safe mount enumeration implementation
 
 ### libblkid / util-linux
 

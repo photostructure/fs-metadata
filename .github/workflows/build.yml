@@ -32,7 +32,7 @@ jobs:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy bear build-essential libglib2.0-dev libblkid-dev uuid-dev
+          sudo apt-get install -y clang-tidy bear build-essential libblkid-dev uuid-dev
 
       # Windows clang-tidy installation
       - if: runner.os == 'Windows'

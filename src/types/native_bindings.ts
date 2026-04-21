@@ -44,11 +44,6 @@ export interface NativeBindings {
   ): Promise<MountPoint[]>;
 
   /**
-   * This is only available on Linux, and only if libglib-2.0 is installed.
-   */
-  getGioMountPoints?(): Promise<MountPoint[]>;
-
-  /**
    * This is only a partial implementation for most platforms, to minimize
    * native code when possible. The javascript side handles a bunch of
    * subsequent parsing and extraction logic.

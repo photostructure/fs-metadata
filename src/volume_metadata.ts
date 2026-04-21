@@ -95,7 +95,8 @@ async function _getVolumeMetadata(
       }
     } catch (err) {
       debug("[getVolumeMetadata] failed to get mtab info: " + err);
-      // this may be a GIO mount. Ignore the error and continue.
+      // Mtab lookup can fail for transient mounts or race conditions.
+      // Ignore and continue with whatever the native call returns.
     }
   }
 
@@ -140,7 +141,7 @@ async function _getVolumeMetadata(
     remote,
   }) as VolumeMetadata;
 
-  // Backfill if blkid or gio failed us:
+  // Backfill if blkid failed us:
   if (isLinux && isNotBlank(device)) {
     // Sometimes blkid doesn't have the UUID in cache. Try to get it from
     // /dev/disk/by-uuid:
@@ -209,7 +210,7 @@ export async function getVolumeMetadataForPathImpl(
 
   // Linux/Windows: stat().dev is reliable (no firmlinks). Find the mount point
   // by comparing device IDs, using path prefix as a tiebreaker for bind mounts
-  // or GIO mounts that share the same device id.
+  // or GVfs/FUSE mounts that share the same device id.
   const mountPoint = await findMountPointByDeviceId(
     resolved,
     resolvedStat,
@@ -226,8 +227,8 @@ export async function getVolumeMetadataForPathImpl(
  *
  * Device ID filters out unrelated filesystems. Among same-device mount points,
  * ancestor-path matches (mount point is a parent of `resolved`) are strongly
- * preferred over device-only matches — GIO/GVFS/FUSE mounts on Linux can
- * share the same device ID across unrelated volumes (e.g. multiple SMB shares
+ * preferred over device-only matches — GVfs/FUSE mounts on Linux can share
+ * the same device ID across unrelated volumes (e.g. multiple SMB shares
  * under /run/user/.../gvfs/), so device ID alone is ambiguous. The longest
  * ancestor wins.
  *

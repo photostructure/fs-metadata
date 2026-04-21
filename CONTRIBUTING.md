@@ -41,7 +41,7 @@ Install the Xcode Command Line Tools, and then
 
 ### On Ubuntu/Debian
 
-    sudo apt-get install bear build-essential clang-format libglib2.0-dev libblkid-dev uuid-dev
+    sudo apt-get install bear build-essential clang-format libblkid-dev uuid-dev
 
 ## Before submitting your PR
 
@@ -57,7 +57,7 @@ into account both Windows and POSIX systems.
 
 - macOS on x86 and Apple Silicon
 - Windows on x64
-- glibc Linux on x64 and arm64, with or without Gnome GIO support
+- glibc Linux on x64 and arm64
 - MUSL Alpine Linux on x64 and arm64
 
 ## Development Gotchas
@@ -121,7 +121,7 @@ Actions that have multiple targets can be run in parallel using wildcards:
 
 ### Naming Guidelines
 
-- Use explicit names to avoid ambiguity (e.g., `setup:native` instead of just `setup`)
+- Use explicit names to avoid ambiguity (e.g., `build:native` instead of just `build`)
 - Group related scripts by action prefix for easy wildcard execution
 - Avoid names that could cause npm lifecycle conflicts (e.g., `prebuild` vs `build`)
 - Use descriptive suffixes that clearly indicate the target or purpose

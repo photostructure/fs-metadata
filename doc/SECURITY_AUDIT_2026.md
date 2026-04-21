@@ -5,6 +5,10 @@
 **Scope**: Complete codebase review including API verification against official documentation
 **Previous Audit**: October-December 2025 (see `doc/SECURITY_AUDIT_2025.md`)
 
+> **Post-audit note (April 2026):** The Linux GIO/GLib integration discussed in
+> re-verification findings #6 and #7 has since been removed entirely. See the
+> "Removed" section of `CHANGELOG.md` for the rationale.
+
 ## Executive Summary
 
 This audit covers all changes since the December 2025 re-audit, focusing on the new

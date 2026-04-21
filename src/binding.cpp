@@ -12,10 +12,6 @@
 #include "darwin/hidden.h"
 #elif defined(__linux__)
 #include "common/volume_metadata.h"
-#ifdef ENABLE_GIO
-#include "linux/gio_mount_points.h"
-#include "linux/gio_volume_metadata.h"
-#endif
 #endif
 
 namespace {
@@ -42,13 +38,6 @@ Napi::Value SetDebugPrefix(const Napi::CallbackInfo &info) {
   FSMeta::Debug::SetDebugPrefix(info[0].As<Napi::String>().Utf8Value());
   return env.Undefined();
 }
-
-#ifdef ENABLE_GIO
-Napi::Value GetGioMountPoints(const Napi::CallbackInfo &info) {
-  const Napi::Env env = info.Env();
-  return FSMeta::gio::GetMountPoints(env);
-}
-#endif
 
 #if defined(_WIN32) || defined(__APPLE__)
 // Fix: Remove extra parameter and use correct signature
@@ -90,10 +79,6 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 
 #if defined(__APPLE__)
   exports.Set("getMountPoint", Napi::Function::New(env, GetMountPointForPath));
-#endif
-
-#ifdef ENABLE_GIO
-  exports.Set("getGioMountPoints", Napi::Function::New(env, GetGioMountPoints));
 #endif
 
 #if defined(_WIN32) || defined(__APPLE__)

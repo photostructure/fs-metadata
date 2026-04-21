@@ -133,6 +133,33 @@ FROM debian:bullseye
 RUN apt-get update && apt-get install -y nodejs npm
 ```
 
+#### Electron Consumers Need libblkid Headers
+
+**Problem**: Electron apps that bundle `@photostructure/fs-metadata` fail to build on Linux with:
+
+```
+fatal error: blkid/blkid.h: No such file or directory
+```
+
+…even though `npm install` reports that prebuilds were found.
+
+**Why it happens**: `@electron/rebuild` (invoked by `electron-forge`, `electron-builder`, and friends) **always recompiles native modules from source** against Electron's bundled Node ABI. The Node-ABI prebuilds shipped in `prebuilds/` are not Electron-compatible and are ignored. The fresh compile then needs the same system headers a from-source build needs.
+
+**Solution**: Install `libblkid-dev` (and friends) on the build machine before running `electron-rebuild` / `electron-forge package`:
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install -y libblkid-dev
+
+# Fedora/RHEL
+sudo dnf install -y libblkid-devel
+
+# Alpine
+apk add blkid-dev
+```
+
+In CI, add this as a step before `npm install` / the Electron package step. The same applies to any consumer that compiles from source for an unsupported architecture or glibc version. See [CONTRIBUTING.md](../CONTRIBUTING.md#on-ubuntudebian) for the full development dependency list.
+
 #### System Volume Filtering
 
 Many mount points on Linux are system-only:

@@ -53,6 +53,7 @@
     "RAII",
     "ramfs",
     "rclone",
+    "recompiles",
     "rootfs",
     "seccomp",
     "securityfs",
