@@ -2,6 +2,7 @@
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
+#include "../common/shutdown.h"
 #include "drive_status.h"
 #include "fs_meta.h"
 #include "security_utils.h"
@@ -21,7 +22,7 @@ struct DriveStringsBuffer {
       : buffer(std::make_unique<WCHAR[]>(size)) {}
 };
 
-class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
+class GetVolumeMountPointsWorker : public SafeAsyncWorker {
 
 private:
   Napi::Promise::Deferred deferred_;
@@ -31,10 +32,14 @@ private:
 public:
   GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred,
                              uint32_t timeoutMs = 5000)
-      : Napi::AsyncWorker(deferred.Env()), deferred_(deferred),
+      : SafeAsyncWorker(deferred.Env()), deferred_(deferred),
         timeoutMs_(timeoutMs) {}
 
   void Execute() override {
+    if (IsShuttingDown()) {
+      SetError("fs-metadata: shutdown in progress");
+      return;
+    }
     try {
       DEBUG_LOG("[GetVolumeMountPoints] getting logical drive strings size");
       DWORD size = GetLogicalDriveStringsW(0, nullptr);
@@ -74,12 +79,19 @@ public:
       }
 
       // Check all drive statuses in parallel
+      if (IsShuttingDown()) {
+        return;
+      }
       auto statuses = CheckDriveStatus(paths, timeoutMs_);
 
       // Build mount points from results
       mountPoints_.reserve(paths.size());
 
       for (size_t i = 0; i < paths.size(); i++) {
+        if (IsShuttingDown()) {
+          return;
+        }
+
         MountPoint mp;
         mp.mountPoint = paths[i];
         mp.status = DriveStatusToString(statuses[i]);
@@ -115,6 +127,7 @@ public:
   }
 
   void OnOK() override {
+    Napi::HandleScope scope(Env());
     auto env = Env();
     Napi::Array result = Napi::Array::New(env, mountPoints_.size());
 
@@ -122,7 +135,12 @@ public:
       result[i] = mountPoints_[i].ToObject(env);
     }
 
-    deferred_.Resolve(result);
+    SafeResolve(deferred_, result);
+  }
+
+  void OnError(const Napi::Error &error) override {
+    Napi::HandleScope scope(Env());
+    SafeReject(deferred_, error.Value());
   }
 
 }; // class GetVolumeMountPointsWorker

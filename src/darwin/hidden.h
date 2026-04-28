@@ -1,11 +1,12 @@
 // src/darwin/hidden.h
 #pragma once
 #include "../common/hidden.h"
+#include "../common/shutdown.h"
 #include <napi.h>
 
 namespace FSMeta {
 
-class GetHiddenWorker : public Napi::AsyncWorker {
+class GetHiddenWorker : public SafeAsyncWorker {
 public:
   GetHiddenWorker(std::string path, Napi::Promise::Deferred deferred);
   void Execute() override;
@@ -18,7 +19,7 @@ private:
   bool is_hidden_;
 };
 
-class SetHiddenWorker : public Napi::AsyncWorker {
+class SetHiddenWorker : public SafeAsyncWorker {
 public:
   SetHiddenWorker(std::string path, bool hidden,
                   Napi::Promise::Deferred deferred);

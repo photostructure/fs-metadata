@@ -154,6 +154,10 @@ private:
   VolumeMetadataOptions options_;
 
   void Execute() override {
+    if (IsShuttingDown()) {
+      SetError("fs-metadata: shutdown in progress");
+      return;
+    }
     try {
       // Get drive status first
       DriveStatus status = CheckDriveStatus(mountPoint);

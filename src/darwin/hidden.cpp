@@ -4,6 +4,7 @@
 #include "../common/error_utils.h"
 #include "../common/fd_guard.h"
 #include "../common/path_security.h"
+#include "../common/shutdown.h"
 #include <fcntl.h>  // for open(), O_RDONLY, O_CLOEXEC
 #include <string.h> // for strcmp
 #include <sys/mount.h>
@@ -14,7 +15,7 @@ namespace FSMeta {
 
 GetHiddenWorker::GetHiddenWorker(std::string path,
                                  Napi::Promise::Deferred deferred)
-    : Napi::AsyncWorker(deferred.Env()), path_(std::move(path)),
+    : SafeAsyncWorker(deferred.Env()), path_(std::move(path)),
       deferred_(deferred), is_hidden_(false) {
   DEBUG_LOG("[GetHiddenWorker] created for path: %s", path_.c_str());
 }
@@ -81,12 +82,12 @@ void GetHiddenWorker::Execute() {
 void GetHiddenWorker::OnOK() {
   Napi::HandleScope scope(Env());
   auto env = Env();
-  deferred_.Resolve(Napi::Boolean::New(env, is_hidden_));
+  SafeResolve(deferred_, Napi::Boolean::New(env, is_hidden_));
 }
 
 void GetHiddenWorker::OnError(const Napi::Error &error) {
   Napi::HandleScope scope(Env());
-  deferred_.Reject(error.Value());
+  SafeReject(deferred_, error.Value());
 }
 
 Napi::Promise GetHiddenAttribute(const Napi::CallbackInfo &info) {
@@ -111,8 +112,8 @@ Napi::Promise GetHiddenAttribute(const Napi::CallbackInfo &info) {
 
 SetHiddenWorker::SetHiddenWorker(std::string path, bool hidden,
                                  Napi::Promise::Deferred deferred)
-    : Napi::AsyncWorker(deferred.Env()), path_(std::move(path)),
-      hidden_(hidden), deferred_(deferred) {
+    : SafeAsyncWorker(deferred.Env()), path_(std::move(path)), hidden_(hidden),
+      deferred_(deferred) {
   DEBUG_LOG("[SetHiddenWorker] created for path: %s, hidden: %d", path_.c_str(),
             hidden_);
 }
@@ -206,12 +207,12 @@ void SetHiddenWorker::Execute() {
 void SetHiddenWorker::OnOK() {
   Napi::HandleScope scope(Env());
   auto env = Env();
-  deferred_.Resolve(env.Undefined());
+  SafeResolve(deferred_, env.Undefined());
 }
 
 void SetHiddenWorker::OnError(const Napi::Error &error) {
   Napi::HandleScope scope(Env());
-  deferred_.Reject(error.Value());
+  SafeReject(deferred_, error.Value());
 }
 
 Napi::Promise SetHiddenAttribute(const Napi::CallbackInfo &info) {

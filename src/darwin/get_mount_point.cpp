@@ -7,6 +7,7 @@
 #include "../common/error_utils.h"
 #include "../common/fd_guard.h"
 #include "../common/path_security.h"
+#include "../common/shutdown.h"
 
 #include <fcntl.h>
 #include <string>
@@ -16,11 +17,11 @@
 
 namespace FSMeta {
 
-class GetMountPointWorker : public Napi::AsyncWorker {
+class GetMountPointWorker : public SafeAsyncWorker {
 public:
   GetMountPointWorker(const std::string &path,
                       const Napi::Promise::Deferred &deferred)
-      : Napi::AsyncWorker(deferred.Env()), path_(path), deferred_(deferred) {}
+      : SafeAsyncWorker(deferred.Env()), path_(path), deferred_(deferred) {}
 
   void Execute() override {
     DEBUG_LOG("[GetMountPointWorker] Executing for path: %s", path_.c_str());
@@ -65,11 +66,12 @@ public:
 
   void OnOK() override {
     Napi::HandleScope scope(Env());
-    deferred_.Resolve(Napi::String::New(Env(), result_));
+    SafeResolve(deferred_, Napi::String::New(Env(), result_));
   }
 
   void OnError(const Napi::Error &error) override {
-    deferred_.Reject(error.Value());
+    Napi::HandleScope scope(Env());
+    SafeReject(deferred_, error.Value());
   }
 
 private:

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/debug_log.h"
+#include "common/shutdown.h"
 #if defined(_WIN32)
 #include "windows/fs_meta.h"
 #include "windows/hidden.h"
@@ -67,6 +68,10 @@ Napi::Value SetHiddenAttribute(const Napi::CallbackInfo &info) {
 #endif
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+  // Register a cleanup hook so in-flight native workers can short-circuit
+  // during env teardown instead of racing FreeEnvironment.
+  FSMeta::EnsureShutdownHook(env);
+
   exports.Set("setDebugLogging", Napi::Function::New(env, SetDebugLogging));
   exports.Set("setDebugPrefix", Napi::Function::New(env, SetDebugPrefix));
 

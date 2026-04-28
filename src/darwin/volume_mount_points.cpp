@@ -2,6 +2,7 @@
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
+#include "../common/shutdown.h"
 #include "./da_mutex.h"
 #include "./fs_meta.h"
 #include "./raii_utils.h"
@@ -13,7 +14,7 @@
 
 namespace FSMeta {
 
-class GetVolumeMountPointsWorker : public Napi::AsyncWorker {
+class GetVolumeMountPointsWorker : public SafeAsyncWorker {
 private:
   Napi::Promise::Deferred deferred_;
   std::vector<MountPoint> mountPoints_;
@@ -22,11 +23,15 @@ private:
 public:
   GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred,
                              uint32_t timeoutMs = 5000)
-      : Napi::AsyncWorker(deferred.Env()), deferred_(deferred),
+      : SafeAsyncWorker(deferred.Env()), deferred_(deferred),
         timeoutMs_(timeoutMs) {}
 
   void Execute() override {
     DEBUG_LOG("[GetVolumeMountPointsWorker] Executing");
+    if (IsShuttingDown()) {
+      SetError("fs-metadata: shutdown in progress");
+      return;
+    }
     try {
       MountBufferRAII mntbuf;
       // Use MNT_NOWAIT for better performance - we'll verify accessibility
@@ -57,6 +62,10 @@ public:
       {
         std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
 
+        if (IsShuttingDown()) {
+          return;
+        }
+
         DASessionRAII session(DASessionCreate(kCFAllocatorDefault));
         if (session.isValid()) {
           static dispatch_queue_t da_queue = dispatch_queue_create(
@@ -66,6 +75,10 @@ public:
         }
 
         for (int j = 0; j < count; j++) {
+          if (IsShuttingDown()) {
+            return;
+          }
+
           MountPoint mp;
           mp.mountPoint = mntbuf.get()[j].f_mntonname;
           mp.fstype = mntbuf.get()[j].f_fstypename;
@@ -88,6 +101,10 @@ public:
       const size_t maxConcurrentChecks = 4; // Limit concurrent access checks
 
       for (size_t i = 0; i < allMountPoints.size(); i += maxConcurrentChecks) {
+        if (IsShuttingDown()) {
+          return;
+        }
+
         std::vector<std::future<std::pair<std::string, bool>>> futures;
         std::vector<MountPoint *> batchPtrs;
 
@@ -182,7 +199,12 @@ public:
       result[i] = mountPoints_[i].ToObject(env);
     }
 
-    deferred_.Resolve(result);
+    SafeResolve(deferred_, result);
+  }
+
+  void OnError(const Napi::Error &error) override {
+    Napi::HandleScope scope(Env());
+    SafeReject(deferred_, error.Value());
   }
 };
 

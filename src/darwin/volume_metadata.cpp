@@ -4,6 +4,7 @@
 #include "../common/debug_log.h"
 #include "../common/fd_guard.h"
 #include "../common/path_security.h"
+#include "../common/shutdown.h"
 #include "../common/volume_utils.h"
 #include "./da_mutex.h"
 #include "./fs_meta.h"
@@ -76,6 +77,11 @@ public:
   void Execute() override {
     DEBUG_LOG("[GetVolumeMetadataWorker] Executing for mount point: %s",
               mountPoint.c_str());
+    if (IsShuttingDown()) {
+      // Avoid kicking off blocking IOKit/DA calls during env teardown.
+      SetError("fs-metadata: shutdown in progress");
+      return;
+    }
     try {
       // Validate and canonicalize mount point using realpath()
       // This follows Apple's Secure Coding Guide recommendations
@@ -206,6 +212,14 @@ private:
   void GetDiskArbitrationInfoSafe() {
     DEBUG_LOG("[GetVolumeMetadataWorker] Getting Disk Arbitration info for: %s",
               mountPoint.c_str());
+
+    if (IsShuttingDown()) {
+      // IOServiceGetMatchingService is uncancellable; if we're already in
+      // teardown, surface a partial result rather than block FreeEnvironment.
+      metadata.status = "partial";
+      metadata.error = "shutdown in progress";
+      return;
+    }
 
     // Check if this is a network filesystem
     if (metadata.fstype == "smbfs" || metadata.fstype == "nfs" ||

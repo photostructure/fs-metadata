@@ -1,6 +1,7 @@
 // src/windows/hidden.cpp
 #include "hidden.h"
 #include "../common/debug_log.h"
+#include "../common/shutdown.h"
 #include "error_utils.h"
 #include "security_utils.h"
 
@@ -36,14 +37,14 @@ public:
 };
 } // anonymous namespace
 
-class GetHiddenWorker : public Napi::AsyncWorker {
+class GetHiddenWorker : public SafeAsyncWorker {
   const std::string path;
   bool result = false;
   Napi::Promise::Deferred deferred;
 
 public:
   GetHiddenWorker(Napi::Env env, std::string p, Napi::Promise::Deferred def)
-      : Napi::AsyncWorker(env), path(std::move(p)), deferred(def) {}
+      : SafeAsyncWorker(env), path(std::move(p)), deferred(def) {}
 
   void Execute() override {
     try {
@@ -104,17 +105,17 @@ public:
     DEBUG_LOG("[GetHiddenWorker] OnOK called, result=%s",
               result ? "true" : "false");
     Napi::HandleScope scope(Env());
-    deferred.Resolve(Napi::Boolean::New(Env(), result));
+    SafeResolve(deferred, Napi::Boolean::New(Env(), result));
   }
 
   void OnError(const Napi::Error &e) override {
     DEBUG_LOG("[GetHiddenWorker] OnError called with: %s", e.Message().c_str());
     Napi::HandleScope scope(Env());
-    deferred.Reject(e.Value());
+    SafeReject(deferred, e.Value());
   }
 };
 
-class SetHiddenWorker : public Napi::AsyncWorker {
+class SetHiddenWorker : public SafeAsyncWorker {
   const std::string path;
   const bool value;
   Napi::Promise::Deferred deferred;
@@ -122,7 +123,7 @@ class SetHiddenWorker : public Napi::AsyncWorker {
 public:
   SetHiddenWorker(Napi::Env env, std::string p, bool v,
                   Napi::Promise::Deferred def)
-      : Napi::AsyncWorker(env), path(std::move(p)), value(v), deferred(def) {}
+      : SafeAsyncWorker(env), path(std::move(p)), value(v), deferred(def) {}
 
   void Execute() override {
     try {
@@ -144,12 +145,12 @@ public:
 
   void OnOK() override {
     Napi::HandleScope scope(Env());
-    deferred.Resolve(Napi::Boolean::New(Env(), true));
+    SafeResolve(deferred, Napi::Boolean::New(Env(), true));
   }
 
   void OnError(const Napi::Error &e) override {
     Napi::HandleScope scope(Env());
-    deferred.Reject(e.Value());
+    SafeReject(deferred, e.Value());
   }
 };
 

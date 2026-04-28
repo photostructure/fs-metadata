@@ -27,6 +27,10 @@ public:
   }
 
   void Execute() override {
+    if (IsShuttingDown()) {
+      SetError("fs-metadata: shutdown in progress");
+      return;
+    }
     try {
       DEBUG_LOG("[LinuxMetadataWorker] starting statvfs for %s",
                 mountPoint.c_str());
