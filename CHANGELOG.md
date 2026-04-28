@@ -14,6 +14,29 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 1.4.1 - 2026-04-27
+
+### Fixed
+
+- **SIGABRT during Node.js environment teardown.** In-flight async workers
+  (DiskArbitration/IOKit calls on macOS, and the equivalent paths on Linux
+  and Windows) could complete after `node::FreeEnvironment` had begun
+  teardown. The default `node-addon-api` completion path then threw a C++
+  `Napi::Error` out of a libuv cleanup-hook frame with no catch, causing
+  `terminate()` / abort.
+
+  All async workers now derive from a new `SafeAsyncWorker` base that
+  tracks per-env shutdown state via napi instance data plus
+  `napi_add_env_cleanup_hook`. During teardown, completion callbacks
+  short-circuit and deferred resolve/reject calls are wrapped to swallow
+  teardown-time napi failures (the JS-side promise is unobservable at
+  that point anyway). Long-running uncancellable native calls
+  (`IOServiceGetMatchingService`, drive-status probes) also bail out as
+  soon as the shutdown flag flips, so process exit isn't dragged out by
+  in-flight work.
+
+  No public API changes.
+
 ## 1.4.0 - 2026-04-20
 
 ### Removed
