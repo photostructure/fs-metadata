@@ -66,7 +66,6 @@ prebuild-win-arm64:
     - uses: actions/setup-node@v4
       with:
         node-version: 20
-        cache: "npm"
     - run: npm ci --ignore-scripts
     - run: npm run build:native
     - uses: actions/upload-artifact@v4
