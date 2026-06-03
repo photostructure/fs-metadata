@@ -73,6 +73,11 @@ jobs:
       # Run linting - the scripts handle platform differences
       - run: npm run lint
 
+      # Verify package.json exports + type declarations resolve correctly.
+      # check:exports (attw --pack .) needs the built dist, so build it first.
+      - run: npm run build:dist
+      - run: npm run check:exports
+
   # This goes away in Fall 2027: https://github.blog/changelog/2025-09-19-github-actions-macos-13-runner-image-is-closing-down/#notice-of-macos-x86_64-intel-architecture-deprecation
   prebuild-mac-x64:
     runs-on: macos-15-intel # Intel x64 runner
