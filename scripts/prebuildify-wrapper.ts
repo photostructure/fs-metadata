@@ -21,6 +21,11 @@ console.log(`Building for platform: ${currentPlatform}, arch: ${currentArch}`);
 // Set up environment variables to help node-gyp
 const env = { ...process.env };
 
+// Architecture-specific compiler defines for Windows. Tracked in a local so we
+// can log the value we set without reading it back out of the environment
+// (which CodeQL flags as clear-text logging of process environment data).
+let clDefines: string | undefined;
+
 // Set architecture-specific defines for Windows
 if (currentPlatform === "win32") {
   // Try various environment variables that might work
@@ -30,9 +35,13 @@ if (currentPlatform === "win32") {
 
   // Try setting compiler flags directly
   if (currentArch === "x64") {
-    env.CL = "/D_M_X64 /D_WIN64 /D_AMD64_";
+    clDefines = "/D_M_X64 /D_WIN64 /D_AMD64_";
   } else if (currentArch === "arm64") {
-    env.CL = "/D_M_ARM64 /D_WIN64";
+    clDefines = "/D_M_ARM64 /D_WIN64";
+  }
+
+  if (clDefines) {
+    env.CL = clDefines;
   }
 }
 
@@ -53,8 +62,8 @@ if (process.argv.length > 2) {
 }
 
 console.log(`Running: prebuildify ${args.join(" ")}`);
-if (currentPlatform === "win32" && env.CL) {
-  console.log(`CL environment variable: ${env.CL}`);
+if (currentPlatform === "win32" && clDefines) {
+  console.log(`CL environment variable: ${clDefines}`);
 }
 
 // Spawn prebuildify with the arguments
