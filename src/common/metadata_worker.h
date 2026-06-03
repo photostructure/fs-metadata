@@ -14,7 +14,8 @@ protected:
 
   MetadataWorkerBase(const std::string &path,
                      const Napi::Promise::Deferred &deferred)
-      : SafeAsyncWorker(deferred.Env()), mountPoint(path), deferred_(deferred) {}
+      : SafeAsyncWorker(deferred.Env()), mountPoint(path), deferred_(deferred) {
+  }
 
   void OnError(const Napi::Error &error) override {
     Napi::HandleScope scope(Env());

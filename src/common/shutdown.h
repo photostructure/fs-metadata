@@ -4,9 +4,9 @@
 // can never escape AsyncWorker callbacks.
 //
 // Why this exists: AsyncWorker::OnWorkComplete can run during
-// node::FreeEnvironment cleanup. If napi_resolve_deferred / napi_reject_deferred
-// fail at that point (env tearing down), node-addon-api throws a C++
-// Napi::Error. With NAPI_CPP_EXCEPTIONS the rethrow path inside
+// node::FreeEnvironment cleanup. If napi_resolve_deferred /
+// napi_reject_deferred fail at that point (env tearing down), node-addon-api
+// throws a C++ Napi::Error. With NAPI_CPP_EXCEPTIONS the rethrow path inside
 // WrapVoidCallback then calls ThrowAsJavaScriptException, which can also fail,
 // letting the C++ exception escape into a libuv cleanup hook frame that has
 // no catch - terminate() / SIGABRT.
@@ -150,9 +150,7 @@ protected:
 
   void SetError(const std::string &error) { error_ = error; }
 
-  bool IsShuttingDown() const {
-    return FSMeta::IsShuttingDown(shutdownState_);
-  }
+  bool IsShuttingDown() const { return FSMeta::IsShuttingDown(shutdownState_); }
 
 private:
   std::shared_ptr<ShutdownState> shutdownState_;
