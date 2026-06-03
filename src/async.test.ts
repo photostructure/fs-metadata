@@ -4,6 +4,18 @@ import { delay, mapConcurrent, TimeoutError, withTimeout } from "./async";
 import { itSkipAlpineARM64 } from "./test-utils/platform";
 import { DayMs, HourMs } from "./units";
 
+// Node 26's jest-environment-node leaves `global.setTimeout` / `global.clearTimeout`
+// as `undefined` after a `jest.spyOn(global, ...).mockRestore()` (the restore
+// deletes the property instead of restoring it). That corrupts the global for
+// every later test in this file, surfacing as "setTimeout is not defined".
+// Capture the real implementations here and restore them manually instead.
+const realSetTimeout = global.setTimeout;
+const realClearTimeout = global.clearTimeout;
+function restoreTimers(): void {
+  global.setTimeout = realSetTimeout;
+  global.clearTimeout = realClearTimeout;
+}
+
 describe("async", () => {
   describe("withTimeout", () => {
     const delayedReject = (ms: number): Promise<never> =>
@@ -144,7 +156,7 @@ describe("async", () => {
         await withTimeout({ promise: delay(50), timeoutMs: 200 });
 
         expect(clearTimeoutSpy).toHaveBeenCalled();
-        clearTimeoutSpy.mockRestore();
+        restoreTimers();
       });
 
       it("should clear timeout when promise rejects", async () => {
@@ -155,7 +167,7 @@ describe("async", () => {
         ).rejects.toThrow("delayed rejection");
 
         expect(clearTimeoutSpy).toHaveBeenCalled();
-        clearTimeoutSpy.mockRestore();
+        restoreTimers();
       });
 
       itSkipAlpineARM64(
@@ -335,8 +347,7 @@ describe("async", () => {
         expect(clearTimeoutSpy).toHaveBeenCalled();
         expect(timeoutSpy).toHaveBeenCalledTimes(2); // One for delay, one for timeout
 
-        timeoutSpy.mockRestore();
-        clearTimeoutSpy.mockRestore();
+        restoreTimers();
       });
 
       it("should not leave hanging timeouts on rejection", async () => {
@@ -350,8 +361,7 @@ describe("async", () => {
         expect(clearTimeoutSpy).toHaveBeenCalled();
         expect(timeoutSpy).toHaveBeenCalledTimes(2);
 
-        timeoutSpy.mockRestore();
-        clearTimeoutSpy.mockRestore();
+        restoreTimers();
       });
     });
   });
