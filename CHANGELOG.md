@@ -14,6 +14,29 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 2.0.0 - 2026-06-03
+
+### Changed
+
+- **BREAKING: Minimum supported Node.js raised to v22.** `engines.node` is now
+  `>=22` (previously `>=20.0.0`). Node.js 20 and 21 are no longer supported. The
+  supported matrix is now Node.js 22, 24, and 26. This drop is what makes the
+  release a major version; there are no breaking changes to the public runtime
+  API.
+
+- **Dual type declarations for ESM and CommonJS.** The build now emits separate
+  `index.d.cts` and `index.d.mts` declaration files, and the package `exports`
+  map points each module system at its matching types. This fixes type
+  resolution under `"moduleResolution": "node16"`/`"nodenext"` consumers. The
+  build is now verified with [`@arethetypeswrong/cli`](https://arethetypeswrong.github.io/),
+  and dual-declaration generation plus export checks (`check:exports`) run as
+  part of the precommit/lint pipeline.
+
+### Fixed
+
+- **`statAsync` now passes `throwIfNoEntry`** to comply with the updated Node.js
+  `fs.stat` signature, avoiding a deprecation/typing mismatch on newer runtimes.
+
 ## 1.4.1 - 2026-04-27
 
 ### Fixed
