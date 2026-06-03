@@ -10,7 +10,10 @@ import { withTimeout } from "./async";
  */
 export async function statAsync(
   path: PathLike,
-  options?: StatOptions & { bigint?: false },
+  // `throwIfNoEntry?: true` selects the overload that resolves to
+  // Promise<Stats> rather than Promise<Stats | undefined>; this wrapper always
+  // throws (rather than returning undefined) when the path doesn't exist.
+  options?: StatOptions & { bigint?: false; throwIfNoEntry?: true },
 ): Promise<Stats> {
   return stat(path, options);
 }
