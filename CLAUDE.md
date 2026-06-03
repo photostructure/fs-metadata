@@ -42,7 +42,7 @@ Use `_dirname()` from `./dirname` instead of `__dirname` - works in both CommonJ
 
 ### Node.js Version Compatibility
 
-Jest 30 doesn't support Node.js 23. Use Node.js 20, 22, or 24.
+Jest 30 doesn't support Node.js 23. Use Node.js 22, 24, or 26.
 
 ## System Volume Detection
 
