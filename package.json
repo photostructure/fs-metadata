@@ -46,6 +46,8 @@
     "lint:native": "tsx scripts/clang-tidy.ts",
     "lint:tsc": "tsc --noEmit",
     "lint:eslint": "eslint",
+    "// check:exports": "verify package.json exports + type declarations resolve correctly (arethetypeswrong). Requires `npm run build:dist` first.",
+    "check:exports": "attw --pack .",
     "fmt": "run-p fmt:*",
     "// fmt:cpp": "on ubuntu: `sudo apt install clang-format`. Note that windows emits `invalid format` with this || true approach, but it works and is better than introducing Yet Another Script Script (like scripts/clang-format.mjs).",
     "fmt:cpp": "clang-format --style=LLVM -i src/*.cpp src/*/*.cpp src/*/*.h || echo \"problem with clang-format\"",
@@ -94,6 +96,7 @@
     "node-gyp-build": "^4.8.4"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
     "@types/semver": "^7.7.1",

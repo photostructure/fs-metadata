@@ -36,6 +36,10 @@ run({ cmd: "npm run fmt", desc: "Formatting code" });
 run({ cmd: "npm run lint", desc: "Running linting checks" });
 run({ cmd: "npm run docs", desc: "TypeDoc generation" });
 run({ cmd: "npm run build:dist", desc: "Building distribution files" });
+run({
+  cmd: "npm run check:exports",
+  desc: "Verifying package exports & type declarations (arethetypeswrong)",
+});
 
 // Detect if we're using glibc (vs musl)
 // Check process.report for musl loader - if not found, assume glibc
