@@ -74,4 +74,4 @@ if (isLinux || isMacOS) {
 // This includes Windows debug memory check on Windows
 run({ cmd: "npm run check:memory", desc: "Comprehensive memory tests" });
 
-console.log("\n✅ All precommit checks passed!");
+console.log("\n✅ All checks passed!");

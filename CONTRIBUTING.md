@@ -45,7 +45,7 @@ Install the Xcode Command Line Tools, and then
 
 ## Before submitting your PR
 
-Run `npm run precommit`, which:
+Run `npm run all`, which:
 
 - reformats your code
 - runs the linter

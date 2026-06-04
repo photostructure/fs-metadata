@@ -62,7 +62,7 @@ Before any work, you MUST read:
 - Follow RAII for all native resource management
 - Platform-specific code goes in platform directories (darwin/, linux/, windows/)
 - Shared interfaces go in src/common/
-- Run `npm run precommit` before declaring implementation complete
+- Run `npm run all` before declaring implementation complete
 
 ### Review & Refinement
 
