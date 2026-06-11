@@ -1,9 +1,11 @@
 {
+  "#": "ignoreDeprecations: tsup injects a default `baseUrl` into its DTS build, which TypeScript 6 deprecates (TS5101)",
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "ignoreDeprecations": "6.0"
   },
   "exclude": [
     "node_modules",

@@ -35,7 +35,10 @@ export default [
     },
     rules: {
       "@typescript-eslint/no-shadow": "error",
-      "security/detect-object-injection": "warn",
+      // Disabled: flags every computed member access, including numeric
+      // array/string indexing (loop counters, char scanning), which this
+      // codebase uses heavily. It's meant for attacker-controlled string keys.
+      "security/detect-object-injection": "off",
       "security/detect-non-literal-require": "warn",
       "security/detect-eval-with-expression": "error",
       "security/detect-non-literal-regexp": "warn",
