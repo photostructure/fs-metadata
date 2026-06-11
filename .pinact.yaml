@@ -1,0 +1,4 @@
+version: 3
+min_age:
+  value: 14 # days — skip Action versions published in the last 14 days
+  always: true # also verify already-pinned versions on every run, not just updates
