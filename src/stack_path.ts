@@ -50,7 +50,6 @@ export function extractCallerPath(stack: string): string {
     throw new Error("Invalid stack trace format: missing caller frame");
   }
   for (let i = callerFrame + 1; i < frames.length; i++) {
-    // eslint-disable-next-line security/detect-object-injection -- accessing array element by index in trusted array
     const frame = frames[i];
     for (const pattern of patterns) {
       const g = toS(frame).trim().match(pattern)?.groups;

@@ -322,7 +322,7 @@ async function getSourceFiles(): Promise<string[]> {
     return files;
   } else {
     // Platform-specific exclusions for Unix-like systems
-    let excludePattern = "";
+    let excludePattern: string;
     if (isMacOS) {
       excludePattern = "| grep -v -E '(windows|linux)/'";
     } else if (isLinux) {
@@ -445,7 +445,6 @@ function filterWindowsHeaderErrors(output: string): {
   ];
 
   for (let i = 0; i < lines.length; i++) {
-    // eslint-disable-next-line security/detect-object-injection
     const line = lines[i];
 
     if (skipNextLine) {

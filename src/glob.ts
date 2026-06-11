@@ -120,7 +120,8 @@ function _compileGlob(patterns: string[] | readonly string[]): RegExp {
   return final.length === 0
     ? // Empty pattern matches nothing
       NeverMatchRE // Case insensitive for Windows paths
-    : new RegExp(`^(?:${final.join("|")})$`, "i");
+    : // eslint-disable-next-line security/detect-non-literal-regexp -- compiling globs to a RegExp is this function's purpose; special characters are escaped above
+      new RegExp(`^(?:${final.join("|")})$`, "i");
 }
 
 // eslint-disable-next-line regexp/no-empty-group
