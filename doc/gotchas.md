@@ -203,6 +203,27 @@ Memory debugging tools like AddressSanitizer may fail due to SIP:
 ASAN_OPTIONS=detect_leaks=1 npm test
 ```
 
+## Mount Point Resolution (Linux and Windows)
+
+`getMountPointForPath()` and `getVolumeMetadataForPath()` resolve a path to its
+mount point by device ID matching: mount points on the same device as the
+target path are candidates, and candidates that are path ancestors of the
+target are strongly preferred (the deepest one wins).
+
+When **no** candidate is a path ancestor — for example, the path is inside a
+bind mount but only the canonical mount point appears in the mount table — the
+longest same-device mount point is returned instead. This fallback is
+intentional: it lets bind-mounted paths resolve to the correct volume.
+
+**Gotcha**: if you pass a custom `mountPoints` array that contains no ancestor
+of the target path, any same-device entry can be returned, even one with no
+path relationship to the target. Build custom arrays with
+`getVolumeMountPoints({ includeSystemVolumes: true })` rather than
+hand-picking entries.
+
+(macOS is unaffected: it resolves mount points natively via `fstatfs()` and
+never scans a mount point list.)
+
 ## Hidden Files Gotchas
 
 ### POSIX vs Native Behavior

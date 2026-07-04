@@ -19,6 +19,13 @@ export interface Options {
    *
    * Obtain via `getVolumeMountPoints({ includeSystemVolumes: true })` — system
    * volumes must be included for device ID matching to work correctly.
+   *
+   * On Linux and Windows, resolution prefers entries that are path ancestors
+   * of the target. If this array contains no ancestor of the target path, a
+   * same-device entry that is *not* an ancestor may be returned instead. That
+   * fallback is intentional (it lets bind-mounted paths resolve to their
+   * canonical mount point), but it means an incomplete or hand-picked array
+   * can match an entry with no path relationship to the target.
    */
   mountPoints?: MountPoint[];
   /**

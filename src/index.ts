@@ -139,13 +139,18 @@ export function getVolumeMetadataForPath(
  * This is a lightweight alternative to {@link getVolumeMetadataForPath} when
  * you only need the mount point string. On macOS it uses a single fstatfs()
  * call (no DiskArbitration, IOKit, or space calculations). On Linux/Windows
- * it uses device ID matching against the mount table.
+ * it uses device ID matching against the mount table: mount points that are
+ * path ancestors of the target are preferred (deepest wins), and if none is
+ * an ancestor, the longest same-device mount point is returned so that
+ * bind-mounted paths still resolve to their canonical mount point. See
+ * {@link Options.mountPoints} for the implications when supplying a custom
+ * mount point array.
  *
  * Symlinks are resolved, and macOS APFS firmlinks (e.g. `/Users` →
  * `/System/Volumes/Data`) are handled correctly.
  *
  * @param pathname Path to any file or directory
- * @param opts Optional settings (timeoutMs, linuxMountTablePaths)
+ * @param opts Optional settings (timeoutMs, linuxMountTablePaths, mountPoints)
  * @returns The mount point path (e.g., "/", "/System/Volumes/Data", "C:\\")
  */
 export function getMountPointForPath(
