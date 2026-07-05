@@ -279,11 +279,32 @@ the hot path. `subvolumeUuid` is additive; `uuid` stays the fs UUID.
       `/home` now yield **distinct** volshas when neither has a `.uuid`.
 - [ ] Verify: `cd src/core && node dist/core/test/mocha-runner.js dist/core/fs/FsMetadata.spec.js`.
 
-### Phase 4 — zfs (deferred)
+### Phase 4 — zfs (evaluated 2026-07-04 → no implementation warranted)
 
-- [ ] Evaluate whether zfs collides at all (dataset `mountFrom` is already distinct).
-- [ ] If needed, populate `subvolumeUuid` from dataset `guid` (libzfs or `zfs get`),
-      behind a capability check; document the extra dependency.
+- [x] **Evaluate whether zfs collides at all.** Conclusion: **it does not**, so the
+      btrfs collision this TPP fixes does not apply to zfs.
+  - zfs mounts surface in `/proc/mounts` as `<dataset-name> <mp> zfs …`, so
+    `fs_spec`/`mountFrom` is the **dataset name** (`tank/home`) — already
+    per-dataset distinct. No sibling collision on `mountFrom`.
+  - fs-metadata passes that dataset name to `blkid` as the "device"; blkid can't
+    resolve a dataset name → zfs datasets get **no `uuid` at all** today. (The only
+    zfs UUID blkid knows is the **pool** guid on the underlying vdev — shared by all
+    datasets in the pool, so it would itself collide, and it isn't even reached.)
+  - Net: read-write zfs datasets fall to PhotoStructure's `.uuid`-file path
+    (`writeVolumeUuidFiles` default true → per-mount unique) — no collision, working
+    identity. The only theoretical gap is **read-only** datasets/snapshots where a
+    `.uuid` can't be written and there's no hardware uuid.
+- [x] **Cheap-guid feasibility — negative.** The rename-stable dataset `guid` is only
+      reachable via **libzfs** (heavy runtime dep, versioned ABI, absent on non-zfs
+      hosts) or `zfs get -Hp -o value guid <mp>` (**a per-filesystem hot-path
+      shell-out — an explicit Non-goal above**). The one cheap procfs source
+      (`/proc/spl/kstat/zfs/<pool>/objset-<id>`) exposes only the **objsetid**, which
+      is _weak_ (not preserved by send/receive, reusable after delete) and is not
+      universally present.
+- [ ] **Decision pending (user):** keep deferred (recommended — no concrete need,
+      no acceptable cheap path), OR add `guid` behind an explicit **out-of-hot-path,
+      opt-in** capability (shell-out or optional libzfs) only if read-only-zfs identity
+      becomes a real requirement. Populates the same generic `subvolumeUuid` slot.
 
 ### Phase 5 — URI-carried subvolume identity (deferred, Option B)
 

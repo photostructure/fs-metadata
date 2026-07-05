@@ -14,6 +14,30 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 2.1.0 - 2026-07-04
+
+### Added
+
+- **btrfs subvolume identity (Linux).** On btrfs, several mount points can be
+  distinct subvolumes of one filesystem; because libblkid keys `uuid` on the
+  block device, every sibling reports the same filesystem `uuid` and cannot be
+  told apart. Three additive, btrfs-only fields now distinguish them (all
+  `undefined` on other filesystems; `uuid` is unchanged and still the filesystem
+  UUID):
+
+  - `MountPoint.subvol` and `MountPoint.subvolid` — the `subvol=` path and
+    `subvolid=` number from the mount options, available from both
+    `getVolumeMountPoints()` and `getVolumeMetadata()`.
+  - `VolumeMetadata.subvolumeUuid` — the strong per-subvolume UUID from the
+    unprivileged `BTRFS_IOC_GET_SUBVOL_INFO` ioctl (kernel ≥ 4.18), stable across
+    remount/reboot and preserved across `btrfs send`/`receive` (as
+    `received_uuid`) and snapshots (fresh uuid + `parent_uuid`). Degrades to
+    `undefined` on older kernels or builds without `<linux/btrfs.h>`.
+
+  See [`doc/subvolume-identity.md`](./doc/subvolume-identity.md) for the full
+  rationale and a cross-platform survey of why other filesystems (zfs, APFS,
+  ReFS, …) do not exhibit this collision.
+
 ## 2.0.0 - 2026-06-03
 
 ### Changed
