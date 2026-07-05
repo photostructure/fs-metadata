@@ -47,6 +47,32 @@ export interface VolumeMetadata extends RemoteInfo, MountPoint {
    * On windows, this _may_ be the 128-bit volume UUID, but if that is not
    * available, like in the case of remote volumes, we fallback to the 32-bit
    * volume serial number, rendered in lowercase hexadecimal.
+   *
+   * Note that on btrfs this is the **filesystem** UUID (keyed on the block
+   * device by libblkid), so every subvolume of one filesystem reports the same
+   * value. Use {@link subvolumeUuid} (and/or {@link MountPoint.subvolid}) to
+   * distinguish sibling subvolumes.
    */
   uuid?: string;
+
+  /**
+   * On btrfs, the UUID of the individual subvolume mounted here, read from the
+   * subvolume's root item via the `BTRFS_IOC_GET_SUBVOL_INFO` ioctl (kernel
+   * >= 4.18, unprivileged). Rendered as a canonical lowercase hyphenated UUID.
+   * Undefined on non-btrfs volumes, and on kernels/builds where the ioctl is
+   * unavailable.
+   *
+   * Unlike {@link uuid} (the filesystem UUID, shared by all subvolumes) and
+   * {@link MountPoint.subvolid} (stable only within one filesystem), this is
+   * the strongest per-subvolume identifier:
+   *
+   * - stable across remount/reboot;
+   * - `btrfs send`/`receive` preserves the source subvolume's UUID as the
+   *   destination's `received_uuid` (the destination itself gets a fresh UUID);
+   * - a snapshot gets a fresh UUID and records its origin as `parent_uuid`.
+   *
+   * This makes it suitable for persistent per-subvolume identity where the
+   * filesystem {@link uuid} would collide across siblings.
+   */
+  subvolumeUuid?: string;
 }

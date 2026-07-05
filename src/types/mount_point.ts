@@ -62,6 +62,30 @@ export interface MountPoint {
   volumeRole?: string;
 
   /**
+   * On btrfs, the subvolume path this mount exposes, taken verbatim from the
+   * `subvol=` mount option (e.g. `/@` or `/@home`). Undefined on non-btrfs
+   * volumes.
+   *
+   * Several mount points can be distinct subvolumes of one btrfs filesystem and
+   * therefore share a single filesystem-level {@link VolumeMetadata.uuid}.
+   * `subvol` and {@link subvolid} distinguish such siblings. Note that the
+   * subvol path changes if the subvolume is renamed or moved; for a
+   * rename-stable identifier prefer {@link VolumeMetadata.subvolumeUuid}.
+   */
+  subvol?: string;
+
+  /**
+   * On btrfs, the numeric subvolume id from the `subvolid=` mount option (e.g.
+   * `256`, `257`). Undefined on non-btrfs volumes.
+   *
+   * Stable across remount/reboot on a given filesystem, but **not** unique
+   * across filesystems and **not** preserved by `btrfs send`/`receive`. See
+   * {@link subvol} for context and {@link VolumeMetadata.subvolumeUuid} for a
+   * stronger identifier.
+   */
+  subvolid?: number;
+
+  /**
    * Whether the volume is mounted read-only.
    *
    * Examples of read-only volumes include the macOS APFS system snapshot at

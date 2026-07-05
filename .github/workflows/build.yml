@@ -180,7 +180,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: |
           docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform ${{ matrix.platform }} node:22-alpine3.21 -c "\
-          apk add build-base git python3 py3-setuptools util-linux-dev --update-cache && \
+          apk add build-base git python3 py3-setuptools util-linux-dev linux-headers --update-cache && \
           cd /tmp/project && \
           npm ci --ignore-scripts && \
           npm run build:native"

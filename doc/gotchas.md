@@ -172,6 +172,23 @@ const userVolumes = await getAllVolumeMetadata({ includeSystemVolumes: false });
 const allVolumes = await getAllVolumeMetadata({ includeSystemVolumes: true });
 ```
 
+#### btrfs Subvolumes Share a Filesystem UUID
+
+On btrfs, several mount points can be distinct subvolumes of **one** filesystem
+(e.g. `/` = `@` and `/home` = `@home`). `libblkid` keys `uuid` on the block
+device, so all siblings report the **same `uuid`** and `mountFrom`:
+
+```typescript
+const root = await getVolumeMetadata("/"); // uuid: 9486d442-…
+const home = await getVolumeMetadata("/home"); // uuid: 9486d442-… (same!)
+```
+
+To distinguish siblings, use the additive btrfs-only fields (all `undefined`
+elsewhere): `subvolid` / `subvol` (from mount options), or the strong
+`subvolumeUuid` (per-subvolume UUID via ioctl, kernel ≥ 4.18). See
+[Subvolume Identity](./subvolume-identity.md) for the full rationale, stability
+semantics, and how zfs/bcachefs differ.
+
 #### GVfs/FUSE Mounts
 
 User-mounted volumes (like Google Drive, SMB shares via Nautilus) appear under `/run/user/*/gvfs`:

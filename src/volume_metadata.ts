@@ -105,6 +105,13 @@ async function _getVolumeMetadata(
     debug("[getVolumeMetadata] using device: %s", device);
   }
 
+  // Pass the mtab fstype to native so the Linux worker can gate btrfs-only
+  // probes (the subvolume-UUID ioctl) without attempting them on other
+  // filesystems.
+  if (isNotBlank(mtabInfo?.fstype)) {
+    o.fstype = mtabInfo.fstype;
+  }
+
   debug("[getVolumeMetadata] requesting native metadata");
   const metadata = (await (
     await nativeFn()

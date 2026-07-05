@@ -49,6 +49,42 @@ function isReadOnlyMount(fs_mntops: string | undefined): boolean {
   return fs_mntops?.split(",").includes("ro") ?? false;
 }
 
+/**
+ * Extracts the btrfs subvolume discriminators from a mount options string.
+ *
+ * btrfs mounts carry `subvol=<path>` and `subvolid=<n>` in the options field
+ * (never in the device/fs_spec field). These distinguish sibling subvolumes of
+ * one filesystem that otherwise share a single libblkid fs UUID. Keys are only
+ * included in the result when present, so the spread is a no-op for non-btrfs
+ * mounts.
+ *
+ * Gated on `fstype === "btrfs"` so the fields stay `undefined` on every other
+ * filesystem, honoring the btrfs-only contract in the public types even if some
+ * unrelated mount happens to carry a `subvol=`-like option.
+ */
+function parseSubvolInfo(
+  fs_mntops: string | undefined,
+  fstype: string | undefined,
+): {
+  subvol?: string;
+  subvolid?: number;
+} {
+  if (fstype !== "btrfs" || fs_mntops == null) return {};
+  const result: { subvol?: string; subvolid?: number } = {};
+  for (const opt of fs_mntops.split(",")) {
+    const eq = opt.indexOf("=");
+    if (eq < 0) continue;
+    const key = opt.slice(0, eq);
+    if (key === "subvol") {
+      result.subvol = opt.slice(eq + 1);
+    } else if (key === "subvolid") {
+      const id = toInt(opt.slice(eq + 1));
+      if (id != null) result.subvolid = id;
+    }
+  }
+  return result;
+}
+
 export function mountEntryToMountPoint(
   entry: MountEntry,
 ): MountPoint | undefined {
@@ -60,6 +96,7 @@ export function mountEntryToMountPoint(
         mountPoint,
         fstype,
         isReadOnly: isReadOnlyMount(entry.fs_mntops),
+        ...parseSubvolInfo(entry.fs_mntops, entry.fs_vfstype),
       };
 }
 
@@ -84,6 +121,7 @@ export function mountEntryToPartialVolumeMetadata(
     isSystemVolume: isSystemVolume(entry.fs_file, entry.fs_vfstype, options),
     isReadOnly: isReadOnlyMount(entry.fs_mntops),
     remote: false, // < default to false, but it may be overridden by extractRemoteInfo
+    ...parseSubvolInfo(entry.fs_mntops, entry.fs_vfstype),
     ...extractRemoteInfo(entry.fs_spec, networkFsTypes),
   };
 }

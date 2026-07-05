@@ -416,6 +416,90 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
     });
   });
 
+  describe("btrfs subvolumes", () => {
+    // Real /proc/self/mounts lines from a btrfs host where `/` and `/home` are
+    // distinct subvolumes (@ / @home) of ONE filesystem — same device, so
+    // libblkid reports the same fs UUID for both. subvol/subvolid are the
+    // per-mount discriminators, and they live in the options field, not fs_spec.
+    const btrfsMtab = `
+/dev/nvme0n1p2 / btrfs rw,relatime,ssd,discard=async,space_cache=v2,subvolid=256,subvol=/@ 0 0
+/dev/nvme0n1p2 /home btrfs rw,relatime,ssd,discard=async,space_cache=v2,subvolid=257,subvol=/@home 0 0
+`;
+
+    it("parses subvol and subvolid into partial volume metadata", () => {
+      const [root, home] = parseMtab(btrfsMtab).map((e) =>
+        mountEntryToPartialVolumeMetadata(e, {}),
+      );
+
+      expect(root).toMatchObject({
+        mountPoint: "/",
+        fstype: "btrfs",
+        mountFrom: "/dev/nvme0n1p2",
+        subvol: "/@",
+        subvolid: 256,
+      });
+      expect(home).toMatchObject({
+        mountPoint: "/home",
+        fstype: "btrfs",
+        mountFrom: "/dev/nvme0n1p2",
+        subvol: "/@home",
+        subvolid: 257,
+      });
+
+      // The whole point: identical device, distinct subvolume discriminators.
+      expect(root?.mountFrom).toBe(home?.mountFrom);
+      expect(root?.subvolid).not.toBe(home?.subvolid);
+      expect(root?.subvol).not.toBe(home?.subvol);
+    });
+
+    it("exposes subvol and subvolid on MountPoint", () => {
+      const [root, home] = parseMtab(btrfsMtab).map((e) =>
+        mountEntryToMountPoint(e),
+      );
+
+      expect(root).toMatchObject({
+        mountPoint: "/",
+        fstype: "btrfs",
+        subvol: "/@",
+        subvolid: 256,
+      });
+      expect(home).toMatchObject({
+        mountPoint: "/home",
+        fstype: "btrfs",
+        subvol: "/@home",
+        subvolid: 257,
+      });
+    });
+
+    it("omits subvol/subvolid on non-btrfs mounts", () => {
+      const [entry] = parseMtab("/dev/sda1 / ext4 rw,relatime 0 1");
+
+      const mp = mountEntryToMountPoint(entry!);
+      expect(mp).not.toHaveProperty("subvol");
+      expect(mp).not.toHaveProperty("subvolid");
+
+      const vm = mountEntryToPartialVolumeMetadata(entry!, {});
+      expect(vm).not.toHaveProperty("subvol");
+      expect(vm).not.toHaveProperty("subvolid");
+    });
+
+    it("omits subvol/subvolid on non-btrfs mounts even if options carry them", () => {
+      // The fields are btrfs-only by contract: gate on fstype, not on the mere
+      // presence of a `subvol=`/`subvolid=` token in the options.
+      const [entry] = parseMtab(
+        "/dev/sda1 /mnt/x ext4 rw,subvolid=256,subvol=/@ 0 0",
+      );
+
+      const mp = mountEntryToMountPoint(entry!);
+      expect(mp).not.toHaveProperty("subvol");
+      expect(mp).not.toHaveProperty("subvolid");
+
+      const vm = mountEntryToPartialVolumeMetadata(entry!, {});
+      expect(vm).not.toHaveProperty("subvol");
+      expect(vm).not.toHaveProperty("subvolid");
+    });
+  });
+
   describe("mountEntryToMountPoint()", () => {
     it("should set isReadOnly from mount options", () => {
       expect(

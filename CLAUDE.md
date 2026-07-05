@@ -57,6 +57,18 @@ Summary:
 - `MNT_DONTBROWSE` is safe to use **only when combined with a non-Data APFS role**. The Data volume (`/System/Volumes/Data`) has `MNT_DONTBROWSE` but role `"Data"`, so it is correctly excluded.
 - Pseudo-filesystems like `devfs` (no IOMedia, no APFS role) are caught by TypeScript fstype/path heuristics.
 
+## Subvolume Identity (btrfs)
+
+**Read `doc/subvolume-identity.md` before modifying subvolume logic.** It covers the collision, the additive fields, and a cross-platform survey of why other filesystems don't collide the same way (zfs/bcachefs/Stratis, macOS APFS — each volume has its own UUID, Windows ReFS/Storage Spaces), plus the distinct LVM/dm duplicate-UUID hazard.
+
+Summary:
+
+- On btrfs, several mount points can be distinct subvolumes of **one** filesystem, so libblkid reports the **same `uuid`** for all of them. `uuid` stays the filesystem UUID; siblings are distinguished by additive fields.
+- `subvol` (path) and `subvolid` (number) come from the `subvol=`/`subvolid=` mount options (`parseSubvolInfo()` in `src/linux/mtab.ts`) — btrfs-only by construction.
+- `subvolumeUuid` (on `VolumeMetadata`) is the strong per-subvolume id from `BTRFS_IOC_GET_SUBVOL_INFO` (kernel ≥ 4.18, **unprivileged**), in `src/linux/volume_metadata.cpp`.
+- **The ioctl returns a positive value on success** (not `0`) — treat only a negative return as failure.
+- The `<linux/btrfs.h>` include is `__has_include`-guarded; Alpine prebuilds need the `linux-headers` apk package for the feature.
+
 ## Windows-Specific Issues
 
 ### Windows CI Jest Worker Failures

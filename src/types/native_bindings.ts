@@ -61,6 +61,12 @@ export interface NativeBindings {
 export type GetVolumeMetadataOptions = {
   mountPoint: string;
   device?: string;
+  /**
+   * Filesystem type (from the mount table on Linux). Used by the native Linux
+   * worker to gate btrfs-only probes (e.g. the subvolume-UUID ioctl) so they
+   * are not attempted on other filesystems.
+   */
+  fstype?: string;
 } & Partial<Pick<Options, "timeoutMs" | "skipNetworkVolumes">>;
 
 export type NativeBindingsFn = () => NativeBindings | Promise<NativeBindings>;

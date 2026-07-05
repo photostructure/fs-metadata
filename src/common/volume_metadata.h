@@ -8,6 +8,7 @@ struct VolumeMetadataOptions {
   std::string mountPoint;    // Required mount point path
   uint32_t timeoutMs = 5000; // Optional timeout with default
   std::string device;        // Optional device path
+  std::string fstype; // Optional filesystem type (gates btrfs-only probes)
   bool skipNetworkVolumes =
       false; // Skip detailed info for network volumes to avoid blocking
 
@@ -27,6 +28,9 @@ struct VolumeMetadataOptions {
     if (obj.Has("device")) {
       options.device = obj.Get("device").As<Napi::String>();
     }
+    if (obj.Has("fstype") && obj.Get("fstype").IsString()) {
+      options.fstype = obj.Get("fstype").As<Napi::String>();
+    }
     if (obj.Has("skipNetworkVolumes")) {
       options.skipNetworkVolumes =
           obj.Get("skipNetworkVolumes").As<Napi::Boolean>().Value();
@@ -44,6 +48,7 @@ struct VolumeMetadata {
   double used = 0.0;
   double available = 0.0;
   std::string uuid;
+  std::string subvolumeUuid; // btrfs per-subvolume UUID (Linux only)
   std::string mountFrom;
   std::string mountName;
   std::string uri;
@@ -82,6 +87,12 @@ struct VolumeMetadata {
       result.Set("uuid", Napi::String::New(env, uuid));
     } else {
       result.Set("uuid", env.Null());
+    }
+
+    // Only present on btrfs (and only when the ioctl is available); omitted
+    // otherwise so consumers see `undefined`, matching volumeRole's pattern.
+    if (!subvolumeUuid.empty()) {
+      result.Set("subvolumeUuid", Napi::String::New(env, subvolumeUuid));
     }
 
     if (!mountFrom.empty()) {

@@ -7,10 +7,26 @@
 #include "../common/path_security.h"
 #include "../common/volume_utils.h"
 #include "blkid_cache.h"
+#include <cstdio>  // for snprintf()
+#include <cstring> // for memset(), strerror()
 #include <fcntl.h> // for open(), O_DIRECTORY, O_RDONLY, O_CLOEXEC
 #include <memory>
 #include <sys/statvfs.h>
 #include <unistd.h>
+
+// btrfs subvolume-UUID support is optional. The UAPI header <linux/btrfs.h> is
+// present on glibc distros (linux-libc-dev) and on Alpine when the
+// linux-headers package is installed, but may be absent in minimal
+// build-from-source environments. Guard on __has_include so the module still
+// compiles where it is missing (the feature is simply unavailable, and
+// subvolumeUuid stays undefined).
+#if defined(__has_include)
+#if __has_include(<linux/btrfs.h>)
+#include <linux/btrfs.h> // BTRFS_IOC_GET_SUBVOL_INFO, btrfs_ioctl_get_subvol_info_args
+#include <sys/ioctl.h> // ioctl()
+#define FSMETA_HAVE_BTRFS 1
+#endif
+#endif
 
 namespace FSMeta {
 
@@ -161,6 +177,46 @@ public:
           metadata.status = std::string("Blkid warning: ") + e.what();
         }
       }
+
+#ifdef FSMETA_HAVE_BTRFS
+      // btrfs: distinct subvolumes of one filesystem share a single libblkid fs
+      // UUID (blkid keys on the block device). BTRFS_IOC_GET_SUBVOL_INFO reads
+      // the per-subvolume UUID from the subvolume's root item — stable across
+      // remount/reboot, preserved by `btrfs send`/`receive` as received_uuid,
+      // and freshly minted (with parent_uuid) for snapshots. It is unprivileged
+      // (kernel >= 4.18). We reuse the mount-point fd already opened above.
+      //
+      // Gated on fstype so we never issue a btrfs ioctl against another
+      // filesystem (in particular, never against network mounts).
+      if (options_.fstype == "btrfs") {
+        struct btrfs_ioctl_get_subvol_info_args subvol_info;
+        memset(&subvol_info, 0, sizeof(subvol_info));
+        // NOTE: on success this ioctl returns a POSITIVE value (observed: 1),
+        // not 0 — so only a negative return indicates failure. Unsupported
+        // kernels or a non-subvolume path yield ENOTTY/EINVAL/EPERM, in which
+        // case we degrade silently and leave subvolumeUuid unset.
+        if (ioctl(fd, BTRFS_IOC_GET_SUBVOL_INFO, &subvol_info) >= 0) {
+          const unsigned char *u = subvol_info.uuid;
+          char uuid_str[37]; // 36 chars + NUL
+          snprintf(
+              uuid_str, sizeof(uuid_str),
+              "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x"
+              "%02x%02x",
+              u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8], u[9], u[10],
+              u[11], u[12], u[13], u[14], u[15]);
+          metadata.subvolumeUuid = uuid_str;
+          DEBUG_LOG("[LinuxMetadataWorker] btrfs subvolume '%s' (id %llu) "
+                    "uuid %s",
+                    subvol_info.name,
+                    static_cast<unsigned long long>(subvol_info.treeid),
+                    metadata.subvolumeUuid.c_str());
+        } else {
+          DEBUG_LOG("[LinuxMetadataWorker] BTRFS_IOC_GET_SUBVOL_INFO "
+                    "unavailable for %s: %s",
+                    validated_mount_point.c_str(), strerror(errno));
+        }
+      }
+#endif
     } catch (const std::exception &e) {
       DEBUG_LOG("[LinuxMetadataWorker] error: %s", e.what());
       SetError(e.what());
