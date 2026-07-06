@@ -71,18 +71,20 @@ private:
       return DriveStatus::Inaccessible;
     }
 
-    // Ensure path ends with backslash for FindFirstFileEx
-    std::string searchPath = path;
-    if (!searchPath.empty() && searchPath.back() != '\\') {
-      searchPath += '\\';
+    // Convert the UTF-8 path to wide chars and use the W API: the A variants
+    // interpret bytes in the active ANSI code page, which mangles or rejects
+    // Unicode paths coming from JS.
+    std::wstring searchPath = SecurityUtils::SafeStringToWide(path);
+    if (!searchPath.empty() && searchPath.back() != L'\\') {
+      searchPath += L'\\';
     }
-    searchPath += "*";
+    searchPath += L'*';
 
-    WIN32_FIND_DATAA findData;
+    WIN32_FIND_DATAW findData;
     // Use FindHandleGuard - search handles MUST be closed with FindClose,
     // not CloseHandle. See:
     // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findclose
-    FindHandleGuard findHandle(FindFirstFileExA(
+    FindHandleGuard findHandle(FindFirstFileExW(
         searchPath.c_str(), FindExInfoBasic, &findData, FindExSearchNameMatch,
         nullptr,
         FIND_FIRST_EX_LARGE_FETCH | FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY));

@@ -10,47 +10,45 @@
 #include <iomanip>
 #include <memory>
 #include <sstream>
+#include <vector>
 #include <winnetwk.h>
 
 namespace FSMeta {
 
 namespace {
-// RAII wrapper for WNet connections
+// Wrapper for WNet connection lookups.
+//
+// W APIs are used throughout this file: JS strings are UTF-8, but the A
+// variants interpret bytes in the active ANSI code page, which mangles or
+// rejects non-ANSI paths, labels, and share names.
 class WNetConnection {
-  std::string drivePath;
-  std::unique_ptr<char[]> buffer;
-  DWORD bufferSize = MAX_PATH;
+  std::string remotePath_;
   bool isValid = false;
 
 public:
-  explicit WNetConnection(const std::string &path)
-      : drivePath(path.substr(0, 2)) {
-
-    // Allocate initial buffer
-    buffer = std::make_unique<char[]>(bufferSize);
+  explicit WNetConnection(const std::string &path) {
+    std::wstring drivePath = SecurityUtils::SafeStringToWide(path.substr(0, 2));
+    DWORD bufferSize = MAX_PATH;
+    std::vector<WCHAR> buffer(bufferSize);
 
     DWORD result =
-        WNetGetConnectionA(drivePath.c_str(), buffer.get(), &bufferSize);
+        WNetGetConnectionW(drivePath.c_str(), buffer.data(), &bufferSize);
 
     if (result == ERROR_MORE_DATA) {
-      // bufferSize now contains the required size
-      buffer = std::make_unique<char[]>(bufferSize);
-      result = WNetGetConnectionA(drivePath.c_str(), buffer.get(), &bufferSize);
+      // bufferSize now contains the required size in WCHARs
+      buffer.resize(bufferSize);
+      result =
+          WNetGetConnectionW(drivePath.c_str(), buffer.data(), &bufferSize);
     }
 
     isValid = (result == NO_ERROR);
+    if (isValid) {
+      remotePath_ = WideToUtf8(buffer.data());
+    }
   }
 
-  ~WNetConnection() = default;
-  WNetConnection(WNetConnection &&) noexcept = default;
-  WNetConnection &operator=(WNetConnection &&) noexcept = default;
-
-  // Prevent copying
-  WNetConnection(const WNetConnection &) = delete;
-  WNetConnection &operator=(const WNetConnection &) = delete;
-
   bool valid() const { return isValid; }
-  const char *remotePath() const { return buffer.get(); }
+  const std::string &remotePath() const { return remotePath_; }
 };
 
 // Helper for formatting volume serialNumber
@@ -86,29 +84,36 @@ inline std::string GetVolumeGUID(const std::string &mountPoint) {
 // RAII wrapper for volume information
 class VolumeInfo {
   static constexpr DWORD VOLUME_NAME_SIZE = MAX_PATH + 1; // 261 characters
-  // Initialize all members to prevent reading uninitialized memory
-  // if GetVolumeInformationA fails with ERROR_NOT_READY
-  char volumeName[VOLUME_NAME_SIZE] = {0};
-  char fstype[VOLUME_NAME_SIZE] = {0};
+  std::string volumeName_;
+  std::string fstype_;
   DWORD serialNumber = 0;
   DWORD maxComponentLen = 0;
   DWORD fsFlags = 0;
   bool valid = false;
 
 public:
-  explicit VolumeInfo(const std::string &mountPoint) {
-    valid = GetVolumeInformationA(
+  explicit VolumeInfo(const std::wstring &mountPoint) {
+    // Initialize buffers to prevent reading uninitialized memory if
+    // GetVolumeInformationW fails with ERROR_NOT_READY
+    WCHAR volumeName[VOLUME_NAME_SIZE] = {0};
+    WCHAR fstype[VOLUME_NAME_SIZE] = {0};
+
+    valid = GetVolumeInformationW(
         mountPoint.c_str(), volumeName, VOLUME_NAME_SIZE, &serialNumber,
         &maxComponentLen, &fsFlags, fstype, VOLUME_NAME_SIZE);
 
     if (!valid && GetLastError() != ERROR_NOT_READY) {
       throw FSException("GetVolumeInformation", GetLastError());
     }
+    if (valid) {
+      volumeName_ = WideToUtf8(volumeName);
+      fstype_ = WideToUtf8(fstype);
+    }
   }
 
   bool isValid() const { return valid; }
-  const char *getVolumeName() const { return volumeName; }
-  const char *getFileSystem() const { return fstype; }
+  const std::string &getVolumeName() const { return volumeName_; }
+  const std::string &getFileSystem() const { return fstype_; }
   DWORD getSerialNumber() const { return serialNumber; }
   DWORD getFlags() const { return fsFlags; }
 };
@@ -116,15 +121,15 @@ public:
 // RAII wrapper for disk space information
 class DiskSpaceInfo {
   // Initialize all members to prevent reading uninitialized memory
-  // if GetDiskFreeSpaceExA fails with ERROR_NOT_READY
+  // if GetDiskFreeSpaceExW fails with ERROR_NOT_READY
   ULARGE_INTEGER totalBytes = {0};
   ULARGE_INTEGER freeBytes = {0};
   ULARGE_INTEGER totalFreeBytes = {0};
   bool valid = false;
 
 public:
-  explicit DiskSpaceInfo(const std::string &mountPoint) {
-    valid = GetDiskFreeSpaceExA(mountPoint.c_str(), &freeBytes, &totalBytes,
+  explicit DiskSpaceInfo(const std::wstring &mountPoint) {
+    valid = GetDiskFreeSpaceExW(mountPoint.c_str(), &freeBytes, &totalBytes,
                                 &totalFreeBytes);
 
     if (!valid && GetLastError() != ERROR_NOT_READY) {
@@ -170,9 +175,11 @@ private:
         return; // Don't try to get additional info for non-healthy drives
       }
 
-      // Get volume information first so we can reuse its flags for
-      // IsSystemVolume, avoiding a redundant GetVolumeInformationW call.
-      VolumeInfo volInfo(mountPoint);
+      // Convert the UTF-8 mount point to wide chars once; the W APIs are
+      // used throughout (see the WNetConnection comment).
+      std::wstring widePath = SecurityUtils::SafeStringToWide(mountPoint);
+
+      VolumeInfo volInfo(widePath);
       if (volInfo.isValid()) {
         metadata.label = volInfo.getVolumeName();
         metadata.fstype = volInfo.getFileSystem();
@@ -196,7 +203,7 @@ private:
         }
 
         // Get disk space information
-        DiskSpaceInfo diskInfo(mountPoint);
+        DiskSpaceInfo diskInfo(widePath);
         if (diskInfo.isValid()) {
           metadata.size = diskInfo.getTotalBytes();
           metadata.available = diskInfo.getFreeBytes();
@@ -210,7 +217,6 @@ private:
 
       // Check system volume using pre-fetched flags from VolumeInfo to
       // avoid a redundant GetVolumeInformationW call.
-      std::wstring widePath = SecurityUtils::SafeStringToWide(mountPoint);
       metadata.isSystemVolume =
           IsSystemVolume(widePath, volInfo.isValid() ? volInfo.getFlags() : 0);
 
@@ -218,7 +224,7 @@ private:
                 mountPoint.c_str(), metadata.isSystemVolume ? "true" : "false");
 
       // Check if drive is remote
-      metadata.remote = (GetDriveTypeA(mountPoint.c_str()) == DRIVE_REMOTE);
+      metadata.remote = (GetDriveTypeW(widePath.c_str()) == DRIVE_REMOTE);
       DEBUG_LOG("[GetVolumeMetadata] %s {remote: %s}", mountPoint.c_str(),
                 metadata.remote ? "true" : "false");
 
