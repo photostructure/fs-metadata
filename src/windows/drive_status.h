@@ -212,9 +212,12 @@ public:
                                ? static_cast<DWORD>(timeoutMs - elapsedMs)
                                : 0;
 
-        if (remainingMs == 0 ||
-            futures[i].wait_for(std::chrono::milliseconds(remainingMs)) ==
-                std::future_status::timeout) {
+        // Even with an exhausted budget (remainingMs == 0), wait_for() still
+        // polls: all checks ran concurrently, so a future whose work finished
+        // while an earlier drive consumed the budget must not be mislabeled
+        // as Timeout.
+        if (futures[i].wait_for(std::chrono::milliseconds(remainingMs)) ==
+            std::future_status::timeout) {
           DEBUG_LOG("[DriveStatusChecker] Timeout waiting for drive %s",
                     paths[i].c_str());
           results.push_back(DriveStatus::Timeout);
