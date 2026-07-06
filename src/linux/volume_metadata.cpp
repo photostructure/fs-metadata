@@ -8,6 +8,7 @@
 #include "../common/volume_utils.h"
 #include "blkid_cache.h"
 #include <cstdio>  // for snprintf()
+#include <cstdlib> // for free()
 #include <cstring> // for memset(), strerror()
 #include <fcntl.h> // for open(), O_DIRECTORY, O_RDONLY, O_CLOEXEC
 #include <memory>
@@ -130,39 +131,26 @@ public:
         try {
           BlkidCache cache;
 
-          // MEMORY MANAGEMENT: blkid_get_tag_value() returns strings allocated
-          // with strdup()
-          //
-          // CRITICAL: These strings MUST be freed with free(), NOT delete or
-          // delete[] blkid is a C library (libblkid), and blkid_get_tag_value()
-          // uses strdup() internally which allocates memory with malloc().
-          //
-          // Memory allocated with malloc() must be deallocated with free().
-          // Using delete or delete[] would invoke the wrong deallocator and
-          // cause undefined behavior (likely a crash).
-          //
+          // blkid_get_tag_value() returns a strdup()'d C string (libblkid is
+          // a C library), so it must be released with free(), not delete.
+          // Wrap it immediately so the free() also happens if the
+          // std::string assignment throws.
           // See: Finding #10 in SECURITY_AUDIT_2025.md
-          // Reference:
-          // https://github.com/util-linux/util-linux/blob/master/libblkid/src/resolve.c
-          // The blkid_get_tag_value() implementation shows it uses strdup():
-          //   return res ? strdup(res) : NULL;
-
-          char *uuid =
-              blkid_get_tag_value(cache.get(), "UUID", options_.device.c_str());
+          std::unique_ptr<char, decltype(&free)> uuid(
+              blkid_get_tag_value(cache.get(), "UUID", options_.device.c_str()),
+              &free);
           if (uuid) {
-            metadata.uuid = uuid;
-            free(uuid); // IMPORTANT: Use free(), not delete (C API, uses
-                        // malloc/strdup)
+            metadata.uuid = uuid.get();
             DEBUG_LOG("[LinuxMetadataWorker] found UUID for %s: %s",
                       options_.device.c_str(), metadata.uuid.c_str());
           }
 
-          char *label = blkid_get_tag_value(cache.get(), "LABEL",
-                                            options_.device.c_str());
+          std::unique_ptr<char, decltype(&free)> label(
+              blkid_get_tag_value(cache.get(), "LABEL",
+                                  options_.device.c_str()),
+              &free);
           if (label) {
-            metadata.label = label;
-            free(label); // IMPORTANT: Use free(), not delete (C API, uses
-                         // malloc/strdup)
+            metadata.label = label.get();
             DEBUG_LOG("[LinuxMetadataWorker] found label for %s: %s",
                       options_.device.c_str(), metadata.label.c_str());
           }
