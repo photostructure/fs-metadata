@@ -9,6 +9,14 @@
 namespace FSMeta {
 
 /**
+ * Upper bound for timeoutMs option values: one day, mirroring the public
+ * TypeScript validation (DayMs in src/units.ts — keep in sync). Larger
+ * values are rejected as TypeErrors rather than silently accepted, so
+ * direct native callers get the same contract as the public API.
+ */
+constexpr double MAX_TIMEOUT_MS = 86400000.0;
+
+/**
  * Checks if multiplying two uint64_t values would overflow.
  *
  * Used to safely calculate volume sizes: size = blockSize * blockCount

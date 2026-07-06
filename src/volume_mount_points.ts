@@ -1,7 +1,7 @@
 // src/mount_point.ts
 
 import { uniqBy } from "./array";
-import { mapConcurrent, withTimeout } from "./async";
+import { mapConcurrent, validateTimeoutMs, withTimeout } from "./async";
 import { debug } from "./debuglog";
 import { getLinuxMountPoints } from "./linux/mount_points";
 import { compactValues } from "./object";
@@ -28,8 +28,10 @@ export async function getVolumeMountPointsImpl(
   opts: Required<GetVolumeMountPointOptions>,
   nativeFn: NativeBindingsFn,
 ): Promise<MountPoint[]> {
+  // Validate before starting any work (including native calls) — also on
+  // Windows, which relies on native timeouts and bypasses withTimeout().
+  validateTimeoutMs(opts.timeoutMs, "getVolumeMountPoints");
   const p = _getVolumeMountPoints(opts, nativeFn);
-  // we rely on the native bindings on Windows to do proper timeouts
   return isWindows
     ? p
     : withTimeout({ desc: "getVolumeMountPoints", ...opts, promise: p });

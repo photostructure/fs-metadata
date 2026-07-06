@@ -3,7 +3,7 @@
 import type { Stats } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { dirname } from "node:path";
-import { mapConcurrent, withTimeout } from "./async";
+import { mapConcurrent, validateTimeoutMs, withTimeout } from "./async";
 import { debug } from "./debuglog";
 import { WrappedError } from "./error";
 import { statAsync } from "./fs";
@@ -41,8 +41,10 @@ export async function getVolumeMetadataImpl(
     );
   }
 
+  // Validate before starting any work (including native calls) — also on
+  // Windows, which relies on native timeouts and bypasses withTimeout().
+  validateTimeoutMs(o.timeoutMs, "getVolumeMetadata()");
   const p = _getVolumeMetadata(o, nativeFn);
-  // we rely on the native bindings on Windows to do proper timeouts
   return isWindows
     ? p
     : withTimeout({
@@ -187,6 +189,11 @@ export async function getVolumeMetadataForPathImpl(
   if (isBlank(pathname)) {
     throw new TypeError("Invalid pathname: got " + JSON.stringify(pathname));
   }
+
+  // Validate before any path work: with a caller-supplied opts.mountPoints
+  // this route can otherwise finish (or fail for unrelated reasons) without
+  // ever reaching a timeoutMs check.
+  validateTimeoutMs(opts.timeoutMs, "getVolumeMetadataForPath()");
 
   // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
   // realpath(), but fstatfs() follows them — handled below.

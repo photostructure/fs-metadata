@@ -19,6 +19,46 @@ export class TimeoutError extends Error {
   }
 }
 /**
+ * Validate a timeoutMs value: it must be a number in [0, one day]. 0 means
+ * "no timeout". Used by {@link withTimeout}, and directly on the Windows
+ * paths that bypass withTimeout and rely on native timeouts — otherwise
+ * out-of-range values would only be range-checked (not day-capped) natively.
+ *
+ * @returns the floored value
+ * @throws {TypeError} if timeoutMs is not a number in [0, one day]
+ */
+export function validateTimeoutMs(
+  timeoutMs: number,
+  desc = "validateTimeoutMs()",
+): number {
+  if (!isNumber(timeoutMs)) {
+    throw new TypeError(
+      desc +
+        ": Expected timeoutMs to be numeric, but got " +
+        JSON.stringify(timeoutMs),
+    );
+  }
+
+  // Range-check the raw value (not the floored one) so the [0, one day]
+  // bound matches the native option parsers, which compare the raw double.
+  if (timeoutMs < 0) {
+    throw new TypeError(
+      desc + ": Expected timeoutMs to be > 0, but got " + timeoutMs,
+    );
+  }
+
+  if (timeoutMs > DayMs) {
+    throw new TypeError(
+      desc +
+        ": Invalid timeoutMs is too large: must be less than one day, but got " +
+        timeoutMs,
+    );
+  }
+
+  return Math.floor(timeoutMs);
+}
+
+/**
  * Rejects the promise with a TimeoutError if it does not resolve within the
  * specified time.
  *
@@ -38,29 +78,7 @@ export async function withTimeout<T>(opts: {
 }): Promise<T> {
   const desc = isBlank(opts.desc) ? "thenOrTimeout()" : opts.desc;
 
-  if (!isNumber(opts.timeoutMs)) {
-    throw new TypeError(
-      desc +
-        ": Expected timeoutMs to be numeric, but got " +
-        JSON.stringify(opts.timeoutMs),
-    );
-  }
-
-  const timeoutMs = Math.floor(opts.timeoutMs);
-
-  if (timeoutMs < 0) {
-    throw new TypeError(
-      desc + ": Expected timeoutMs to be > 0, but got " + timeoutMs,
-    );
-  }
-
-  if (timeoutMs > DayMs) {
-    throw new TypeError(
-      desc +
-        ": Invalid timeoutMs is too large: must be less than one day, but got " +
-        timeoutMs,
-    );
-  }
+  const timeoutMs = validateTimeoutMs(opts.timeoutMs, desc);
 
   if (timeoutMs === 0) {
     return opts.promise;

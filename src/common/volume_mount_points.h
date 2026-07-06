@@ -1,5 +1,7 @@
 // src/common/volume_mount_points.h
 #pragma once
+#include "./volume_utils.h"
+#include <cstdint>
 #include <napi.h>
 #include <string>
 
@@ -12,7 +14,16 @@ struct MountPointOptions {
   static MountPointOptions FromObject(const Napi::Object &obj) {
     MountPointOptions options;
     if (obj.Has("timeoutMs")) {
-      options.timeoutMs = obj.Get("timeoutMs").As<Napi::Number>().Uint32Value();
+      // Uint32Value() would wrap negative values into ~50-day timeouts;
+      // reject out-of-range values instead. The !(x >= 0) form also catches
+      // NaN. 0 is valid and disables the timeout.
+      const double timeoutMs =
+          obj.Get("timeoutMs").As<Napi::Number>().DoubleValue();
+      if (!(timeoutMs >= 0) || timeoutMs > MAX_TIMEOUT_MS) {
+        throw Napi::TypeError::New(
+            obj.Env(), "timeoutMs must be between 0 and 86400000 (one day)");
+      }
+      options.timeoutMs = static_cast<uint32_t>(timeoutMs);
     }
     return options;
   }

@@ -2,7 +2,7 @@
 
 import { realpath } from "node:fs/promises";
 import { dirname } from "node:path";
-import { withTimeout } from "./async";
+import { validateTimeoutMs, withTimeout } from "./async";
 import { debug } from "./debuglog";
 import { statAsync } from "./fs";
 import { isMacOS } from "./platform";
@@ -19,6 +19,11 @@ export async function getMountPointForPathImpl(
   if (isBlank(pathname)) {
     throw new TypeError("Invalid pathname: got " + JSON.stringify(pathname));
   }
+
+  // Validate up front: the Linux/Windows device-matching route (especially
+  // with a caller-supplied opts.mountPoints) never reaches withTimeout(),
+  // which would otherwise be the first place an invalid timeoutMs throws.
+  validateTimeoutMs(opts.timeoutMs, "getMountPointForPath()");
 
   // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
   // realpath(), but fstatfs() follows them — handled below on macOS.

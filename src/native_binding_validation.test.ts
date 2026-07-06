@@ -47,5 +47,19 @@ describe("native binding argument validation", () => {
         (bindings.getVolumeMetadata as unknown as () => unknown)(),
       ).toThrow(/Expected options object/);
     });
+
+    it("throws a TypeError for a negative timeoutMs", () => {
+      // Uint32Value() used to wrap -1 into a ~50-day timeout
+      expect(() =>
+        bindings.getVolumeMetadata({ mountPoint: "/", timeoutMs: -1 }),
+      ).toThrow(/timeoutMs/);
+    });
+
+    it("throws a TypeError for a timeoutMs above one day", () => {
+      // mirrors the public DayMs cap in validateTimeoutMs()
+      expect(() =>
+        bindings.getVolumeMetadata({ mountPoint: "/", timeoutMs: 86_400_001 }),
+      ).toThrow(/timeoutMs/);
+    });
   });
 });
