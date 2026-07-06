@@ -55,9 +55,12 @@ public:
         "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
         "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
 
+    // Cast through unsigned char: passing a negative char (any UTF-8 byte >=
+    // 0x80) to the C ctype functions is undefined behavior.
     std::string upperPath = path;
-    std::transform(upperPath.begin(), upperPath.end(), upperPath.begin(),
-                   ::toupper);
+    std::transform(
+        upperPath.begin(), upperPath.end(), upperPath.begin(),
+        [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
 
     for (const auto &device : deviceNames) {
       // Check for device name in path components
@@ -83,7 +86,8 @@ public:
     size_t colonPos = path.find(':');
     if (colonPos != std::string::npos) {
       // Allow only if it's a drive letter at position 1
-      if (!(colonPos == 1 && isalpha(path[0]) &&
+      if (!(colonPos == 1 &&
+            std::isalpha(static_cast<unsigned char>(path[0])) &&
             (path.length() == 2 || path[2] == '\\' || path[2] == '/'))) {
         return false; // Alternate data stream attempt
       }
