@@ -38,6 +38,81 @@ Security in case of vulnerabilities.
   rationale and a cross-platform survey of why other filesystems (zfs, APFS,
   ReFS, …) do not exhibit this collision.
 
+### Fixed
+
+- **Native `getVolumeMetadata()` no longer aborts the process on bad input.**
+  Calling the native binding directly with an empty or missing `mountPoint`
+  threw a C++ exception that node-addon-api does not translate, killing Node
+  with SIGABRT; it now throws a JS `TypeError` on all platforms.
+- **Windows: data drives are no longer misreported as system volumes.**
+  System-volume detection keyed off `GetVolumeInformationW()` flags
+  `0x00100000`/`0x00200000`, which are actually `FILE_SEQUENTIAL_WRITE_ONCE`
+  and `FILE_SUPPORTS_TRANSACTIONS` (the latter set on every local NTFS
+  volume). Detection now uses only the Windows-directory drive comparison.
+- **Windows: Unicode paths and volume labels.** `getVolumeMetadata()` and
+  drive-status checks used ANSI (`...A`) Win32 APIs on UTF-8 strings, mangling
+  or rejecting non-ANSI paths, labels, and UNC share names. All calls now use
+  the wide (`...W`) APIs and convert at the JS boundary.
+- **Windows: `timeoutMs` is honored consistently.** `getVolumeMetadata()`
+  passed the default 5s to its drive-status check regardless of the option,
+  and `timeoutMs: 0` (documented as "disable timeouts") was treated as an
+  immediate timeout by the native Windows and macOS mount-point checks; `0`
+  now disables the native timeout as documented.
+- **Windows: thread-pool shutdown use-after-free.** Shutdown waited on all
+  worker handles with a single `WaitForMultipleObjects()` call (which fails
+  outright beyond 64 handles, e.g. on >64-logical-core machines) and then
+  freed per-thread state even when workers were still running. The pool is
+  now clamped to 64 threads and per-thread state is only freed once a worker
+  has actually exited.
+- **macOS: timed-out mount-point checks no longer pin the worker thread.**
+  Accessibility probes used `std::async`, whose future destructor blocks
+  until the task finishes — so a `faccessat()` hung on a dead network mount
+  kept blocking after the timeout was reported. Probes now use a detached
+  thread with a promise, whose future destructor never blocks, and in-flight
+  probes are deduplicated per path so repeated polling of a hung mount reuses
+  its stuck probe instead of accumulating threads. The probing phase also
+  shares a single `timeoutMs` deadline, so N dead mounts no longer take
+  N × `timeoutMs`.
+- **Native debug logging data race.** The debug-enabled flag and prefix were
+  plain globals written from the JS thread and read from worker threads; the
+  flag is now atomic and the prefix mutex-guarded.
+- **Linux: `blkid` tag strings are exception-safe.** The `strdup()`'d UUID and
+  label from `blkid_get_tag_value()` are now owned by a `unique_ptr` so they
+  are freed even if a `std::string` assignment throws.
+- **Windows: UTF-8/wide string conversions no longer write into the
+  `std::string` terminator slot.** Conversion buffers are now sized to the
+  full API-returned length (including the trailing NUL) and trimmed after.
+- **`skipNetworkVolumes` is now honored.** The option was parsed but never
+  applied. On Linux, `getVolumeMetadata()` now detects remote volumes from
+  the mount table — before any filesystem IO that could hang — and returns
+  shallow mount-table metadata (`status: "unknown"`, no `size`/`uuid`/
+  `label`). Mount-point enumeration no longer health-probes remote volumes,
+  and on macOS and Windows `getAllVolumeMetadata()` skips detailed queries
+  for mount points whose fstype matches `networkFsTypes`. Path resolution
+  (`getVolumeMetadataForPath()`, `getMountPointForPath()`) skips `stat()`ing
+  remote mount points that aren't ancestors of the target, so a dead network
+  mount can't hang lookups for unrelated local paths. The option is now
+  accepted by the public `getVolumeMetadata()`, `getVolumeMetadataForPath()`,
+  `getMountPointForPath()`, and `getVolumeMountPoints()` signatures.
+- **Mounts with network fstypes but unparseable sources are now `remote`.**
+  Remote detection keyed only on parsing the mount source, so a `9p` mount
+  with a bare tag source, or a `davfs` mount with an `https://` URI, was
+  reported `remote: false` (and would have dodged `skipNetworkVolumes`). The
+  fstype now marks remote-ness too.
+- **Windows: undefined behavior on non-ASCII path bytes.** Path security
+  validation passed raw `char` values (negative for UTF-8 bytes ≥ 0x80) to
+  `toupper()`/`isalpha()`; now cast through `unsigned char`.
+- **Windows: concurrently-checked drives are no longer mislabeled `timeout`.**
+  When one slow drive exhausted the shared enumeration budget, later drives
+  whose checks had already completed were reported as timed out instead of
+  their actual status.
+- **Out-of-range `timeoutMs` values are rejected everywhere.** Native option
+  parsing wrapped `timeoutMs: -1` into a ~50-day timeout via unsigned
+  conversion (reachable on Windows, where the TypeScript timeout wrapper is
+  bypassed, and from direct native calls); both the native parsers and the
+  Windows bypass now enforce the same `[0, one day]` bound as the TypeScript
+  wrapper, and validation runs before any native work is started.
+
 ## 2.0.0 - 2026-06-03
 
 ### Changed
