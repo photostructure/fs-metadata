@@ -35,12 +35,7 @@ public:
   LinuxMetadataWorker(const std::string &mountPoint,
                       const VolumeMetadataOptions &options,
                       const Napi::Promise::Deferred &deferred)
-      : MetadataWorkerBase(mountPoint, deferred), options_(options) {
-    // Validate mount point is not empty
-    if (mountPoint.empty()) {
-      throw std::invalid_argument("Mount point cannot be empty");
-    }
-  }
+      : MetadataWorkerBase(mountPoint, deferred), options_(options) {}
 
   void Execute() override {
     if (IsShuttingDown()) {
@@ -230,10 +225,13 @@ private:
 Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
   auto env = info.Env();
 
-  VolumeMetadataOptions options;
-  if (info.Length() > 0 && info[0].IsObject()) {
-    options = VolumeMetadataOptions::FromObject(info[0].As<Napi::Object>());
+  // Reject bad input with a JS TypeError before constructing the worker: a
+  // plain C++ exception thrown from this function is not translated by
+  // node-addon-api and aborts the process.
+  if (info.Length() < 1 || !info[0].IsObject()) {
+    throw Napi::TypeError::New(env, "Expected options object with mountPoint");
   }
+  auto options = VolumeMetadataOptions::FromObject(info[0].As<Napi::Object>());
 
   auto deferred = Napi::Promise::Deferred::New(env);
   auto *worker = new LinuxMetadataWorker(options.mountPoint, options, deferred);

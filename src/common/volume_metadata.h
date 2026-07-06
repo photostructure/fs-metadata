@@ -20,6 +20,9 @@ struct VolumeMetadataOptions {
       throw Napi::TypeError::New(obj.Env(), "String expected for mountPoint");
     }
     options.mountPoint = obj.Get("mountPoint").As<Napi::String>();
+    if (options.mountPoint.empty()) {
+      throw Napi::TypeError::New(obj.Env(), "mountPoint cannot be empty");
+    }
 
     // Optional parameters
     if (obj.Has("timeoutMs")) {

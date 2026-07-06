@@ -372,10 +372,13 @@ Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
   auto env = info.Env();
   DEBUG_LOG("[GetVolumeMetadata] called");
 
-  VolumeMetadataOptions options;
-  if (info.Length() > 0 && info[0].IsObject()) {
-    options = VolumeMetadataOptions::FromObject(info[0].As<Napi::Object>());
+  // Reject bad input with a JS TypeError before constructing the worker: a
+  // plain C++ exception thrown from this function is not translated by
+  // node-addon-api and aborts the process.
+  if (info.Length() < 1 || !info[0].IsObject()) {
+    throw Napi::TypeError::New(env, "Expected options object with mountPoint");
   }
+  auto options = VolumeMetadataOptions::FromObject(info[0].As<Napi::Object>());
 
   auto deferred = Napi::Promise::Deferred::New(env);
   auto *worker =
