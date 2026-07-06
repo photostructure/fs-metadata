@@ -9,10 +9,69 @@
 #include "./system_volume.h"
 #include <chrono>
 #include <future>
+#include <mutex>
 #include <sys/mount.h>
+#include <thread>
 #include <unistd.h>
+#include <unordered_map>
 
 namespace FSMeta {
+
+namespace {
+
+// In-flight accessibility probes keyed by mount path. A probe stuck in
+// faccessat() on a dead network mount is reused by later calls instead of
+// spawning another thread, so at most one probe thread exists per distinct
+// hung path — repeated getVolumeMountPoints() polling cannot accumulate
+// stuck threads without bound. Deliberately leaked (never destroyed):
+// detached probe threads may still touch these during process exit.
+std::mutex *const g_probeMutex = new std::mutex();
+auto *const g_inflightProbes =
+    new std::unordered_map<std::string, std::shared_future<bool>>();
+
+// Returns a future answering "is path readable?", reusing any in-flight
+// probe for the same path. std::async is deliberately avoided: the
+// destructor of a std::async future blocks until the task finishes, so a
+// hung faccessat() would pin the worker thread even after its timeout was
+// reported. A promise + detached-thread pair yields futures whose
+// destructors never block.
+std::shared_future<bool> StartAccessProbe(const std::string &path) {
+  std::lock_guard<std::mutex> lock(*g_probeMutex);
+  auto it = g_inflightProbes->find(path);
+  if (it != g_inflightProbes->end()) {
+    return it->second;
+  }
+  auto promise = std::make_shared<std::promise<bool>>();
+  std::shared_future<bool> future = promise->get_future().share();
+  g_inflightProbes->emplace(path, future);
+  try {
+    std::thread([promise, path]() {
+      // faccessat is preferred over access() for security:
+      // - AT_FDCWD: Use current working directory as base
+      // - AT_EACCESS: Check using effective user/group IDs (not real IDs)
+      //   This prevents TOCTOU attacks and privilege escalation issues
+      bool accessible =
+          faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
+      {
+        std::lock_guard<std::mutex> lock(*g_probeMutex);
+        g_inflightProbes->erase(path);
+        // set_value under the same lock as erase: otherwise a concurrent
+        // StartAccessProbe() for this path could observe the erased entry
+        // before the value is set and spawn a redundant probe.
+        promise->set_value(accessible);
+      }
+    }).detach();
+  } catch (...) {
+    // Thread construction can throw under resource exhaustion. Remove the
+    // just-inserted entry (still under the lock) so later calls retry
+    // instead of forever reusing a future that will never be satisfied.
+    g_inflightProbes->erase(path);
+    throw;
+  }
+  return future;
+}
+
+} // namespace
 
 class GetVolumeMountPointsWorker : public SafeAsyncWorker {
 private:
@@ -100,12 +159,22 @@ public:
       // Process mount points in batches to limit concurrent threads
       const size_t maxConcurrentChecks = 4; // Limit concurrent access checks
 
+      // One deadline for the whole probing phase, matching the per-call
+      // timeoutMs contract enforced by the TypeScript wrapper — otherwise
+      // each hung probe would burn its own timeoutMs and N dead mounts would
+      // pin this worker for N * timeoutMs. wait_until() with an expired
+      // deadline still polls, so probes that already completed report their
+      // real status even after the budget is spent. (Unused when
+      // timeoutMs_ == 0, which disables the timeout.)
+      const auto deadline = std::chrono::steady_clock::now() +
+                            std::chrono::milliseconds(timeoutMs_);
+
       for (size_t i = 0; i < allMountPoints.size(); i += maxConcurrentChecks) {
         if (IsShuttingDown()) {
           return;
         }
 
-        std::vector<std::future<std::pair<std::string, bool>>> futures;
+        std::vector<std::shared_future<bool>> futures;
         std::vector<MountPoint *> batchPtrs;
 
         // Launch async accessibility checks (no DA operations here)
@@ -117,27 +186,21 @@ public:
                     mp.mountPoint.c_str());
 
           batchPtrs.push_back(&mp);
-
-          // Launch async check
-          futures.push_back(
-              std::async(std::launch::async, [path = mp.mountPoint]() {
-                // faccessat is preferred over access() for security:
-                // - AT_FDCWD: Use current working directory as base
-                // - AT_EACCESS: Check using effective user/group IDs (not real
-                // IDs) This prevents TOCTOU attacks and privilege escalation
-                // issues
-                bool accessible =
-                    faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
-                return std::make_pair(path, accessible);
-              }));
+          futures.push_back(StartAccessProbe(mp.mountPoint));
         }
 
         // Process results for this batch
         for (size_t k = 0; k < futures.size(); k++) {
           auto &mp = *batchPtrs[k];
           try {
-            auto status =
-                futures[k].wait_for(std::chrono::milliseconds(timeoutMs_));
+            // timeoutMs 0 disables the timeout (see Options.timeoutMs).
+            std::future_status status;
+            if (timeoutMs_ == 0) {
+              futures[k].wait();
+              status = std::future_status::ready;
+            } else {
+              status = futures[k].wait_until(deadline);
+            }
 
             switch (status) {
             case std::future_status::timeout:
@@ -150,8 +213,7 @@ public:
 
             case std::future_status::ready:
               try {
-                auto result = futures[k].get();
-                bool isAccessible = result.second;
+                bool isAccessible = futures[k].get();
                 mp.status = isAccessible ? "healthy" : "inaccessible";
                 if (!isAccessible) {
                   mp.error = "Path is not accessible";
