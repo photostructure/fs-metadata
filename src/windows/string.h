@@ -39,7 +39,12 @@ inline std::string WideToUtf8(const WCHAR *wide) {
         "String conversion size exceeds reasonable limits");
   }
 
-  std::string result(static_cast<size_t>(size - 1), 0);
+  // Allocate the full returned size (which includes the terminating NUL,
+  // because the input length was -1), let the conversion fill the whole
+  // buffer, then trim the NUL. Converting into a (size - 1) buffer would
+  // make the API write its NUL into the string's terminator slot, which
+  // std::string does not permit writes to.
+  std::string result(static_cast<size_t>(size), 0);
 
   // Perform conversion and check result
   int written = WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size,
@@ -50,6 +55,7 @@ inline std::string WideToUtf8(const WCHAR *wide) {
     throw std::runtime_error("String conversion failed");
   }
 
+  result.resize(static_cast<size_t>(written) - 1); // drop the trailing NUL
   return result;
 }
 

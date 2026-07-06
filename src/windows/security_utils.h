@@ -159,12 +159,19 @@ public:
       throw std::runtime_error("Invalid UTF-8 sequence");
     }
 
-    std::wstring result(requiredSize - 1, L'\0');
-    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.c_str(), -1,
-                             &result[0], requiredSize)) {
+    // requiredSize includes the terminating NUL (input length was -1), so
+    // allocate the full size, convert, then trim the NUL. Converting into a
+    // (requiredSize - 1) buffer would make the API write its NUL into the
+    // string's terminator slot, which std::wstring does not permit writes to.
+    std::wstring result(static_cast<size_t>(requiredSize), L'\0');
+    int written =
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.c_str(), -1,
+                            &result[0], requiredSize);
+    if (written <= 0) {
       throw std::runtime_error("Failed to convert string");
     }
 
+    result.resize(static_cast<size_t>(written) - 1); // drop the trailing NUL
     return result;
   }
 };
