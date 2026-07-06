@@ -149,6 +149,11 @@ public:
     try {
       auto future = CheckDriveAsync(path);
 
+      // timeoutMs 0 disables the timeout (see Options.timeoutMs).
+      if (timeoutMs == 0) {
+        return future.get();
+      }
+
       // Use wait_for to enforce timeout - no detached threads needed!
       // The worker thread continues running but we return Timeout to caller.
       // The promise will eventually be satisfied (or abandoned).
@@ -192,6 +197,12 @@ public:
 
     for (size_t i = 0; i < futures.size(); ++i) {
       try {
+        // timeoutMs 0 disables the timeout (see Options.timeoutMs).
+        if (timeoutMs == 0) {
+          results.push_back(futures[i].get());
+          continue;
+        }
+
         // Calculate remaining time for this future
         auto elapsed = std::chrono::steady_clock::now() - startTime;
         auto elapsedMs =

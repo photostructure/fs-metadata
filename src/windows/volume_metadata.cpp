@@ -165,7 +165,7 @@ private:
     }
     try {
       // Get drive status first
-      DriveStatus status = CheckDriveStatus(mountPoint);
+      DriveStatus status = CheckDriveStatus(mountPoint, options_.timeoutMs);
       metadata.status = DriveStatusToString(status);
 
       if (status != DriveStatus::Healthy) {
