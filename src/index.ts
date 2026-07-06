@@ -98,11 +98,21 @@ export function getVolumeMountPoints(
  * Get metadata for the volume at the given mount point.
  *
  * @param mountPoint Must be a non-blank string
- * @param opts Optional filesystem operation settings
+ * @param opts Optional filesystem operation settings, including
+ * {@link Options.skipNetworkVolumes} to avoid blocking on unreachable
+ * network volumes
  */
 export function getVolumeMetadata(
   mountPoint: string,
-  opts?: Partial<Pick<Options, "timeoutMs">>,
+  opts?: Partial<
+    Pick<
+      Options,
+      | "timeoutMs"
+      | "skipNetworkVolumes"
+      | "networkFsTypes"
+      | "linuxMountTablePaths"
+    >
+  >,
 ): Promise<VolumeMetadata> {
   return getVolumeMetadataImpl(
     { ...optionsWithDefaults(opts), mountPoint },
@@ -123,7 +133,14 @@ export function getVolumeMetadata(
 export function getVolumeMetadataForPath(
   pathname: string,
   opts?: Partial<
-    Pick<Options, "timeoutMs" | "linuxMountTablePaths" | "mountPoints">
+    Pick<
+      Options,
+      | "timeoutMs"
+      | "linuxMountTablePaths"
+      | "mountPoints"
+      | "skipNetworkVolumes"
+      | "networkFsTypes"
+    >
   >,
 ): Promise<VolumeMetadata> {
   return getVolumeMetadataForPathImpl(
@@ -156,7 +173,14 @@ export function getVolumeMetadataForPath(
 export function getMountPointForPath(
   pathname: string,
   opts?: Partial<
-    Pick<Options, "timeoutMs" | "linuxMountTablePaths" | "mountPoints">
+    Pick<
+      Options,
+      | "timeoutMs"
+      | "linuxMountTablePaths"
+      | "mountPoints"
+      | "skipNetworkVolumes"
+      | "networkFsTypes"
+    >
   >,
 ): Promise<string> {
   return getMountPointForPathImpl(

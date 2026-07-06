@@ -225,7 +225,9 @@ https://webdav.example.com/remote.php/webdav/ /mnt/webdav davfs rw,user,noauto,_
           isReadOnly: false,
           mountFrom: "https://webdav.example.com/remote.php/webdav/",
           mountPoint: "/mnt/webdav",
-          remote: false,
+          // davfs aliases to webdav, a network fstype: remote even though
+          // the https:// spec itself doesn't parse as a remote share
+          remote: true,
           uri: "https://webdav.example.com/remote.php/webdav/",
         },
       ]);

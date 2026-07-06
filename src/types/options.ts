@@ -81,8 +81,28 @@ export interface Options {
   includeSystemVolumes: boolean;
 
   /**
-   * Skip detailed info for network volumes to avoid blocking.
-   * Defaults to false.
+   * Skip the detailed (potentially blocking) volume queries for network
+   * volumes. Defaults to false.
+   *
+   * When enabled, remote volumes return shallow metadata derived from the
+   * mount table or mount-point enumeration instead of probing the volume:
+   * `size`/`used`/`available`, `label`, and `uuid` are omitted, and `remote`
+   * is true.
+   *
+   * - On Linux, `getVolumeMetadata()` detects remote volumes from the mount
+   *   table (which never touches the mount point itself) and returns
+   *   `status: "unknown"` without any filesystem IO on the volume.
+   * - On macOS and Windows, single-volume `getVolumeMetadata()` calls cannot
+   *   cheaply detect remote-ness up front, so only `getAllVolumeMetadata()`
+   *   honors this option there, using the fstype from mount-point
+   *   enumeration matched against {@link Options.networkFsTypes}. Note that
+   *   Windows drive letters mapped to network shares report the remote
+   *   server's filesystem (typically `NTFS`), so mapped drives may still be
+   *   probed; native drive-status timeouts bound that blocking.
+   * - Path resolution ({@link getVolumeMetadataForPath},
+   *   {@link getMountPointForPath}) skips `stat()`ing remote mount points
+   *   that are not path ancestors of the target, so a dead network mount
+   *   cannot hang lookups for unrelated local paths.
    */
   skipNetworkVolumes: boolean;
 }

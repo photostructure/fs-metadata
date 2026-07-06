@@ -71,18 +71,12 @@ async function _getVolumeMetadata(
   );
   debug("[getVolumeMetadata] options: %o", o);
 
-  const { status, error } = await directoryStatus(o.mountPoint, o.timeoutMs);
-  if (status !== VolumeHealthStatuses.healthy) {
-    debug("[getVolumeMetadata] directoryStatus error: %s", error);
-    throw error ?? new Error("Volume not healthy: " + status);
-  }
-
-  debug("[getVolumeMetadata] readdir status: %s", status);
-
   let remote: boolean = false;
-  // Get filesystem info from mtab first on Linux
   let mtabInfo: undefined | MtabVolumeMetadata;
   let device: undefined | string;
+  // On Linux, read the mount table before touching the mount point: it comes
+  // from /proc (or /etc/mtab) and never blocks on the volume itself, so
+  // remote-ness is known before any IO that could hang on a dead mount.
   if (isLinux) {
     debug("[getVolumeMetadata] collecting Linux mtab info");
     try {
@@ -101,6 +95,31 @@ async function _getVolumeMetadata(
       // Ignore and continue with whatever the native call returns.
     }
   }
+
+  if (o.skipNetworkVolumes && remote) {
+    // Honor skipNetworkVolumes without probing the mount point: both
+    // directoryStatus() and the native worker (open()/fstatvfs()) would
+    // block on an unreachable network volume. status is "unknown" because
+    // we deliberately didn't check.
+    debug(
+      "[getVolumeMetadata] skipping detailed queries for network volume %s",
+      o.mountPoint,
+    );
+    return compactValues({
+      ...compactValues(mtabInfo),
+      mountPoint: o.mountPoint,
+      status: VolumeHealthStatuses.unknown,
+      remote: true,
+    }) as VolumeMetadata;
+  }
+
+  const { status, error } = await directoryStatus(o.mountPoint, o.timeoutMs);
+  if (status !== VolumeHealthStatuses.healthy) {
+    debug("[getVolumeMetadata] directoryStatus error: %s", error);
+    throw error ?? new Error("Volume not healthy: " + status);
+  }
+
+  debug("[getVolumeMetadata] readdir status: %s", status);
 
   if (isNotBlank(device)) {
     o.device = device;
@@ -267,11 +286,24 @@ export async function findMountPointByDeviceId(
   const deviceMatches: string[] = [];
 
   await Promise.all(
-    mountPoints.map(async ({ mountPoint }) => {
+    mountPoints.map(async ({ mountPoint, fstype }) => {
+      const isAncestor = isAncestorOrSelf(mountPoint, resolved);
+      // skipNetworkVolumes: don't stat() non-ancestor remote mount points —
+      // a dead network mount would hang the lookup for an unrelated local
+      // path. Ancestor candidates are still statted: if the target lives
+      // under a remote mount, resolving the target already touched it, and
+      // skipping ancestors would break lookups on healthy network mounts.
+      if (
+        !isAncestor &&
+        opts.skipNetworkVolumes &&
+        isRemoteFsType(fstype, opts.networkFsTypes)
+      ) {
+        return;
+      }
       try {
         const mpDev = (await statAsync(mountPoint)).dev;
         if (mpDev !== targetDev) return;
-        if (isAncestorOrSelf(mountPoint, resolved)) {
+        if (isAncestor) {
           prefixMatches.push(mountPoint);
         } else {
           deviceMatches.push(mountPoint);
@@ -333,6 +365,20 @@ export async function getAllVolumeMetadataImpl(
     (ea) => ea.status == null || ea.status === VolumeHealthStatuses.healthy,
   );
 
+  // On macOS and Windows, getVolumeMetadataImpl cannot cheaply detect remote
+  // volumes before the native call, but the enumerated mount points carry
+  // fstype — honor skipNetworkVolumes here with mount-point-derived shallow
+  // results. (On Linux, getVolumeMetadataImpl itself short-circuits from the
+  // mount table with richer remote info, so nothing is skipped here.)
+  const skippedNetwork =
+    o.skipNetworkVolumes && !isLinux
+      ? healthy.filter((ea) => isRemoteFsType(ea.fstype, o.networkFsTypes))
+      : [];
+  const skippedNetworkResults = skippedNetwork.map(
+    (ea) =>
+      compactValues({ ...compactValues(ea), remote: true }) as VolumeMetadata,
+  );
+
   debug("[getAllVolumeMetadata] ", {
     allMountPoints: arr.map((ea) => ea.mountPoint),
     healthyMountPoints: healthy.map((ea) => ea.mountPoint),
@@ -346,10 +392,10 @@ export async function getAllVolumeMetadataImpl(
 
   const results = await (mapConcurrent({
     maxConcurrency: o.maxConcurrency,
-    items:
-      (opts?.includeSystemVolumes ?? IncludeSystemVolumesDefault)
-        ? healthy
-        : healthy.filter((ea) => !ea.isSystemVolume),
+    items: (includeSystemVolumes
+      ? healthy
+      : healthy.filter((ea) => !ea.isSystemVolume)
+    ).filter((ea) => !skippedNetwork.includes(ea)),
     fn: async (mp) =>
       getVolumeMetadataImpl({ ...mp, ...o }, nativeFn).catch((error) => ({
         mountPoint: mp.mountPoint,
@@ -364,7 +410,10 @@ export async function getAllVolumeMetadataImpl(
         unhealthyMountPoints.find(
           (ea) => ea.mountPoint === result.mountPoint,
         ) ??
-        systemMountPoints.find((ea) => ea.mountPoint === result.mountPoint) ?? {
+        systemMountPoints.find((ea) => ea.mountPoint === result.mountPoint) ??
+        skippedNetworkResults.find(
+          (ea) => ea.mountPoint === result.mountPoint,
+        ) ?? {
           ...result,
           error: new WrappedError("Mount point metadata not retrieved", {
             name: "NotApplicableError",

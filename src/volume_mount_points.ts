@@ -6,6 +6,7 @@ import { debug } from "./debuglog";
 import { getLinuxMountPoints } from "./linux/mount_points";
 import { compactValues } from "./object";
 import { isMacOS, isWindows } from "./platform";
+import { isRemoteFsType } from "./remote_info";
 import { isBlank, isNotBlank, sortObjectsByLocale, toNotBlank } from "./string";
 import { assignSystemVolume, SystemVolumeConfig } from "./system_volume";
 import type { MountPoint } from "./types/mount_point";
@@ -20,6 +21,8 @@ export type GetVolumeMountPointOptions = Partial<
     | "linuxMountTablePaths"
     | "maxConcurrency"
     | "includeSystemVolumes"
+    | "skipNetworkVolumes"
+    | "networkFsTypes"
   > &
     SystemVolumeConfig
 >;
@@ -81,8 +84,13 @@ async function _getVolumeMountPoints(
   await mapConcurrent({
     maxConcurrency: o.maxConcurrency,
     items: results.filter(
-      // trust but verify
-      (ea) => isBlank(ea.status) || ea.status === "healthy",
+      (ea) =>
+        // trust but verify
+        (isBlank(ea.status) || ea.status === "healthy") &&
+        // skipNetworkVolumes: don't health-probe remote volumes — a dead
+        // network mount can hang the readdir() probe. Their status is left
+        // as reported (undefined on Linux). See Options.skipNetworkVolumes.
+        !(o.skipNetworkVolumes && isRemoteFsType(ea.fstype, o.networkFsTypes)),
     ),
     fn: async (mp) => {
       debug("[getVolumeMountPoints] checking status of %s", mp.mountPoint);

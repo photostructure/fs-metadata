@@ -3,7 +3,7 @@
 import { toInt } from "../number";
 import { NetworkFsTypesDefault } from "../options";
 import { normalizePosixPath } from "../path";
-import { extractRemoteInfo } from "../remote_info";
+import { extractRemoteInfo, isRemoteFsType } from "../remote_info";
 import {
   decodeEscapeSequences,
   encodeEscapeSequences,
@@ -114,15 +114,21 @@ export function mountEntryToPartialVolumeMetadata(
   options: MtabOptions = {},
 ): MtabVolumeMetadata {
   const networkFsTypes = options.networkFsTypes ?? NetworkFsTypesDefault;
+  const remoteInfo = extractRemoteInfo(entry.fs_spec, networkFsTypes);
   return {
     mountPoint: entry.fs_file,
     fstype: entry.fs_vfstype,
     mountFrom: entry.fs_spec,
     isSystemVolume: isSystemVolume(entry.fs_file, entry.fs_vfstype, options),
     isReadOnly: isReadOnlyMount(entry.fs_mntops),
-    remote: false, // < default to false, but it may be overridden by extractRemoteInfo
     ...parseSubvolInfo(entry.fs_mntops, entry.fs_vfstype),
-    ...extractRemoteInfo(entry.fs_spec, networkFsTypes),
+    ...remoteInfo,
+    // The spec alone can miss remote mounts — a network fstype with an
+    // unparseable source (e.g. 9p's "svc", or davfs's https:// URI) must
+    // still be marked remote, or skipNetworkVolumes would probe it.
+    remote:
+      (remoteInfo?.remote ?? false) ||
+      isRemoteFsType(entry.fs_vfstype, networkFsTypes),
   };
 }
 
