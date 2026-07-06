@@ -135,6 +135,15 @@ private:
 public:
   explicit ThreadPool(size_t numThreads = 4)
       : queue(std::make_shared<WorkQueue>()) {
+    // Clamp the thread count: hardware_concurrency() may return 0, and
+    // Shutdown() waits on every worker with a single WaitForMultipleObjects
+    // call, which fails outright past MAXIMUM_WAIT_OBJECTS (64) handles.
+    // An IO-probe pool gains nothing beyond that anyway.
+    if (numThreads == 0) {
+      numThreads = 1;
+    } else if (numThreads > MAXIMUM_WAIT_OBJECTS) {
+      numThreads = MAXIMUM_WAIT_OBJECTS;
+    }
     InitializeCriticalSection(&poolCs);
 
     for (size_t i = 0; i < numThreads; ++i) {
@@ -191,23 +200,37 @@ public:
     }
 
     if (!handles.empty()) {
+      // The constructor clamps the pool to MAXIMUM_WAIT_OBJECTS threads, so
+      // a single WaitForMultipleObjects call can cover every worker.
       DWORD result = WaitForMultipleObjects(static_cast<DWORD>(handles.size()),
                                             handles.data(), TRUE, 5000);
 
-      if (result == WAIT_TIMEOUT) {
-        DEBUG_LOG(
-            "[ThreadPool] WARNING: %zu threads did not exit within 5000 ms",
-            handles.size());
+      if (result == WAIT_TIMEOUT || result == WAIT_FAILED) {
+        DEBUG_LOG("[ThreadPool] WARNING: wait for %zu threads returned %lu "
+                  "(error %lu)",
+                  handles.size(), result,
+                  result == WAIT_FAILED ? GetLastError() : 0);
         // Note: TerminateThread is dangerous and not recommended
-        // Threads will be forcefully terminated when process exits
       }
     }
 
-    // Close handles
+    // Free per-thread state only for threads that have actually exited. A
+    // worker that is still running (hung task, wait timeout) holds a raw
+    // ThreadData* — freeing it here would be a use-after-free, so leak that
+    // state instead. The worker keeps the queue alive via its shared_ptr.
     for (auto &thread : threads) {
-      if (thread->handle) {
-        CloseHandle(thread->handle);
-        thread->handle = nullptr;
+      if (!thread->handle) {
+        continue;
+      }
+      const bool exited =
+          WaitForSingleObject(thread->handle, 0) == WAIT_OBJECT_0;
+      CloseHandle(thread->handle);
+      thread->handle = nullptr;
+      if (!exited) {
+        DEBUG_LOG("[ThreadPool] Worker thread %lu still running; leaking its "
+                  "ThreadData",
+                  thread->id);
+        thread.release(); // deliberate leak — the worker may still read it
       }
     }
 
