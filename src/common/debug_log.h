@@ -1,29 +1,29 @@
 // src/common/debug_log.h
 #pragma once
+#include <atomic>
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
+#include <mutex>
 #include <string>
-#include <string_view>
 
 namespace FSMeta {
 namespace Debug {
 
-inline bool enableDebugLogging = false;
+// Written from the JS thread (setDebugLogging/setDebugPrefix) and read from
+// async worker threads, so the flag is atomic and the prefix is
+// mutex-guarded.
+inline std::atomic<bool> enableDebugLogging{false};
+inline std::mutex debugPrefixMutex;
 inline std::string debugPrefix;
 
-#ifdef _WIN32
-inline std::wstring wDebugPrefix;
 inline void SetDebugPrefix(const std::string &prefix) {
+  std::lock_guard<std::mutex> lock(debugPrefixMutex);
   debugPrefix = prefix;
-  wDebugPrefix = std::wstring(prefix.begin(), prefix.end());
 }
-#else
-inline void SetDebugPrefix(const std::string &prefix) { debugPrefix = prefix; }
-#endif
 
 inline void DebugLog(const char *format, ...) {
-  if (!enableDebugLogging) {
+  if (!enableDebugLogging.load(std::memory_order_relaxed)) {
     return;
   }
 
@@ -55,7 +55,13 @@ inline void DebugLog(const char *format, ...) {
   vsnprintf(message, MESSAGE_SIZE, format, args);
   va_end(args);
 
-  fprintf(stderr, "%s %s %s\n", timestamp, debugPrefix.c_str(), message);
+  std::string prefix;
+  {
+    std::lock_guard<std::mutex> lock(debugPrefixMutex);
+    prefix = debugPrefix;
+  }
+
+  fprintf(stderr, "%s %s %s\n", timestamp, prefix.c_str(), message);
 }
 
 } // namespace Debug
