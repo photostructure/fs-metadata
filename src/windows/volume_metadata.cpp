@@ -215,10 +215,7 @@ private:
         }
       }
 
-      // Check system volume using pre-fetched flags from VolumeInfo to
-      // avoid a redundant GetVolumeInformationW call.
-      metadata.isSystemVolume =
-          IsSystemVolume(widePath, volInfo.isValid() ? volInfo.getFlags() : 0);
+      metadata.isSystemVolume = IsSystemVolume(widePath);
 
       DEBUG_LOG("[GetVolumeMetadata] %s {isSystemVolume: %s}",
                 mountPoint.c_str(), metadata.isSystemVolume ? "true" : "false");

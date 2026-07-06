@@ -97,9 +97,9 @@ public:
         mp.status = DriveStatusToString(statuses[i]);
 
         std::wstring widePath = SecurityUtils::SafeStringToWide(paths[i]);
-        DWORD fsFlags = 0;
 
         if (statuses[i] == DriveStatus::Healthy) {
+          DWORD fsFlags = 0;
           WCHAR fsName[MAX_PATH + 1] = {0};
 
           if (GetVolumeInformationW(widePath.c_str(), nullptr, 0, nullptr,
@@ -110,10 +110,7 @@ public:
                       paths[i].c_str(), mp.fstype.c_str());
           }
 
-          // Only check system volume for healthy drives — IsSystemVolume
-          // may call GetVolumeInformationW, which hangs on dead drives and
-          // would defeat the async timeout protection from CheckDriveStatus.
-          mp.isSystemVolume = IsSystemVolume(widePath, fsFlags);
+          mp.isSystemVolume = IsSystemVolume(widePath);
         }
         mountPoints_.push_back(std::move(mp));
       }

@@ -209,16 +209,17 @@ holds user data (`C:\Users`).
 
 ### Native detection (Layer 1)
 
-`IsSystemVolume()` in `src/windows/system_volume.h` uses two checks:
+`IsSystemVolume()` in `src/windows/system_volume.h` uses a single check:
+**`SHGetFolderPathW(CSIDL_WINDOWS)`** retrieves the Windows system folder
+path (e.g., `C:\Windows`), extracts the drive letter, and compares it against
+the volume being tested.
 
-1. **`SHGetFolderPathW(CSIDL_WINDOWS)`** — retrieves the Windows system
-   folder path (e.g., `C:\Windows`), extracts the drive letter, and compares
-   it against the volume being tested. This is the primary detection method.
-
-2. **Volume capability flags** — calls `GetVolumeInformationW()` and checks
-   for `FILE_SUPPORTS_SYSTEM_PATHS` (0x00100000) and
-   `FILE_SUPPORTS_SYSTEM_FILES` (0x00200000). These are modern (Windows 10+)
-   volume flags that indicate system volume capabilities.
+> **History**: earlier versions also checked `GetVolumeInformationW()` flags
+> `0x00100000` and `0x00200000` under the invented names
+> `FILE_SUPPORTS_SYSTEM_PATHS`/`FILE_SUPPORTS_SYSTEM_FILES`. Those bits are
+> actually `FILE_SEQUENTIAL_WRITE_ONCE` and `FILE_SUPPORTS_TRANSACTIONS`, and
+> the latter is set on every local NTFS volume — so the check marked every
+> NTFS data drive as a system volume. It has been removed.
 
 ### TypeScript detection (Layer 2)
 
