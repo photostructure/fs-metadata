@@ -37,22 +37,22 @@ Use a separate worktree so the main checkout is untouched:
 
 ### The 14 commits (base 9752a96)
 
-| #  | sha     | commit | native compiled? |
-|----|---------|--------|------------------|
-| 1  | 9446071 | fix(string): NUL-slot conversion buffers | **Windows-only** |
-| 2  | 22dae34 | fix(security_utils): ctype UB | **Windows-only** |
-| 3  | 79a8fd3 | fix(thread_pool): shutdown UAF, clamp to 64 | **Windows-only** |
-| 4  | 3112d2d | fix(darwin): access probes (+set_value-under-lock nit) | macOS ✓ |
-| 5  | f02466a | fix(volume_metadata): abort→TypeError | mac/Linux ✓ + **win entry** |
-| 6  | edac15c | fix(windows): wide-char APIs (+ExW comment nit) | **Windows-only** |
-| 7  | 42d1b59 | fix(system_volume): NTFS false-positive | **Windows-only** |
-| 8  | 63812d0 | fix(drive_status): honor timeoutMs, 0 disables | **Windows-only** |
-| 9  | 87efaab | fix(drive_status): poll ready futures | **Windows-only** |
-| 10 | 952a120 | fix(debug_log): thread safety | Linux ✓ |
-| 11 | d9431f6 | fix(linux): blkid exception safety | Linux ✓ |
-| 12 | f7c3e23 | fix(async): timeoutMs validation | mac/Linux ✓ |
-| 13 | d2f9317 | fix(volume_metadata): skipNetworkVolumes | (TS) |
-| 14 | fdfe506 | docs(changelog) | (docs) |
+| #   | sha     | commit                                                 | native compiled?            |
+| --- | ------- | ------------------------------------------------------ | --------------------------- |
+| 1   | 9446071 | fix(string): NUL-slot conversion buffers               | **Windows-only**            |
+| 2   | 22dae34 | fix(security_utils): ctype UB                          | **Windows-only**            |
+| 3   | 79a8fd3 | fix(thread_pool): shutdown UAF, clamp to 64            | **Windows-only**            |
+| 4   | 3112d2d | fix(darwin): access probes (+set_value-under-lock nit) | macOS ✓                     |
+| 5   | f02466a | fix(volume_metadata): abort→TypeError                  | mac/Linux ✓ + **win entry** |
+| 6   | edac15c | fix(windows): wide-char APIs (+ExW comment nit)        | **Windows-only**            |
+| 7   | 42d1b59 | fix(system_volume): NTFS false-positive                | **Windows-only**            |
+| 8   | 63812d0 | fix(drive_status): honor timeoutMs, 0 disables         | **Windows-only**            |
+| 9   | 87efaab | fix(drive_status): poll ready futures                  | **Windows-only**            |
+| 10  | 952a120 | fix(debug_log): thread safety                          | Linux ✓                     |
+| 11  | d9431f6 | fix(linux): blkid exception safety                     | Linux ✓                     |
+| 12  | f7c3e23 | fix(async): timeoutMs validation                       | mac/Linux ✓                 |
+| 13  | d2f9317 | fix(volume_metadata): skipNetworkVolumes               | (TS)                        |
+| 14  | fdfe506 | docs(changelog)                                        | (docs)                      |
 
 ### Per-commit build loop (git-bash)
 
@@ -80,7 +80,7 @@ files and `npm run tests` at the tip covers them.
 
 ### Intermediate-compilability invariants to watch
 
-A *mid-chain* Windows build failure is almost certainly at one of these
+A _mid-chain_ Windows build failure is almost certainly at one of these
 hand-engineered split boundaries (Linux/macOS could not check them):
 
 - **Commit 5 — `windows/volume_metadata.cpp`:** ONLY the `GetVolumeMetadata`
