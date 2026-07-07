@@ -189,6 +189,22 @@ elsewhere): `subvolid` / `subvol` (from mount options), or the strong
 [Subvolume Identity](./subvolume-identity.md) for the full rationale, stability
 semantics, and how zfs/bcachefs differ.
 
+#### ZFS Datasets Have No `uuid` — Use `fsid`
+
+`libblkid` can't resolve a ZFS dataset name (`tank/home`) to a block device, so
+ZFS datasets report **`uuid: undefined`**:
+
+```typescript
+const m = await getVolumeMetadata("/tank/home");
+// { uuid: undefined, mountFrom: "tank/home", fstype: "zfs", fsid: "005856b5…" }
+```
+
+For a stable per-dataset identity, use `fsid` — a 16-hex-char id from
+`statfs` `f_fsid` (the dataset's persistent fsid GUID), distinct per dataset and
+stable across remount, reboot, and rename. It is **not** the `zfs get guid`
+value, and `stat -f %i` prints the two halves in the opposite order. Populated on
+ZFS only. See [Subvolume Identity](./subvolume-identity.md#zfs-identity-via-fsid).
+
 #### GVfs/FUSE Mounts
 
 User-mounted volumes (like Google Drive, SMB shares via Nautilus) appear under `/run/user/*/gvfs`:
