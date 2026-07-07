@@ -13,6 +13,7 @@
 #include <fcntl.h> // for open(), O_DIRECTORY, O_RDONLY, O_CLOEXEC
 #include <memory>
 #include <sys/statvfs.h>
+#include <sys/vfs.h> // for fstatfs(), struct statfs (f_fsid)
 #include <unistd.h>
 
 // btrfs subvolume-UUID support is optional. The UAPI header <linux/btrfs.h> is
@@ -200,6 +201,37 @@ public:
         }
       }
 #endif
+
+      // zfs: datasets of one pool never collide the way btrfs subvolumes do
+      // (each mounts under its own dataset name), but they get no libblkid uuid
+      // — blkid cannot resolve a dataset name to a block device. statfs(2)'s
+      // f_fsid on zfs is dmu_objset_fsid_guid: a persistent, per-dataset id
+      // that is stable across remount, reboot, and rename. Expose it as a
+      // 16-hex-char string so consumers have a dependency-free stable identity
+      // for datasets. (This is NOT the `zfs get guid` ds_guid, which needs
+      // libzfs / a subprocess.) We reuse the mount-point fd already opened
+      // above.
+      if (options_.fstype == "zfs") {
+        struct statfs sfs;
+        if (fstatfs(fd, &sfs) == 0) {
+          const uint64_t id =
+              static_cast<uint64_t>(
+                  static_cast<uint32_t>(sfs.f_fsid.__val[0])) |
+              (static_cast<uint64_t>(static_cast<uint32_t>(sfs.f_fsid.__val[1]))
+               << 32);
+          if (id != 0) {
+            char fsid_str[17]; // 16 hex chars + NUL
+            snprintf(fsid_str, sizeof(fsid_str), "%016llx",
+                     static_cast<unsigned long long>(id));
+            metadata.fsid = fsid_str;
+            DEBUG_LOG("[LinuxMetadataWorker] zfs fsid for %s: %s",
+                      validated_mount_point.c_str(), metadata.fsid.c_str());
+          }
+        } else {
+          DEBUG_LOG("[LinuxMetadataWorker] fstatfs failed for %s: %s",
+                    validated_mount_point.c_str(), strerror(errno));
+        }
+      }
     } catch (const std::exception &e) {
       DEBUG_LOG("[LinuxMetadataWorker] error: %s", e.what());
       SetError(e.what());

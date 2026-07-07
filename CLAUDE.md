@@ -68,6 +68,7 @@ Summary:
 - `subvolumeUuid` (on `VolumeMetadata`) is the strong per-subvolume id from `BTRFS_IOC_GET_SUBVOL_INFO` (kernel ≥ 4.18, **unprivileged**), in `src/linux/volume_metadata.cpp`.
 - **The ioctl returns a positive value on success** (not `0`) — treat only a negative return as failure.
 - The `<linux/btrfs.h>` include is `__has_include`-guarded; Alpine prebuilds need the `linux-headers` apk package for the feature.
+- **ZFS** datasets get no `uuid` (blkid can't resolve a dataset name). `fsid` (on `VolumeMetadata`) is a stable per-dataset id from `statfs` `f_fsid` (`fstatfs()` in `src/linux/volume_metadata.cpp`, gated on `fstype === "zfs"`). It is not the `zfs get guid` value; `stat -f %i` byte-swaps the two halves.
 
 ## Windows-Specific Issues
 

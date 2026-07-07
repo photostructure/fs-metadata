@@ -38,6 +38,15 @@ Security in case of vulnerabilities.
   rationale and a cross-platform survey of why other filesystems (zfs, APFS,
   ReFS, …) do not exhibit this collision.
 
+- **ZFS dataset identity via `fsid` (Linux).** ZFS datasets report no `uuid`
+  (libblkid cannot resolve a dataset name to a block device). `VolumeMetadata`
+  now carries `fsid`, a stable per-dataset identifier read from `statfs(2)`'s
+  `f_fsid` (the dataset's persistent fsid GUID) and rendered as a 16-character
+  hex string — distinct per dataset and stable across remount, reboot, and
+  rename, with no libzfs dependency or subprocess. Populated on ZFS only;
+  `undefined` elsewhere. It is not the `zfs get guid` value; see
+  [`doc/subvolume-identity.md`](./doc/subvolume-identity.md).
+
 ### Fixed
 
 - **Native `getVolumeMetadata()` no longer aborts the process on bad input.**

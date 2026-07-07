@@ -63,6 +63,7 @@ struct VolumeMetadata {
   double available = 0.0;
   std::string uuid;
   std::string subvolumeUuid; // btrfs per-subvolume UUID (Linux only)
+  std::string fsid;          // statfs f_fsid, hex (Linux; zfs dataset id)
   std::string mountFrom;
   std::string mountName;
   std::string uri;
@@ -107,6 +108,12 @@ struct VolumeMetadata {
     // otherwise so consumers see `undefined`, matching volumeRole's pattern.
     if (!subvolumeUuid.empty()) {
       result.Set("subvolumeUuid", Napi::String::New(env, subvolumeUuid));
+    }
+
+    // Only present where f_fsid is a stable identifier (currently zfs); omitted
+    // otherwise so consumers see `undefined`.
+    if (!fsid.empty()) {
+      result.Set("fsid", Napi::String::New(env, fsid));
     }
 
     if (!mountFrom.empty()) {

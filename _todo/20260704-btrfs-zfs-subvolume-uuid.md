@@ -28,8 +28,8 @@ PhotoStructure integration.
 - [x] Design review of the additive API shape (field names + header/gating strategy settled — see Lore)
 - [x] Implementation — fs-metadata Phase 1 (mount-option tier) — **done, verified live**
 - [x] Implementation — fs-metadata Phase 2 (btrfs ioctl tier) — **done, verified live**
-- [ ] Implementation — PhotoStructure Phase 3 (consume in fallback path) — deferred to the PhotoStructure repo
-- [~] zfs (Phase 4) — **IN PROGRESS: evaluation** (does zfs collide? cheap-guid feasibility)
+- [x] Implementation — PhotoStructure Phase 3 (consume in fallback path) — **done in photostructure repo, verified live; see Session log (Phase 3)**
+- [x] zfs (Phase 4) — **done**: added `fsid` (stable per-dataset id from `statfs` `f_fsid`), verified live on a zfs pool. zfs does not collide; `fsid` fills the no-`uuid` gap without libzfs/shell-out.
 - [ ] URI-carried identity (Phase 5) — deferred, scope only if needed
 - [ ] Review & final integration verification (fs-metadata `npm run all`; then Phase 3)
 
@@ -79,6 +79,49 @@ skipped, `build:dist` clean (new fields in public `.d.ts`).
   regression test.
 
 Still TODO before commit: full `npm run all` (prettier/full ESM jest) if desired.
+
+## Session log — Phase 3 (2026-07-04, photostructure repo)
+
+Landed in `~/src/photostructure/src/core`, consuming the new fields via a local
+`npm link` of fs-metadata (symlinked into `src/core/node_modules` only; the
+published dep must ship before this can merge). Verified live on speedy-mint.
+
+Baseline (collision, live in the test): `volumes()` reported `/` and `/home`
+both with effective `uuid = 9486d442-…`. After the change:
+
+```
+/      → volsha from subvolumeUuid 9ad5ad15-…   (distinct)
+/home  → volsha from subvolumeUuid 3508cb72-…   (distinct)
+```
+
+Design: identity precedence is now **`.uuid` file → subvolumeUuid → filesystem
+uuid**. New `fallbackVolumeUuid(v) = toVolumeUUID(v.subvolumeUuid) ?? toVolumeUUID(v.uuid)`
+in `src/core/volumes/VolumeUUID.ts`, substituted at every hardware-UUID fallback
+in `addVolumeUUID`/`readVolumeUUID` (the `.uuid`-file and freshly-written-random
+returns are untouched → **no migration** for volumes that already have a `.uuid`).
+`subvolumeUuid` flows for free: `getVolumeMetadata_` already passes the raw
+fs-metadata object to `addVolumeUUID`, and `VolumeLike` gained `subvolumeUuid?`.
+
+Files changed (photostructure):
+
+- `src/core/volumes/VolumeUUID.ts` — `subvolumeUuid` on `VolumeLike`;
+  `fallbackVolumeUuid()`; 4 fallback sites switched to it.
+- `src/core/volumes/VolumesUUIDsInCI.ts` — speedy-mint fixture: `/` and `/home`
+  now assert their distinct subvolume UUIDs (documents the fix end-to-end).
+- `src/core/volumes/VolumeUUID.spec.ts` — `fallbackVolumeUuid()` precedence tests
+  - `readVolumeUUID()` fallback-path tests (settings-gated, deterministic).
+- `src/core/fs/FsMetadata.spec.ts` — portable, skippable "sibling subvolumes get
+  distinct volshas" end-to-end test.
+
+Verification: `tsc` clean; `VolumeUUID.spec` 28 passing; `FsMetadata.spec` 50
+passing / 6 pending; `psfile`/`UriDeleted` specs green. Confirmed the sibling
+test rides the real production path (`getMountPoints` → `getVolumeMetadata`) and
+was red at baseline (both mounts shared one volsha).
+
+Follow-ups before merge: bump + publish fs-metadata, `npm install` it across all
+four photostructure packages (desktop/core/library/account), drop the `npm link`.
+Other btrfs CI hosts' `/` fixtures (deb11vm, hack, pi4, speedy, swift-ubuntu) will
+report subvolume UUIDs once they run — update per host as the existing test intends.
 
 ## Required reading
 
@@ -279,7 +322,7 @@ the hot path. `subvolumeUuid` is additive; `uuid` stays the fs UUID.
       `/home` now yield **distinct** volshas when neither has a `.uuid`.
 - [ ] Verify: `cd src/core && node dist/core/test/mocha-runner.js dist/core/fs/FsMetadata.spec.js`.
 
-### Phase 4 — zfs (evaluated 2026-07-04 → no implementation warranted)
+### Phase 4 — zfs ✅ (2026-07-06: `fsid` field from statfs f_fsid)
 
 - [x] **Evaluate whether zfs collides at all.** Conclusion: **it does not**, so the
       btrfs collision this TPP fixes does not apply to zfs.
@@ -301,10 +344,25 @@ the hot path. `subvolumeUuid` is additive; `uuid` stays the fs UUID.
       (`/proc/spl/kstat/zfs/<pool>/objset-<id>`) exposes only the **objsetid**, which
       is _weak_ (not preserved by send/receive, reusable after delete) and is not
       universally present.
-- [ ] **Decision pending (user):** keep deferred (recommended — no concrete need,
-      no acceptable cheap path), OR add `guid` behind an explicit **out-of-hot-path,
-      opt-in** capability (shell-out or optional libzfs) only if read-only-zfs identity
-      becomes a real requirement. Populates the same generic `subvolumeUuid` slot.
+- [x] **Cheap path found after all — `statfs(2)` `f_fsid`.** The initial "negative"
+      only considered the _`ds_guid`_; it missed that `statfs` `f_fsid` on zfs is
+      `dmu_objset_fsid_guid` — a **stable, per-dataset id from one syscall**, no
+      libzfs/shell-out. Empirically verified on a live pool: distinct per dataset,
+      nonzero, and **identical across a 2-day/remount gap** (alpha
+      `005856b559015c97`, beta `001aa61033935cd6`). It is _not_ the `ds_guid` (user
+      confirmed that's fine — they want stability, not the specific guid value).
+- [x] **Implemented** as a new `VolumeMetadata.fsid` field (16-hex `f_fsid`), gated
+      on `fstype === "zfs"`, reusing the mount-point fd (`fstatfs`), `undefined`
+      elsewhere. Chose a **new field** (not `subvolumeUuid`) because `f_fsid` is a
+      64-bit int, not a UUID. Files: `src/common/volume_metadata.h`,
+      `src/linux/volume_metadata.cpp`, `src/types/volume_metadata.ts`,
+      `src/linux/zfs-fsid.test.ts`. Verified live via `getVolumeMetadata` +
+      `stat -f`; native rebuild clean; clang-tidy/tsc/eslint OK.
+  - **Reboot-stability confirmed (2026-07-06):** `zpool export`/`import` (re-reads
+    pool state from disk, as a reboot does) left `fsid` **identical** —
+    alpha `005856b559015c97`, beta `001aa61033935cd6`.
+- [ ] Note: the `ds_guid` (via libzfs / `zfs get`) remains deferred — `fsid` meets
+      the stated need. Revisit only if the exact `zfs get guid` value is ever required.
 
 ### Phase 5 — URI-carried subvolume identity (deferred, Option B)
 

@@ -43,6 +43,35 @@ Install the Xcode Command Line Tools, and then
 
     sudo apt-get install bear build-essential clang clang-format libblkid-dev uuid-dev
 
+No extra packages are needed for the btrfs/zfs identity features: `<linux/btrfs.h>`
+comes from `linux-libc-dev` and `<sys/vfs.h>` from `libc6-dev`, both pulled in by
+`build-essential`.
+
+### Exercising the btrfs / zfs identity tests (optional)
+
+The Linux filesystem-identity integration tests auto-skip unless the matching
+filesystem is actually mounted, so on a typical dev box (and in CI) they no-op:
+
+- `src/linux/btrfs-subvolume.test.ts` runs against any mounted **btrfs**
+  filesystem (e.g. when `/` or `/home` is btrfs).
+- `src/linux/zfs-fsid.test.ts` needs a mounted **zfs** dataset.
+
+To exercise the zfs `fsid` path, create a throwaway file-backed pool:
+
+```bash
+sudo apt-get install -y zfsutils-linux
+truncate -s 256M /tmp/zfstest.img
+sudo zpool create -m /mnt/zfstest zfstest /tmp/zfstest.img
+sudo zfs create zfstest/alpha
+sudo zfs create zfstest/beta
+sudo chmod -R a+rx /mnt/zfstest
+
+npx jest src/linux/zfs-fsid.test.ts
+
+# teardown when done
+sudo zpool destroy zfstest && rm -f /tmp/zfstest.img
+```
+
 ## Before submitting your PR
 
 Run `npm run all`, which:

@@ -75,4 +75,22 @@ export interface VolumeMetadata extends RemoteInfo, MountPoint {
    * filesystem {@link uuid} would collide across siblings.
    */
   subvolumeUuid?: string;
+
+  /**
+   * A stable filesystem identifier read from `statfs(2)`'s `f_fsid`, rendered as
+   * a 16-character lowercase hex string.
+   *
+   * Currently populated on **ZFS**, where `f_fsid` is the dataset's persistent
+   * *fsid GUID* — distinct per dataset and stable across remount, reboot, and
+   * dataset rename (unlike {@link mountFrom}, which is the dataset name). ZFS
+   * datasets otherwise report no {@link uuid} (libblkid cannot resolve a dataset
+   * name to a block device), so this is a lightweight, dependency-free identity
+   * source for them.
+   *
+   * Note: this is **not** the ZFS `guid` property shown by `zfs get guid` — it is
+   * a separate, equally-stable per-dataset identifier available without libzfs or
+   * a subprocess. Undefined on filesystems where `f_fsid` is not a reliable
+   * stable identifier.
+   */
+  fsid?: string;
 }
