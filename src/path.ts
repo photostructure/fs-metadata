@@ -14,6 +14,16 @@ export function normalizePath(
     throw new Error("Invalid path: contains directory traversal pattern");
   }
 
+  // Security check: reject Windows device-namespace paths (\\.\… and \\?\…,
+  // including forward-slash variants). These name devices (\\.\CON,
+  // \\.\PhysicalDrive0) or bypass path canonicalization (\\?\…), and Node's
+  // dirname() leaves them unchanged — which makes isRootDirectory() treat them
+  // as filesystem roots and short-circuit before native validation runs. Reject
+  // them here, at the shared choke point, so no caller can smuggle one through.
+  if (/^[\\/]{2}[.?][\\/]/.test(mountPoint)) {
+    throw new Error("Invalid path: Windows device-namespace path");
+  }
+
   // Check for invalid UTF-8 sequences by looking for common invalid patterns
   // This is a basic check - the native code will do more thorough validation
   if (mountPoint.includes("\uFFFD") || mountPoint.includes("\0")) {
