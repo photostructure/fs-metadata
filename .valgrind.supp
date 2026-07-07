@@ -47,3 +47,17 @@
    fun:*node*inspector*
    ...
 }
+
+# Node >= 26 bundles an OpenSSL that registers built-in compression methods in
+# a process-global default library context on first use. The block is never
+# freed (one-time global) and shows as "definitely lost" under an abrupt
+# process.exit(). Not our allocation - Node/OpenSSL internal.
+{
+   OpenSSL-BuiltinCompressions-OneTimeInit
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:CRYPTO_malloc
+   fun:ossl_load_builtin_compressions
+   ...
+}

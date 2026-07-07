@@ -73,6 +73,15 @@ Security in case of vulnerabilities.
   freed per-thread state even when workers were still running. The pool is
   now clamped to 64 threads and per-thread state is only freed once a worker
   has actually exited.
+- **Module-init memory leak on Node 26 (all platforms).** The per-env shutdown
+  hook allocated a heap `std::shared_ptr` whose only deleter was a
+  `napi_add_env_cleanup_hook` callback. Node 26 skips those callbacks on an
+  abrupt `process.exit()` (while still running napi instance-data finalizers),
+  stranding the block — a one-time 16-byte "definitely lost" at module
+  registration that failed the valgrind memory gate on Node 26. The separate
+  allocation is gone; the instance-data finalizer now owns teardown and removes
+  the hook, so nothing leaks whether or not the cleanup hook runs, and the
+  shutdown-flag timing that guards teardown-time SIGABRTs is unchanged.
 - **macOS: timed-out mount-point checks no longer pin the worker thread.**
   Accessibility probes used `std::async`, whose future destructor blocks
   until the task finishes — so a `faccessat()` hung on a dead network mount

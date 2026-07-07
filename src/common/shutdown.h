@@ -61,36 +61,49 @@ inline bool IsShuttingDown(const std::shared_ptr<ShutdownState> &state) {
          state->shuttingDown.load(std::memory_order_acquire);
 }
 
-// Registers per-env shutdown state and a cleanup hook that flips the flag.
-// Idempotent per env: binding.cpp Init runs once per env load.
+// Env cleanup hook: flips the shutdown flag during normal environment teardown
+// (node::FreeEnvironment) so in-flight SafeAsyncWorkers short-circuit instead
+// of touching napi as the env is destroyed. A named function (not a lambda) so
+// the instance-data finalizer can pass the same function pointer to
+// napi_remove_env_cleanup_hook.
+inline void ShutdownFlagHook(void *arg) {
+  auto *data = static_cast<ModuleInstanceData *>(arg);
+  data->shutdownState->shuttingDown.store(true, std::memory_order_release);
+}
+
+// Registers per-env shutdown state, a cleanup hook that flips the flag, and an
+// instance-data finalizer that owns teardown. Idempotent per env: binding.cpp
+// Init runs once per env load.
+//
+// Lifetime is anchored to the finalizer, not the cleanup hook: Node >= 26 may
+// skip napi_add_env_cleanup_hook callbacks on an abrupt process.exit() while
+// still running instance-data finalizers. Freeing `data` from the finalizer
+// (and removing the hook there so it can never fire on freed memory) keeps
+// teardown leak-free whether or not the cleanup hook runs. There is no separate
+// heap allocation to strand.
 inline void EnsureShutdownHook(napi_env env) {
   if (GetInstanceData(env) != nullptr) {
     return;
   }
   auto *data = new ModuleInstanceData();
-  auto *cleanupState = new std::shared_ptr<ShutdownState>(data->shutdownState);
   napi_status status = napi_set_instance_data(
       env, data,
-      [](napi_env /*env*/, void *raw, void * /*hint*/) {
-        delete static_cast<ModuleInstanceData *>(raw);
+      [](napi_env env, void *raw, void * /*hint*/) {
+        auto *d = static_cast<ModuleInstanceData *>(raw);
+        // Remove before freeing; no-op if the hook already ran during a normal
+        // FreeEnvironment teardown.
+        napi_remove_env_cleanup_hook(env, ShutdownFlagHook, d);
+        delete d;
       },
       nullptr);
   if (status != napi_ok) {
-    delete cleanupState;
     delete data;
     return;
   }
-  status = napi_add_env_cleanup_hook(
-      env,
-      [](void *arg) {
-        auto *state = static_cast<std::shared_ptr<ShutdownState> *>(arg);
-        (*state)->shuttingDown.store(true, std::memory_order_release);
-        delete state;
-      },
-      cleanupState);
-  if (status != napi_ok) {
-    delete cleanupState;
-  }
+  // Best-effort: if this fails, the finalizer still frees `data`; the only loss
+  // is the teardown flag never flipping (matching behavior before this hook
+  // existed).
+  napi_add_env_cleanup_hook(env, ShutdownFlagHook, data);
 }
 
 // Wrap deferred.Resolve so a teardown-time napi failure cannot escape the
