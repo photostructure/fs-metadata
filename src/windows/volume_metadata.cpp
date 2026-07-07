@@ -67,7 +67,7 @@ inline std::string GetVolumeGUID(const std::string &mountPoint) {
     widePath += L'\\';
   }
 
-  // Volume GUID paths have format: \\?\Volume{GUID}\ 
+  // Volume GUID paths have the format "\\?\Volume{GUID}\".
   // Maximum length is 49 characters + null terminator
   constexpr DWORD VOLUME_GUID_PATH_LENGTH = 50;
   WCHAR volumeGUID[VOLUME_GUID_PATH_LENGTH] = {0};
