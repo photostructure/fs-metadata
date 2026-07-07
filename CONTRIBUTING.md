@@ -66,7 +66,7 @@ sudo zfs create zfstest/alpha
 sudo zfs create zfstest/beta
 sudo chmod -R a+rx /mnt/zfstest
 
-npx jest src/linux/zfs-fsid.test.ts
+npx jest --no-coverage src/linux/zfs-fsid.test.ts
 
 # teardown when done
 sudo zpool destroy zfstest && rm -f /tmp/zfstest.img
