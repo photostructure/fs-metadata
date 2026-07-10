@@ -42,8 +42,9 @@ export const LocalSupport = HiddenSupportByPlatform[process.platform]
 
 /**
  * Checks if the file or directory is hidden through any available method
- * @returns A boolean indicating if the item is hidden
- * @throws {Error} If the file doesn't exist or permissions are insufficient
+ * @returns A boolean indicating if the item is hidden. A non-existent path
+ * resolves to `false` rather than throwing.
+ * @throws {Error} If the pathname is invalid or permissions are insufficient
  */
 export async function isHiddenImpl(
   pathname: string,
@@ -66,6 +67,11 @@ export async function isHiddenImpl(
   // and https://en.wikipedia.org/wiki/File_attribute
   if (isRootDirectory(norm)) {
     debug("Root directory, returning false");
+    return false;
+  }
+
+  if (LocalSupport.dotPrefix && !(await pathExists(norm))) {
+    debug("Path does not exist, returning false");
     return false;
   }
 
@@ -130,6 +136,17 @@ function isPosixHidden(pathname: string): boolean {
   return b.startsWith(".") && b !== "." && b !== "..";
 }
 
+async function pathExists(pathname: string): Promise<boolean> {
+  try {
+    await statAsync(pathname);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    throw error;
+  }
+}
+
 async function isSystemHidden(
   pathname: string,
   nativeFn: NativeBindingsFn,
@@ -164,8 +181,9 @@ async function isSystemHidden(
 
 /**
  * Gets detailed information about the hidden state of the file or directory
- * @returns An object containing detailed hidden state information
- * @throws {Error} If the file doesn't exist or permissions are insufficient
+ * @returns An object containing detailed hidden state information. A
+ * non-existent path resolves to a non-hidden result rather than throwing.
+ * @throws {Error} If the pathname is invalid or permissions are insufficient
  */
 export async function getHiddenMetadataImpl(
   pathname: string,
@@ -186,8 +204,12 @@ export async function getHiddenMetadataImpl(
     };
   }
 
-  const dotPrefix = isPosixHidden(norm);
-  const systemFlag = await isSystemHidden(norm, nativeFn);
+  // Windows must reach the native implementation before deciding a missing
+  // path is not hidden: native validation rejects device namespaces, reserved
+  // names, and alternate data streams before checking existence.
+  const exists = !LocalSupport.dotPrefix || (await pathExists(norm));
+  const dotPrefix = exists && isPosixHidden(norm);
+  const systemFlag = exists && (await isSystemHidden(norm, nativeFn));
   return {
     hidden: dotPrefix || systemFlag,
     dotPrefix,

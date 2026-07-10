@@ -120,6 +120,14 @@ describe("hidden file tests", () => {
         );
       });
 
+      if (!isWindows) {
+        it("should return false for a non-existent dot-prefixed path", async () => {
+          expect(await isHidden(path.join(tempDir, ".does-not-exist"))).toBe(
+            false,
+          );
+        });
+      }
+
       it("should throw error for invalid pathname (null)", async () => {
         await expect(isHidden(null as unknown as string)).rejects.toThrow(
           "Invalid pathname",
@@ -162,7 +170,9 @@ describe("hidden file tests", () => {
       skipItIf(["win32"])(
         "should detect hidden files by dot prefix",
         async () => {
-          expect(await isHidden(path.join(tempDir, ".hidden.txt"))).toBe(true);
+          const testFile = path.join(tempDir, ".hidden.txt");
+          await fs.writeFile(testFile, "test");
+          expect(await isHidden(testFile)).toBe(true);
         },
       );
 
@@ -482,6 +492,19 @@ describe("hidden file tests", () => {
   });
 
   describe("getHiddenMetadata()", () => {
+    if (!isWindows) {
+      it("does not classify a missing dot-prefixed path as hidden", async () => {
+        const result = await getHiddenMetadata(
+          path.join(tempDir, ".does-not-exist"),
+        );
+        expect(result).toMatchObject({
+          hidden: false,
+          dotPrefix: false,
+          systemFlag: false,
+        });
+      });
+    }
+
     describe("platform-specific behavior", () => {
       if (isWindows) {
         it("should return correct metadata for normal file", async () => {
