@@ -384,6 +384,14 @@ describe("hidden file tests", () => {
     });
 
     describe("method handling", () => {
+      it("should reject unsupported method values from JavaScript", async () => {
+        const testFile = path.join(tempDir, "invalid-method.txt");
+        await fs.writeFile(testFile, "test");
+        await expect(
+          setHidden(testFile, true, "systemFlg" as "auto"),
+        ).rejects.toThrow(/invalid.*method/i);
+      });
+
       it("should handle 'all' method", async () => {
         const testFile = path.join(tempDir, "all-test.txt");
         await fs.writeFile(testFile, "test");

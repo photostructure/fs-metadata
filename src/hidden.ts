@@ -7,6 +7,7 @@ import { WrappedError } from "./error";
 import { statAsync } from "./fs";
 import { isRootDirectory, normalizePath } from "./path";
 import { isWindows } from "./platform";
+import { stringEnum, type StringEnumKeys } from "./string_enum";
 import type { HiddenMetadata } from "./types/hidden_metadata";
 import type { NativeBindingsFn } from "./types/native_bindings";
 
@@ -195,7 +196,9 @@ export async function getHiddenMetadataImpl(
   };
 }
 
-export type HideMethod = "dotPrefix" | "systemFlag" | "all" | "auto";
+const HideMethods = stringEnum("dotPrefix", "systemFlag", "all", "auto");
+
+export type HideMethod = StringEnumKeys<typeof HideMethods>;
 
 export type SetHiddenResult = {
   pathname: string;
@@ -211,6 +214,10 @@ export async function setHiddenImpl(
   method: HideMethod,
   nativeFn: NativeBindingsFn,
 ): Promise<SetHiddenResult> {
+  if (HideMethods.get(method) == null) {
+    throw new TypeError("Invalid hide method: " + JSON.stringify(method));
+  }
+
   let norm = normalizePath(pathname);
   if (norm == null) {
     throw new Error("Invalid pathname: " + JSON.stringify(pathname));
