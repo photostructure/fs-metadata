@@ -119,9 +119,9 @@ function _compileGlob(patterns: string[] | readonly string[]): RegExp {
   const final = regexPatterns.filter((ea) => ea.length > 0);
   return final.length === 0
     ? // Empty pattern matches nothing
-      NeverMatchRE // Case insensitive for Windows paths
+      NeverMatchRE
     : // eslint-disable-next-line security/detect-non-literal-regexp -- compiling globs to a RegExp is this function's purpose; special characters are escaped above
-      new RegExp(`^(?:${final.join("|")})$`, "i");
+      new RegExp(`^(?:${final.join("|")})$`, isWindows ? "i" : "");
 }
 
 // eslint-disable-next-line regexp/no-empty-group

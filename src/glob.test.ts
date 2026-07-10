@@ -1,6 +1,7 @@
 // src/glob.test.ts
 
 import { compileGlob } from "./glob";
+import { isWindows } from "./platform";
 
 describe("compileGlob", () => {
   // Test basic literal matching
@@ -10,11 +11,10 @@ describe("compileGlob", () => {
     expect(regex.test("src/other.ts")).toBe(false);
   });
 
-  // Test case insensitivity
-  test("matches paths case-insensitively", () => {
+  test("matches case-insensitively only on Windows", () => {
     const regex = compileGlob(["src/Index.ts"]);
-    expect(regex.test("src/index.ts")).toBe(true);
-    expect(regex.test("SRC/INDEX.TS")).toBe(true);
+    expect(regex.test("src/index.ts")).toBe(isWindows);
+    expect(regex.test("SRC/INDEX.TS")).toBe(isWindows);
   });
 
   // Test single asterisk wildcard

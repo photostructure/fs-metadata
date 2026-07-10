@@ -256,6 +256,10 @@ enumeration and applies the shared heuristic layer:
 3. Checks `mountPoint` against `SystemPathPatternsDefault` glob patterns
    (configurable)
 
+Path-glob matching is lexical: case-insensitive on Windows and case-sensitive
+on Linux/macOS. It does not probe the backing filesystem's case-sensitivity
+capabilities. Thus `/TMP` is not classified by the POSIX `/tmp` rule.
+
 Native `isSystemVolume: true` is **never downgraded** — only upgraded from
 `false` to `true`.
 

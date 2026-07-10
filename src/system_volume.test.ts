@@ -69,6 +69,13 @@ describe("isSystemVolume", () => {
     expect(isSystemVolume("/boot", "")).toBe(true); // path pattern match
   });
 
+  if (!isWindows) {
+    it("keeps POSIX system-path matching case-sensitive", () => {
+      expect(isSystemVolume("/tmp", "ext4")).toBe(true);
+      expect(isSystemVolume("/TMP", "ext4")).toBe(false);
+    });
+  }
+
   it("should handle custom config", () => {
     const config = {
       systemFsTypes: ["customfs"],
