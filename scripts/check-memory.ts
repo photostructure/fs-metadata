@@ -154,21 +154,14 @@ if (platform === "linux") {
     execFileSync("bash", [macosAsanScript], { stdio: "inherit" });
     console.log(color(colors.GREEN, "✓ macOS AddressSanitizer tests passed"));
   } catch (error) {
-    // On macOS, AddressSanitizer may fail due to SIP restrictions
-    // This is expected behavior and should not fail the overall test
-    console.log(
-      color(
-        colors.YELLOW,
-        "⚠ macOS AddressSanitizer tests completed with warnings",
-      ),
-    );
-    console.log(
-      color(
-        colors.YELLOW,
-        "  This is expected due to macOS System Integrity Protection (SIP)",
-      ),
-    );
-    // Don't set exitCode = 1 for macOS ASAN failures
+    // macos-asan.sh already converts the one known SIP interceptor failure to
+    // success. Every remaining nonzero exit is a real build, test, or
+    // sanitizer failure and must fail CI.
+    console.log(color(colors.RED, "✗ macOS AddressSanitizer tests failed"));
+    if (error instanceof Error) {
+      console.log(color(colors.RED, `  Error: ${error.message}`));
+    }
+    exitCode = 1;
   }
 }
 

@@ -27,8 +27,15 @@ export CFLAGS="-fsanitize=address -g -O1 -fno-omit-frame-pointer"
 export CXXFLAGS="-fsanitize=address -g -O1 -fno-omit-frame-pointer"
 export LDFLAGS="-fsanitize=address"
 
-# Set ASan options
-export ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1:strict_init_order=1:print_stats=1:halt_on_error=0"
+# Set ASan options.
+# LeakSanitizer is unavailable on arm64 macOS; requesting detect_leaks there
+# aborts ASan at startup with "detect_leaks is not supported on this platform".
+# The Xcode `leaks` tool below covers native leak detection on Apple Silicon.
+if [[ "$(uname -m)" == "arm64" ]]; then
+    export ASAN_OPTIONS="check_initialization_order=1:strict_init_order=1:print_stats=1"
+else
+    export ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1:strict_init_order=1:print_stats=1"
+fi
 export MallocScribble=1
 export MallocGuardEdges=1
 
@@ -58,25 +65,44 @@ echo -e "${YELLOW}Running tests with AddressSanitizer...${NC}"
 # in a single process to ensure ASAN works correctly.
 
 # Run the test and capture output
-TEST_OUTPUT=$(npm test -- --runInBand 2>&1)
+set +e
+TEST_OUTPUT=$(TEST_ESM=0 ./node_modules/.bin/jest --no-coverage --runInBand 2>&1)
 TEST_EXIT_CODE=$?
+set -e
 
-if [[ $TEST_EXIT_CODE -eq 0 ]]; then
+ASAN_OUTPUT_FILE=$(mktemp "${TMPDIR:-/tmp}/fs-metadata-macos-asan.XXXXXX")
+trap 'rm -f "$ASAN_OUTPUT_FILE"' EXIT
+printf '%s' "$TEST_OUTPUT" > "$ASAN_OUTPUT_FILE"
+if [[ "${VERBOSE:-0}" == "1" ]]; then
+    printf '%s\n' "$TEST_OUTPUT"
+fi
+
+# Analyze the captured output regardless of the exit code, mirroring the Linux
+# sanitizers-test.sh path. A sanitizer report can be emitted with a zero exit
+# code (e.g. LSAN_OPTIONS=exitcode=0), so the test exit code alone is not a
+# sufficient gate. --allow-macos-sip permits ONLY the exact three-line SIP
+# interceptor startup failure; Jest is invoked directly above so any additional
+# captured output rejects it.
+set +e
+env -u DYLD_INSERT_LIBRARIES -u ASAN_OPTIONS -u LSAN_OPTIONS \
+    ./node_modules/.bin/tsx scripts/analyze-sanitizer-output.ts \
+    "$ASAN_OUTPUT_FILE" "$TEST_EXIT_CODE" --allow-macos-sip
+ANALYSIS_EXIT_CODE=$?
+set -e
+
+if [[ $ANALYSIS_EXIT_CODE -ne 0 ]]; then
+    echo -e "${RED}✗ Tests failed with AddressSanitizer${NC}"
+    echo "$TEST_OUTPUT"
+    # This is a real failure, exit with error
+    exit 1
+elif [[ $TEST_EXIT_CODE -eq 0 ]]; then
     echo -e "${GREEN}✓ Tests passed with AddressSanitizer${NC}"
 else
-    # Check if the failure is due to SIP interceptor issues
-    if echo "$TEST_OUTPUT" | grep -q "interceptors not installed"; then
-        echo -e "${YELLOW}⚠ Tests completed but AddressSanitizer interceptors not installed${NC}"
-        echo -e "${YELLOW}  This is due to macOS System Integrity Protection (SIP) stripping${NC}"
-        echo -e "${YELLOW}  DYLD_INSERT_LIBRARIES from child processes. This is expected behavior.${NC}"
-        echo -e "${YELLOW}  To run ASAN tests properly, you may need to disable SIP temporarily.${NC}"
-        # Don't treat this as a failure
-    else
-        echo -e "${RED}✗ Tests failed with AddressSanitizer${NC}"
-        echo "$TEST_OUTPUT"
-        # This is a real failure, exit with error
-        exit 1
-    fi
+    echo -e "${YELLOW}⚠ Tests completed but AddressSanitizer interceptors not installed${NC}"
+    echo -e "${YELLOW}  This is due to macOS System Integrity Protection (SIP) stripping${NC}"
+    echo -e "${YELLOW}  DYLD_INSERT_LIBRARIES from child processes. This is expected behavior.${NC}"
+    echo -e "${YELLOW}  To run ASAN tests properly, you may need to disable SIP temporarily.${NC}"
+    # Known SIP condition: not a failure.
 fi
 
 # Run memory leak check using leaks tool

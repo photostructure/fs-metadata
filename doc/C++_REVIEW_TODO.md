@@ -166,8 +166,7 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 
 1. [x] Run valgrind, LeakSanitizer, and AddressSanitizer on Linux builds
    - **Implemented**: Comprehensive memory testing infrastructure
-   - Valgrind: `npm run test:valgrind` with suppressions in `.valgrind.supp`
-   - AddressSanitizer: `npm run asan` with proper clang integration
+   - Valgrind and AddressSanitizer: `npm run check:memory`
    - LeakSanitizer: Integrated with ASan, suppressions in `.lsan-suppressions.txt`
    - All tests show 0 memory leaks in fs-metadata code
 2. [ ] Use Application Verifier on Windows
@@ -246,16 +245,16 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
    - Added to precommit checks
 
 3. **Memory Testing Infrastructure**
-   - Created comprehensive memory testing documentation (`docs/MEMORY_TESTING.md`)
    - Improved ASan configuration with proper suppressions
    - Created standalone test runner (`scripts/sanitizers-test.sh`)
-   - Updated `scripts/check-memory.mjs` with better ASan support
+   - Updated `scripts/check-memory.ts` with ASan support
    - All memory tests integrated into CI/CD
 
 ## Documentation Updates Needed
 
 - [x] Document RAII pattern usage guidelines - See existing code patterns
-- [x] Add platform-specific memory management notes - Added to MEMORY_TESTING.md
+- [x] Add platform-specific memory management notes - See `AGENTS.md` and the
+      platform API references
 - [x] Create error handling best practices - Documented in code
 - [ ] Document thread safety requirements
 

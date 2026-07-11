@@ -52,20 +52,23 @@ The `scripts/macos-asan.sh` script now:
 
 1. Builds with ASAN flags
 2. Runs tests with `--runInBand` to avoid worker processes
-3. Detects the "interceptors not installed" error and treats it as expected behavior
+3. Detects the known "Interceptors are not working"/"interceptors not
+   installed" startup error and treats only that SIP condition as expected;
+   mixed output containing a sanitizer report or Jest failure still fails
 4. Falls back to the macOS `leaks` tool for additional memory checking
 5. Provides clear messaging about the SIP limitation
 
-The `scripts/check-memory.mjs` script:
+The `scripts/check-memory.ts` script:
 
-1. Ensures a clean build before running JavaScript memory tests to avoid ASAN contamination
-2. Clears ASAN environment variables when running tests
-3. Treats macOS ASAN failures due to SIP as warnings, not errors
+1. Runs JavaScript memory tests before platform-native checks
+2. Invokes the macOS ASAN script, which classifies the known SIP startup error
+3. Propagates every other build, test, or sanitizer failure to CI
 4. Still runs the `leaks` tool for native memory checking
 
 ## CI Considerations
 
 - The GitHub Actions workflow runs ASAN tests on both Linux and macOS
 - Linux ASAN tests are more reliable due to no SIP restrictions
-- macOS ASAN failures due to SIP are treated as warnings, not CI failures
+- Only the known macOS SIP interceptor-startup failure is treated as a warning;
+  other ASAN/test failures fail CI
 - macOS tests still provide value through the `leaks` tool and JavaScript memory tests

@@ -1,12 +1,13 @@
 # AddressSanitizer runtime options for @photostructure/fs-metadata
-# These options are loaded via ASAN_OPTIONS environment variable
+# Reference values for manual runs. scripts/sanitizers-test.sh sets its own
+# runtime options; this file is not loaded automatically.
 
 # Leak detection
 detect_leaks=1
 leak_check_at_exit=1
 
 # Error handling
-halt_on_error=0
+halt_on_error=1
 exitcode=1
 
 # Output formatting

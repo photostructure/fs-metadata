@@ -142,11 +142,11 @@ Actions that have multiple targets can be run in parallel using wildcards:
 - `npm run lint` runs all `lint:*` scripts
 - Uses `run-p` from npm-run-all for parallel execution
 
-### Special Namespaces
+### Memory checks
 
-- **memory:\*** - Memory testing scripts that should not run automatically with `test:*`
-  - `memory:test` - Comprehensive memory testing suite
-  - Run with `ENABLE_ASAN=1` to include sanitizer tests
+- `npm run check:memory` runs the comprehensive platform-specific memory suite.
+- On Linux this includes AddressSanitizer/LeakSanitizer and Valgrind when the
+  required tools are installed.
 
 ### Naming Guidelines
 

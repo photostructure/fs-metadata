@@ -47,7 +47,7 @@ jobs:
           path: |
             *.log
             valgrind-*.log
-            asan-test.log
+            asan-output.log
             core.*
             test-results/
           retention-days: 7
