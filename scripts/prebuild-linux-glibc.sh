@@ -77,7 +77,7 @@ CONTAINER_NAME="fs-metadata-build-$$"
 docker run -d \
   --name "$CONTAINER_NAME" \
   --platform "linux/$DOCKER_ARCH" \
-  node:20-bullseye \
+  node:22-bullseye \
   sleep 3600
 
 # Copy project files into container
