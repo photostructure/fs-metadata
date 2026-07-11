@@ -199,7 +199,9 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
    - ✅ Replaced `volatile bool shouldTerminate` with `std::atomic<bool>`
    - ✅ Replaced `DriveStatus result` with `std::atomic<DriveStatus>`
    - ✅ Removed dangerous `TerminateThread` usage
-   - ✅ Increased graceful shutdown timeout from 100ms to 1000ms
+   - ✅ Replaced the fixed application pool with adaptive Windows callbacks
+     marked by `CallbackMayRunLong()` so stuck probes do not exhaust a fixed
+     worker count
 2. ~~**High**: Windows API buffer issues~~ ✅ Completed
    - ✅ WNetConnection: Handle ERROR_MORE_DATA with dynamic buffer resize
    - ✅ GetVolumeInformation: Use MAX_PATH+1 instead of BUFFER_SIZE

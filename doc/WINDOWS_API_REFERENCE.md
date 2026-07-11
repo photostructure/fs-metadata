@@ -86,18 +86,22 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 }
 ```
 
-### FindFirstFileExA / FindClose
+### FindFirstFileExW / FindClose
 
 - **Docs**:
-  - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfileexa
+  - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfileexw
   - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findclose
 - **Purpose**: Searches a directory for files/subdirectories
 - **Flags**:
   - `FIND_FIRST_EX_LARGE_FETCH`: Optimize for large directories
-  - `FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY`: Skip reparse points
+  - `FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY`: Limit results to physical files when
+    a filesystem virtualization filter is present
 - **Security**: Can follow symbolic links if not careful
 - **Critical**: Search handles **must** be closed with `FindClose()`, not `CloseHandle()`
 - **Return Value**: Returns `INVALID_HANDLE_VALUE` on failure (not `NULL`)
+- **Empty roots**: A `root + "*"` search can return `ERROR_FILE_NOT_FOUND`
+  when it has no matching child. That means the root is accessible, not that
+  the root path is missing.
 - **RAII Pattern**:
   ```cpp
   class FindHandleGuard {
@@ -253,12 +257,33 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
   }
   ```
 
+### Windows callback pool
+
+- **Docs**:
+  - https://learn.microsoft.com/en-us/windows/win32/api/threadpoolapiset/nf-threadpoolapiset-trysubmitthreadpoolcallback
+  - https://learn.microsoft.com/en-us/windows/win32/api/threadpoolapiset/nf-threadpoolapiset-callbackmayrunlong
+- Drive checks use `TrySubmitThreadpoolCallback()` and call
+  `CallbackMayRunLong()` before entering the filesystem provider. This lets
+  Windows provide replacement capacity if a callback blocks indefinitely.
+- The signal is adaptive, not cancellation. A timed-out callback can keep
+  running; `CancelSynchronousIo()` is driver-dependent and is unsafe to apply
+  casually to a reused pool thread.
+- The callback runs addon code on a process-wide pool that Node does not track,
+  so it holds a reference to the addon module for its lifetime:
+  `GetModuleHandleEx(...FROM_ADDRESS...)` at submit time plus
+  `FreeLibraryWhenCallbackReturns()` on entry. Without it, a Worker teardown
+  that unloads the addon (`uv_dlclose`) could unmap code a probe is still
+  running. See:
+  https://learn.microsoft.com/en-us/windows/win32/api/threadpoolapiset/nf-threadpoolapiset-freelibrarywhencallbackreturns
+
 ### CreateThread
 
 - **Docs**: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createthread
 - **Best Practice**: Always store handle for cleanup
 - **Never**: Never use `TerminateThread` - it can corrupt process state
-- **Never**: Never use `std::thread::detach()` for timeout handling - use `std::future::wait_for()` instead
+- **Never**: Never use `TerminateThread` or a detached thread for timeout
+  handling. `std::future::wait_for()` bounds only the waiter; the work itself
+  needs replacement capacity, cancellation, or isolation.
 
 ### WaitForSingleObject / WaitForMultipleObjects
 

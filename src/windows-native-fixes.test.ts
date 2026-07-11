@@ -1,8 +1,8 @@
 // src/windows-native-fixes.test.ts
 // Tests to verify the Windows native code fixes:
 // 1. FindHandleGuard - proper cleanup with FindClose (not CloseHandle)
-// 2. Promise/future timeout - no detached threads, proper timeout handling
-// 3. WorkQueue - proper error handling
+// 2. Adaptive callback-pool scheduling for potentially blocking drive probes
+// 3. Promise/future timeout - no detached threads, proper timeout handling
 // 4. VolumeInfo/DiskSpaceInfo - initialized members
 
 import {
@@ -169,10 +169,9 @@ describePlatformStable("win32")("Windows Native Code Fixes", () => {
     });
   });
 
-  describe("Thread Pool and WorkQueue", () => {
+  describe("Windows callback pool", () => {
     it("should handle high concurrency without deadlock", async () => {
-      // Test that the thread pool handles many concurrent requests
-      // This exercises the WorkQueue and event signaling
+      // Test that the callback pool handles many concurrent requests.
       const promises: Promise<unknown>[] = [];
 
       for (let i = 0; i < 100; i++) {
@@ -208,7 +207,7 @@ describePlatformStable("win32")("Windows Native Code Fixes", () => {
       const handleGrowth = finalHandles - initialHandles;
 
       // Handle count should stay relatively stable
-      // Large growth would indicate leaked handles from the thread pool
+      // Large growth would indicate leaked handles from callback work.
       expect(handleGrowth).toBeLessThan(20);
     });
   });

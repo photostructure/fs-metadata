@@ -305,7 +305,7 @@ No unsafe C functions found:
 | `g_diskArbitrationMutex`                | `da_mutex.h` (shared)                            | All DA + IOKit operations across both metadata and mount point workers |
 | `DASessionRAII` + serial dispatch queue | `volume_metadata.cpp`, `volume_mount_points.cpp` | DA session lifecycle (unschedule-before-release)                       |
 | `BlkidCache::mutex_`                    | `blkid_cache.h`                                  | blkid cache operations                                                 |
-| `CRITICAL_SECTION`                      | `thread_pool.h`, `drive_status.h`                | Windows thread pool task queue                                         |
+| Windows callback pool                   | `drive_status.h`                                 | Replacement capacity for potentially blocking drive probes             |
 | `Napi::AsyncWorker`                     | All worker classes                               | V8 isolate access (N-API guarantee)                                    |
 | `std::async` + `std::future`            | `volume_mount_points.cpp`                        | Timeout-aware concurrent `faccessat()` checks                          |
 

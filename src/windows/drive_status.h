@@ -2,10 +2,11 @@
 #pragma once
 #include "../common/debug_log.h"
 #include "security_utils.h"
-#include "thread_pool.h"
 #include "windows_arch.h"
 #include <chrono>
 #include <future>
+#include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -41,7 +42,6 @@ private:
     case ERROR_SUCCESS:
       return DriveStatus::Healthy;
 
-    case ERROR_FILE_NOT_FOUND:
     case ERROR_PATH_NOT_FOUND:
     case ERROR_ACCESS_DENIED:
     case ERROR_LOGON_FAILURE:
@@ -93,6 +93,11 @@ private:
       DWORD error = GetLastError();
       DEBUG_LOG("[DriveStatusChecker] FindFirstFileEx failed for %s: %lu",
                 path.c_str(), error);
+      // A wildcard search on an empty root has no matching child and returns
+      // ERROR_FILE_NOT_FOUND. The root itself is still accessible.
+      if (error == ERROR_FILE_NOT_FOUND) {
+        return DriveStatus::Healthy;
+      }
       return MapErrorToDriveStatus(error);
     }
 
@@ -102,37 +107,89 @@ private:
     return DriveStatus::Healthy;
   }
 
+  struct DriveCheckTask {
+    std::string path;
+    std::shared_ptr<std::promise<DriveStatus>> promise;
+    HMODULE module; // addon DLL reference released when the callback returns
+  };
+
+  static void CALLBACK DriveCheckCallback(PTP_CALLBACK_INSTANCE instance,
+                                          PVOID context) noexcept {
+    std::unique_ptr<DriveCheckTask> task(
+        static_cast<DriveCheckTask *>(context));
+
+    // Release, when this callback returns, the addon DLL reference taken in
+    // CheckDriveAsync. A Node Worker that is the addon's last loader unloads
+    // this DLL (uv_dlclose) on teardown; without the held reference a probe
+    // still blocked in the pool would return into unmapped code and crash.
+    // https://learn.microsoft.com/en-us/windows/win32/api/threadpoolapiset/nf-threadpoolapiset-freelibrarywhencallbackreturns
+    FreeLibraryWhenCallbackReturns(instance, task->module);
+
+    // These probes may block indefinitely in a filesystem/network provider.
+    // Marking the callback as long-running lets the Windows pool provide
+    // replacement capacity instead of pinning a fixed set of workers.
+    if (!CallbackMayRunLong(instance)) {
+      DEBUG_LOG("[DriveStatusChecker] Windows could not immediately provide "
+                "replacement capacity for %s",
+                task->path.c_str());
+    }
+
+    try {
+      task->promise->set_value(CheckDriveInternal(task->path));
+    } catch (const std::exception &e) {
+      DEBUG_LOG("[DriveStatusChecker] Exception in CheckDriveInternal: %s",
+                e.what());
+      try {
+        task->promise->set_exception(std::current_exception());
+      } catch (...) {
+        // The promise may already have been satisfied.
+      }
+    } catch (...) {
+      DEBUG_LOG("[DriveStatusChecker] Unknown exception in "
+                "CheckDriveInternal");
+      try {
+        task->promise->set_exception(std::current_exception());
+      } catch (...) {
+        // The promise may already have been satisfied.
+      }
+    }
+  }
+
 public:
-  // Submit a drive check to the thread pool and return a future.
-  // The caller is responsible for enforcing timeout via future.wait_for().
-  // This design avoids detached threads and race conditions.
+  // Submit a drive check to the adaptive Windows callback pool and return a
+  // future. The caller is responsible for enforcing timeout via wait_for().
+  // A timed-out callback may remain blocked, but it no longer consumes one of
+  // a fixed number of application-owned workers.
   static std::future<DriveStatus> CheckDriveAsync(const std::string &path) {
     auto promise = std::make_shared<std::promise<DriveStatus>>();
     auto future = promise->get_future();
 
-    GetGlobalThreadPool().Submit([path, promise]() {
-      try {
-        DriveStatus status = CheckDriveInternal(path);
-        promise->set_value(status);
-      } catch (const std::exception &e) {
-        DEBUG_LOG("[DriveStatusChecker] Exception in CheckDriveInternal: %s",
-                  e.what());
-        // Set exception instead of value so caller can handle it
-        try {
-          promise->set_exception(std::current_exception());
-        } catch (...) {
-          // Promise may have been abandoned if caller timed out
-        }
-      } catch (...) {
-        DEBUG_LOG(
-            "[DriveStatusChecker] Unknown exception in CheckDriveInternal");
-        try {
-          promise->set_exception(std::current_exception());
-        } catch (...) {
-          // Promise may have been abandoned if caller timed out
-        }
-      }
-    });
+    // Pin this addon DLL for the callback's lifetime. GetModuleHandleEx with
+    // FROM_ADDRESS takes a reference (refcount++) that the callback releases via
+    // FreeLibraryWhenCallbackReturns, so a Node Worker teardown cannot unmap
+    // code the process thread pool is still running. Fail closed if the
+    // reference cannot be taken rather than risk a use-after-unload.
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                            reinterpret_cast<LPCWSTR>(&DriveCheckCallback),
+                            &module)) {
+      const DWORD error = GetLastError();
+      promise->set_exception(std::make_exception_ptr(std::runtime_error(
+          "GetModuleHandleEx failed with error " + std::to_string(error))));
+      return future;
+    }
+
+    auto task =
+        std::make_unique<DriveCheckTask>(DriveCheckTask{path, promise, module});
+    if (!TrySubmitThreadpoolCallback(DriveCheckCallback, task.get(), nullptr)) {
+      const DWORD error = GetLastError();
+      FreeLibrary(module); // no callback will run to release the reference
+      promise->set_exception(std::make_exception_ptr(
+          std::runtime_error("TrySubmitThreadpoolCallback failed with error " +
+                             std::to_string(error))));
+      return future;
+    }
+    task.release(); // callback owns and deletes the task
 
     return future;
   }

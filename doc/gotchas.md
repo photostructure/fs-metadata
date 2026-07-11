@@ -296,21 +296,13 @@ await setHidden("/path/../file", true); // Error!
 
 ## Memory and Resource Management
 
-### Handle Leaks on Windows
+### Blocking drive probes on Windows
 
-Each volume check uses a separate thread on Windows. With many volumes:
-
-```typescript
-// This creates one thread per volume
-const volumes = await getVolumeMountPoints();
-
-// For systems with many volumes, use smaller batches
-const BATCH_SIZE = 10;
-for (let i = 0; i < mountPoints.length; i += BATCH_SIZE) {
-  const batch = mountPoints.slice(i, i + BATCH_SIZE);
-  await Promise.all(batch.map((mp) => getVolumeMetadata(mp.mountPoint)));
-}
-```
+Drive accessibility checks run on the Windows callback pool and are marked as
+long-running so the pool can provide replacement capacity when a network
+provider blocks. A timed-out OS request may still remain in that pool because
+Windows cancellation is driver-dependent; avoid repeatedly probing the same
+known-dead share.
 
 ## Testing Gotchas
 
