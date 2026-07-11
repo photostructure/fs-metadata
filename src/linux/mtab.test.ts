@@ -323,6 +323,13 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
       ]);
     });
 
+    it("keeps digits after a fixed-width escaped space", () => {
+      const [entry] = parseMtab(
+        "/dev/sda1 /mnt/Backup\\0402026 ext4 rw,relatime 0 1",
+      );
+      expect(entry?.fs_file).toBe("/mnt/Backup 2026");
+    });
+
     it("should parse entries with escape sequences", () => {
       const mtabContent = `
 /dev/sda1 /weird\\011mount\\012point ext4 rw,relatime,data=ordered 0 1
@@ -552,6 +559,21 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
   });
 
   describe("formatMtab()", () => {
+    it("round-trips a path containing a fixed-width escape", () => {
+      const entry = {
+        fs_spec: "/dev/sda1",
+        fs_file: "/mnt/Backup 2026",
+        fs_vfstype: "ext4",
+        fs_mntops: "rw,relatime",
+        fs_freq: 0,
+        fs_passno: 1,
+      };
+
+      const formatted = formatMtab([entry]);
+      expect(formatted).toContain("/mnt/Backup\\0402026");
+      expect(parseMtab(formatted)).toEqual([entry]);
+    });
+
     it("should format mount entries back into mtab file content", () => {
       const entries = [
         {

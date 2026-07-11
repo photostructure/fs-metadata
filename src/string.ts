@@ -26,43 +26,34 @@ export function toNotBlank(input: unknown): string | undefined {
   return isNotBlank(input) ? input : undefined;
 }
 
-/**
- * Decodes a string containing octal (\000-\377) and/or hexadecimal
- * (\x00-\xFF) escape sequences
- * @param input The string containing escape sequences to decode
- * @returns The decoded string with escape sequences converted to their
- * corresponding characters
- * @throws Error if an invalid escape sequence is encountered
- */
-export function decodeEscapeSequences(input: string): string {
-  const escapeRegex = /\\(?:([0-7]{2,6})|x([0-9a-fA-F]{2,4}))/g;
+/** Decode the exactly three-digit octal escapes used by fstab/mtab. */
+export function decodeMountTableEscapes(input: string): string {
+  return input.replace(/\\([0-3][0-7]{2})/g, (_match, octal: string) =>
+    String.fromCharCode(parseInt(octal, 8)),
+  );
+}
 
-  return input.replace(escapeRegex, (match, octal, hex) => {
-    // Handle octal escape sequences
-    if (octal != null) {
-      return String.fromCharCode(parseInt(octal, 8));
-    }
-
-    // Handle hexadecimal escape sequences
-    if (hex != null) {
-      return String.fromCharCode(parseInt(hex, 16));
-    }
-
-    // This should never happen due to the regex pattern
-    throw new Error(`Invalid escape sequence: ${match}`);
-  });
+/** Decode the exactly two-digit hexadecimal escapes used by udev symlinks. */
+export function decodeUdevEscapes(input: string): string {
+  return input.replace(/\\x([0-9a-fA-F]{2})/g, (_match, hex: string) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  );
 }
 
 const AlphaNumericRE = /[/\w.-]/;
 
+/**
+ * Encode Latin-1 code units other than `/`, word characters, `.`, and `-` as
+ * three-digit octal escapes; preserve higher Unicode code units unchanged.
+ */
 export function encodeEscapeSequences(input: string): string {
   return input
     .split("")
     .map((char) => {
-      const encodedChar = AlphaNumericRE.test(char)
+      const code = char.charCodeAt(0);
+      return AlphaNumericRE.test(char) || code > 0xff
         ? char
-        : "\\" + char.charCodeAt(0).toString(8).padStart(2, "0");
-      return encodedChar;
+        : "\\" + code.toString(8).padStart(3, "0");
     })
     .join("");
 }

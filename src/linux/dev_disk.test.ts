@@ -44,7 +44,7 @@ describePlatform("linux")("dev_disk", () => {
     await mkdir(byLabelDir, { recursive: true });
 
     // Create some device files
-    for (const device of ["sda1", "sda2"]) {
+    for (const device of ["sda1", "sda2", "sda3"]) {
       const devicePath = join(devDir, device);
       await writeFile(devicePath, "# " + devicePath);
     }
@@ -54,6 +54,7 @@ describePlatform("linux")("dev_disk", () => {
     await symlink("../../sda2", join(byUuidDir, "789-ABC"));
     await symlink("../../sda1", join(byLabelDir, "ROOT"));
     await symlink("../../sda2", join(byLabelDir, "1tb\\x20\\x28test\\x29"));
+    await symlink("../../sda3", join(byLabelDir, "Backup\\x202026"));
     // Create a broken symlink
     await symlink("../../sdX1", join(byUuidDir, "BAD-LINK"));
   });
@@ -76,6 +77,11 @@ describePlatform("linux")("dev_disk", () => {
   it("should find label for existing device", async () => {
     const result = await getBasenameLinkedTo(byLabelDir, join(devDir, "sda2"));
     expect(result).toBe("1tb (test)");
+  });
+
+  it("keeps digits after a fixed-width udev escape", async () => {
+    const result = await getBasenameLinkedTo(byLabelDir, join(devDir, "sda3"));
+    expect(result).toBe("Backup 2026");
   });
 
   it("should return undefined for non-existent device", async () => {

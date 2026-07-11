@@ -4,7 +4,7 @@ import { Dirent } from "node:fs";
 import { readdir, readlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { debug } from "../debuglog";
-import { decodeEscapeSequences } from "../string";
+import { decodeUdevEscapes } from "../string";
 
 /**
  * Gets the UUID from symlinks for a given device path asynchronously
@@ -52,7 +52,7 @@ export async function getBasenameLinkedTo(
   for await (const ea of readLinks(linkDir)) {
     if (ea.linkTarget === linkPath) {
       // Expect the symlink to be named like '1tb\x20\x28test\x29'
-      return decodeEscapeSequences(ea.dirent.name);
+      return decodeUdevEscapes(ea.dirent.name);
     }
   }
   return;

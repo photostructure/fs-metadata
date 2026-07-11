@@ -1,7 +1,8 @@
 // src/string.test.ts
 
 import {
-  decodeEscapeSequences,
+  decodeMountTableEscapes,
+  decodeUdevEscapes,
   encodeEscapeSequences,
   isBlank,
   isNotBlank,
@@ -12,45 +13,54 @@ import {
   toS,
 } from "./string";
 
-describe("decodeOctalEscapes", () => {
+describe("OS escape sequences", () => {
   it("decodes simple space character \\040", () => {
-    expect(decodeEscapeSequences("hello\\040world")).toBe("hello world");
+    expect(decodeMountTableEscapes("hello\\040world")).toBe("hello world");
   });
 
   it("handles multiple octal sequences", () => {
-    expect(decodeEscapeSequences("\\047quote\\047")).toBe("'quote'");
+    expect(decodeMountTableEscapes("\\047quote\\047")).toBe("'quote'");
   });
 
   it("preserves non-octal parts of the string", () => {
-    expect(decodeEscapeSequences("normal text")).toBe("normal text");
+    expect(decodeMountTableEscapes("normal text")).toBe("normal text");
   });
 
-  it("handles two digit octal numbers", () => {
-    expect(decodeEscapeSequences("\\42")).toBe('"');
+  it("preserves incomplete two digit octal numbers", () => {
+    expect(decodeMountTableEscapes("\\42")).toBe("\\42");
   });
 
   it("handles three digit octal numbers", () => {
-    expect(decodeEscapeSequences("\\101\\102\\103")).toBe("ABC");
+    expect(decodeMountTableEscapes("\\101\\102\\103")).toBe("ABC");
   });
 
   it("handles sequences at start and end of string", () => {
-    expect(decodeEscapeSequences("\\040start")).toBe(" start");
-    expect(decodeEscapeSequences("end\\040")).toBe("end ");
+    expect(decodeMountTableEscapes("\\040start")).toBe(" start");
+    expect(decodeMountTableEscapes("end\\040")).toBe("end ");
   });
 
   it("handles consecutive octal sequences", () => {
-    expect(decodeEscapeSequences("\\047\\047")).toBe("''");
+    expect(decodeMountTableEscapes("\\047\\047")).toBe("''");
   });
 
   function assertRoundTrip(input: string) {
     const enc = encodeEscapeSequences(input);
-    const dec = decodeEscapeSequences(enc);
+    const dec = decodeMountTableEscapes(enc);
     expect(dec).toEqual(input);
   }
 
   it("handles the full range of valid octal values", () => {
-    expect(decodeEscapeSequences("\\40")).toBe(" "); // space character
-    expect(decodeEscapeSequences("\\377")).toBe("\xFF"); // highest valid octal
+    expect(decodeMountTableEscapes("\\040")).toBe(" "); // space character
+    expect(decodeMountTableEscapes("\\377")).toBe("\xFF"); // highest valid octal
+  });
+
+  it("does not consume digits following fixed-width OS escapes", () => {
+    expect(decodeMountTableEscapes("Backup\\0402026")).toBe("Backup 2026");
+    expect(decodeUdevEscapes("Backup\\x202026")).toBe("Backup 2026");
+  });
+
+  it("encodes octal escapes at the mount-table width", () => {
+    expect(encodeEscapeSequences("Backup 2026")).toBe("Backup\\0402026");
   });
 
   it("handles hindi characters", () => {
@@ -66,22 +76,22 @@ describe("decodeOctalEscapes", () => {
   });
 
   it("handles empty string", () => {
-    expect(decodeEscapeSequences("")).toBe("");
+    expect(decodeMountTableEscapes("")).toBe("");
   });
 
   it("handles string with only octal sequences", () => {
-    expect(decodeEscapeSequences("\\040\\040\\040")).toBe("   ");
+    expect(decodeMountTableEscapes("\\040\\040\\040")).toBe("   ");
   });
 
   describe("edge cases", () => {
     it("ignores incomplete octal sequences", () => {
-      expect(decodeEscapeSequences("\\")).toBe("\\");
-      expect(decodeEscapeSequences("test\\")).toBe("test\\");
+      expect(decodeMountTableEscapes("\\")).toBe("\\");
+      expect(decodeMountTableEscapes("test\\")).toBe("test\\");
     });
 
     it("preserves backslashes not part of octal sequence", () => {
-      expect(decodeEscapeSequences("\\\\040")).toBe("\\ ");
-      expect(decodeEscapeSequences("back\\\\slash")).toBe("back\\\\slash");
+      expect(decodeMountTableEscapes("\\\\040")).toBe("\\ ");
+      expect(decodeMountTableEscapes("back\\\\slash")).toBe("back\\\\slash");
     });
   });
   describe("isString", () => {

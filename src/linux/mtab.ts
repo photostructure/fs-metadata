@@ -5,7 +5,7 @@ import { NetworkFsTypesDefault } from "../options";
 import { normalizePosixPath } from "../path";
 import { extractRemoteInfo, isRemoteFsType } from "../remote_info";
 import {
-  decodeEscapeSequences,
+  decodeMountTableEscapes,
   encodeEscapeSequences,
   isBlank,
   toNotBlank,
@@ -150,7 +150,7 @@ export function parseMtab(content: string): MountEntry[] {
     const fields = line
       .trim()
       .match(/(?:[^\s\\]|\\.)+/g)
-      ?.map(decodeEscapeSequences);
+      ?.map(decodeMountTableEscapes);
 
     if (!fields || fields.length < 3) {
       continue; // Skip malformed lines
