@@ -15,6 +15,7 @@ export async function getMountPointForPathImpl(
   pathname: string,
   opts: Options,
   nativeFn: NativeBindingsFn,
+  resolvePath: typeof realpath = realpath,
 ): Promise<string> {
   if (isBlank(pathname)) {
     throw new TypeError("Invalid pathname: got " + JSON.stringify(pathname));
@@ -25,9 +26,22 @@ export async function getMountPointForPathImpl(
   // which would otherwise be the first place an invalid timeoutMs throws.
   validateTimeoutMs(opts.timeoutMs, "getMountPointForPath()");
 
+  return withTimeout({
+    desc: "getMountPointForPath()",
+    timeoutMs: opts.timeoutMs,
+    promise: _getMountPointForPath(pathname, opts, nativeFn, resolvePath),
+  });
+}
+
+async function _getMountPointForPath(
+  pathname: string,
+  opts: Options,
+  nativeFn: NativeBindingsFn,
+  resolvePath: typeof realpath,
+): Promise<string> {
   // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
   // realpath(), but fstatfs() follows them — handled below on macOS.
-  const resolved = await realpath(pathname);
+  const resolved = await resolvePath(pathname);
 
   const resolvedStat = await statAsync(resolved);
   const dir = resolvedStat.isDirectory() ? resolved : dirname(resolved);
@@ -38,12 +52,9 @@ export async function getMountPointForPathImpl(
     const native = await nativeFn();
     if (native.getMountPoint) {
       debug("[getMountPointForPath] using native getMountPoint for %s", dir);
-      const p = native.getMountPoint(dir);
-      const mountPoint = await withTimeout({
-        desc: "getMountPoint()",
-        timeoutMs: opts.timeoutMs,
-        promise: p,
-      });
+      // No withTimeout() here: getMountPointForPathImpl() already wraps this
+      // whole function in one deadline that also covers realpath()/stat().
+      const mountPoint = await native.getMountPoint(dir);
       if (isNotBlank(mountPoint)) {
         debug("[getMountPointForPath] resolved to %s", mountPoint);
         return mountPoint;

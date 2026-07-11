@@ -98,7 +98,11 @@ export interface Options {
    *   enumeration matched against {@link Options.networkFsTypes}. Note that
    *   Windows drive letters mapped to network shares report the remote
    *   server's filesystem (typically `NTFS`), so mapped drives may still be
-   *   probed; native drive-status timeouts bound that blocking.
+   *   probed. `timeoutMs` bounds each single-volume metadata call (applied per
+   *   volume by `getAllVolumeMetadata()`, not as one global deadline) and
+   *   native drive checks use adaptive Windows callback-pool capacity, but a
+   *   blocked OS request may continue in the background because cancellation is
+   *   provider-dependent.
    * - Path resolution ({@link getVolumeMetadataForPath},
    *   {@link getMountPointForPath}) skips `stat()`ing remote mount points
    *   that are not path ancestors of the target, so a dead network mount

@@ -322,7 +322,9 @@ The Darwin/macOS implementation demonstrates excellent resource management with 
 - WNetGetConnection: Start with 256 chars, handle ERROR_MORE_DATA
 - GetVolumeInformation: Fixed buffers of MAX_PATH+1
 - Key Documentation: Microsoft Learn Win32 API Reference
-- **Review Status**: ⚠️ Buffer handling needs fixes, thread safety critical issue
+- **Review Status**: ✅ Buffer handling and fixed-pool starvation addressed;
+  blocking provider calls remain non-cancellable and are bounded at the public
+  promise boundary
 
 ### Linux
 

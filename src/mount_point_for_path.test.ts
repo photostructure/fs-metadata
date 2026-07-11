@@ -48,6 +48,18 @@ describe("getMountPointForPath()", () => {
     expect(mountPoint).toBe(metadata.mountPoint);
   });
 
+  it("starts the timeout before resolving the input path", async () => {
+    await expect(
+      getMountPointForPath(thisDir, { timeoutMs: 1 }),
+    ).rejects.toThrow(/timeout/i);
+  });
+
+  it("bounds the complete metadata-for-path operation", async () => {
+    await expect(
+      getVolumeMetadataForPath(thisDir, { timeoutMs: 1 }),
+    ).rejects.toThrow(/timeout/i);
+  });
+
   it("throws TypeError for null pathname", async () => {
     await expect(
       getMountPointForPath(null as unknown as string),

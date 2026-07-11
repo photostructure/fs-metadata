@@ -11,11 +11,13 @@ import {
   VolumeHealthStatuses,
 } from "./index";
 import { omit } from "./object";
-import { IncludeSystemVolumesDefault } from "./options";
+import { IncludeSystemVolumesDefault, optionsWithDefaults } from "./options";
 import { isLinux, isMacOS, isWindows } from "./platform";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "./random";
 import { assertMetadata } from "./test-utils/assert";
 import { systemDrive } from "./test-utils/platform";
+import type { NativeBindingsFn } from "./types/native_bindings";
+import { getVolumeMetadataImpl } from "./volume_metadata";
 
 const rootPath = systemDrive();
 
@@ -204,21 +206,46 @@ describe("getAllVolumeMetadata()", () => {
   });
 });
 
-if (!isWindows) {
-  describe("Timeout Handling", () => {
+describe("Timeout Handling", () => {
+  if (!isWindows) {
     it("should handle getVolumeMountPoints() timeout", async () => {
       await expect(getVolumeMountPoints({ timeoutMs: 1 })).rejects.toThrow(
         /timeout/i,
       );
     });
+  }
 
-    it("should handle getVolumeMetadata() timeout", async () => {
-      await expect(
-        getVolumeMetadata(rootPath, { timeoutMs: 1 }),
-      ).rejects.toThrow(/timeout/i);
-    });
+  it("should bound the complete getVolumeMetadata() operation", async () => {
+    await expect(getVolumeMetadata(rootPath, { timeoutMs: 1 })).rejects.toThrow(
+      /timeout/i,
+    );
   });
-}
+
+  it("bounds a hung native metadata call with the outer deadline", async () => {
+    // The injected native metadata call never resolves, so ONLY the outer
+    // withTimeout in getVolumeMetadataImpl can end this. We assert nativeReached
+    // so the test cannot silently pass via the earlier directoryStatus()/
+    // canReaddir() timeout (which fires under the old Windows bypass too) —
+    // it must actually reach the native call. A generous, real (non-1)
+    // timeoutMs avoids withTimeout's test-mode immediate-throw and keeps
+    // readdir(rootPath) well within the deadline, so the native call is what
+    // the outer deadline bounds.
+    let nativeReached = false;
+    const hangingNativeFn = (() => ({
+      getVolumeMetadata: () => {
+        nativeReached = true;
+        return new Promise<never>(() => {});
+      },
+    })) as unknown as NativeBindingsFn;
+    await expect(
+      getVolumeMetadataImpl(
+        { ...optionsWithDefaults({ timeoutMs: 150 }), mountPoint: rootPath },
+        hangingNativeFn,
+      ),
+    ).rejects.toThrow(/timeout/i);
+    expect(nativeReached).toBe(true);
+  });
+});
 
 describe("Error Handling", () => {
   it("should handle invalid paths appropriately", async () => {

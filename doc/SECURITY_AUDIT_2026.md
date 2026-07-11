@@ -313,7 +313,7 @@ No unsafe C functions found:
 
 ## Testing Summary
 
-- **Test Suite**: 503 tests passed, 55 platform-specific skipped (558 total)
+- **Test Suite**: 543 tests passed, 76 platform-specific skipped (619 total)
 - **macOS Concurrent Tests**: 100 rapid DA requests (`darwin-disk-arbitration-threading.test.ts`)
 - **Cross-API Concurrent Tests**: Interleaved `getVolumeMountPoints()` + `getVolumeMetadata()` calls
 - **System Volume Detection**: Validated on macOS (`/` = MNT_SNAPSHOT, `/System/Volumes/VM` = APFS role)

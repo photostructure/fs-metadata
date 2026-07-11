@@ -42,16 +42,14 @@ export async function getVolumeMetadataImpl(
   }
 
   // Validate before starting any work (including native calls) — also on
-  // Windows, which relies on native timeouts and bypasses withTimeout().
+  // Windows, where the native health probe also receives this timeout.
   validateTimeoutMs(o.timeoutMs, "getVolumeMetadata()");
   const p = _getVolumeMetadata(o, nativeFn);
-  return isWindows
-    ? p
-    : withTimeout({
-        desc: "getVolumeMetadata()",
-        timeoutMs: o.timeoutMs,
-        promise: p,
-      });
+  return withTimeout({
+    desc: "getVolumeMetadata()",
+    timeoutMs: o.timeoutMs,
+    promise: p,
+  });
 }
 
 async function _getVolumeMetadata(
@@ -204,6 +202,7 @@ export async function getVolumeMetadataForPathImpl(
   pathname: string,
   opts: Options,
   nativeFn: NativeBindingsFn,
+  resolvePath: typeof realpath = realpath,
 ): Promise<VolumeMetadata> {
   if (isBlank(pathname)) {
     throw new TypeError("Invalid pathname: got " + JSON.stringify(pathname));
@@ -214,9 +213,27 @@ export async function getVolumeMetadataForPathImpl(
   // ever reaching a timeoutMs check.
   validateTimeoutMs(opts.timeoutMs, "getVolumeMetadataForPath()");
 
+  // This deadline wraps the WHOLE operation, including realpath()/stat() and the
+  // nested getVolumeMetadataImpl() call inside _getVolumeMetadataForPath().
+  // getVolumeMetadataImpl() has its own withTimeout(), but that inner one only
+  // starts after path resolution, so this outer wrapper is what bounds a hung
+  // realpath(). The two are intentional — don't drop this as "redundant".
+  return withTimeout({
+    desc: "getVolumeMetadataForPath()",
+    timeoutMs: opts.timeoutMs,
+    promise: _getVolumeMetadataForPath(pathname, opts, nativeFn, resolvePath),
+  });
+}
+
+async function _getVolumeMetadataForPath(
+  pathname: string,
+  opts: Options,
+  nativeFn: NativeBindingsFn,
+  resolvePath: typeof realpath,
+): Promise<VolumeMetadata> {
   // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
   // realpath(), but fstatfs() follows them — handled below.
-  const resolved = await realpath(pathname);
+  const resolved = await resolvePath(pathname);
 
   // getVolumeMetadataImpl requires a directory path, not a file.
   const resolvedStat = await statAsync(resolved);

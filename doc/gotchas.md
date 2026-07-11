@@ -51,6 +51,16 @@ const metadata = await getVolumeMetadata("\\\\nas\\share", {
 - Linux: NFS mounts without `soft` option will retry forever
 - macOS: AFP/SMB shares may hang during network interruptions
 
+`timeoutMs` bounds the caller-visible promise of each single-volume operation —
+`getVolumeMetadata()`, `getVolumeMetadataForPath()`, and `getMountPointForPath()`
+— including initial `realpath()`/`stat()` calls and later native metadata
+queries. It is **not** a single global deadline for `getAllVolumeMetadata()`,
+which applies `timeoutMs` to enumeration and to each per-volume call separately,
+so its total runtime can approach `volumeCount × timeoutMs` at low concurrency.
+The operating-system request may still remain blocked in a background worker
+because Node's filesystem promises and several platform APIs do not provide
+portable cancellation.
+
 ### Optical Drives
 
 Optical drives (CD/DVD) can take 30+ seconds to spin up:

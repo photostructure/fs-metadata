@@ -97,6 +97,10 @@ export function getVolumeMountPoints(
 /**
  * Get metadata for the volume at the given mount point.
  *
+ * `timeoutMs` bounds the complete caller-visible operation on every platform.
+ * It does not guarantee cancellation of a filesystem request already blocked
+ * inside the operating system.
+ *
  * @param mountPoint Must be a non-blank string
  * @param opts Optional filesystem operation settings, including
  * {@link Options.skipNetworkVolumes} to avoid blocking on unreachable
