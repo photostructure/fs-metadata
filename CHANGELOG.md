@@ -14,6 +14,56 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 2.2.0 - 2026-07-11
+
+### Changed
+
+- **`getVolumeMetadata()` now enforces `timeoutMs` on every platform.**
+  Previously Windows bypassed the JavaScript timeout and relied on the native
+  probe, so a slow call resolved with `status: "timeout"`; it now **rejects**
+  with a timeout error, matching Linux and macOS. `timeoutMs` bounds each
+  single-volume operation (`getVolumeMetadata()`, `getVolumeMetadataForPath()`,
+  `getMountPointForPath()`); `getAllVolumeMetadata()` applies it per volume, not
+  as one global deadline.
+
+- **`setHidden()` rejects unsupported hide methods.** A misspelled or otherwise
+  unsupported hide method previously succeeded as a silent no-op; JavaScript
+  callers now receive an error.
+
+### Fixed
+
+- **Timeouts now cover path resolution.** `getMountPointForPath()` and
+  `getVolumeMetadataForPath()` armed their timeout only around the native call,
+  so a hung `realpath()`/`stat()` on a dead mount could block past the deadline.
+  The timeout now wraps the complete operation, including the initial
+  `realpath()`/`stat()`. (A blocked OS request may still continue in a background
+  worker — Node's filesystem promises and several platform APIs provide no
+  portable cancellation.)
+
+- **Windows drive checks stay responsive after timeouts.** Empty but accessible
+  volumes are now reported healthy rather than inaccessible (a wildcard
+  enumeration that finds no children returns `ERROR_FILE_NOT_FOUND`, which means
+  the root is reachable). Potentially blocking probes run on the adaptive Windows
+  callback pool marked with `CallbackMayRunLong()`, so timed-out network checks
+  can no longer exhaust a fixed worker pool, and the addon module is pinned
+  across each probe so a Worker teardown that unloads the addon cannot crash a
+  still-running check.
+
+- **Device labels and mount paths with trailing digits decode correctly.** The
+  fixed-width mtab (three-digit octal) and udev symlink (two-digit hex) escape
+  decoders no longer greedily consume the digits following an escape — for
+  example `Backup\x202026` now decodes to `Backup 2026` instead of a stray
+  U+2020 followed by `26`.
+
+- **System-volume detection is case-exact on POSIX.** System-volume path
+  patterns compare mount-point spelling exactly on Linux and macOS, while Windows
+  keeps case-insensitive matching.
+
+- **Non-existent dot-prefixed paths are no longer reported hidden.** `isHidden()`
+  and `getHiddenMetadata()` reported a missing `.foo` as hidden from its name
+  alone; they now confirm the path exists first (Windows still reaches native
+  validation for malformed paths).
+
 ## 2.1.0 - 2026-07-04
 
 ### Added
