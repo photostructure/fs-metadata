@@ -42,6 +42,8 @@
     "test:cjs": "cross-env TEST_ESM=0 jest",
     "test:esm": "cross-env TEST_ESM=1 node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js",
     "check:memory": "tsx scripts/check-memory.ts",
+    "// check:tsan": "ThreadSanitizer (Linux, clang). Exclusive with ASan, so it needs its own binary and its own run.",
+    "check:tsan": "bash scripts/tsan-test.sh",
     "lint": "run-s lint:*",
     "lint:native": "tsx scripts/clang-tidy.ts",
     "lint:tsc": "tsc --noEmit",

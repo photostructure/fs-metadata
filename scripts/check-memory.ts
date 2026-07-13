@@ -137,6 +137,32 @@ if (platform === "linux") {
     }
     exitCode = 1;
   }
+
+  // CI has a dedicated TSan job so the Node-version memory matrix does not run
+  // the same expensive sanitizer three times. Keep it in the local all-in-one
+  // command for developer convenience.
+  if (process.env.CI?.toLowerCase() !== "true") {
+    console.log(color(colors.YELLOW, "\nRunning ThreadSanitizer tests..."));
+    try {
+      const tsanScript = path.join(__dirname, "tsan-test.sh");
+      if (!existsSync(tsanScript) || !tsanScript.startsWith(__dirname)) {
+        throw new Error(`Invalid script path: ${tsanScript}`);
+      }
+
+      execFileSync("bash", [tsanScript], { stdio: "inherit", shell: false });
+      console.log(color(colors.GREEN, "✓ ThreadSanitizer tests passed"));
+    } catch (error) {
+      console.log(color(colors.RED, "✗ ThreadSanitizer tests failed"));
+      if (error instanceof Error) {
+        console.log(color(colors.RED, `  Error: ${error.message}`));
+      }
+      exitCode = 1;
+    }
+  } else {
+    console.log(
+      color(colors.YELLOW, "\nThreadSanitizer runs in its dedicated CI job."),
+    );
+  }
 } else if (platform === "darwin") {
   // Run macOS AddressSanitizer, UndefinedBehaviorSanitizer, and leaks.
   console.log(

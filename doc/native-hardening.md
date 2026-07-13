@@ -122,9 +122,28 @@ The sanitizer scripts set it for you.
 | ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ASan + **UBSan** | `npm run check:memory` (Linux/macOS) | `-fsanitize=address,undefined -fno-sanitize-recover=undefined`. LSan runs where supported; macOS also gates on Apple's `leaks` tool. Without `-fno-sanitize-recover`, UBSan is _recoverable_: it prints `runtime error:` and the process still exits 0. |
 | Valgrind         | part of `check:memory` (Linux)       |                                                                                                                                                                                                                                                         |
+| **TSan**         | `npm run check:tsan` (Linux)         | Separate job — TSan cannot share a binary with ASan.                                                                                                                                                                                                    |
 
 UBSan's `vptr` check is inert here: it needs RTTI, and Node's `common.gypi` builds addons with
 `-fno-rtti`; clang silently omits `vptr` from the `undefined` group in that case.
+
+### ThreadSanitizer specifics
+
+TSan runs a dedicated stress harness (`src/test-utils/tsan-stress.ts`), **not** the Jest suite:
+
+- TSan's `LD_PRELOAD` is inherited by **child processes**. The debuglog tests spawn child
+  `node` processes and assert on their stdout; TSan's startup re-exec and diagnostics corrupt
+  those assertions, failing ~8 tests for reasons unrelated to thread safety.
+- TSan **re-execs the process** (to disable ASLR for its shadow mapping), and that re-exec
+  mangles `argv` for a shebang script. Invoking `./node_modules/.bin/jest` under TSan makes
+  Jest see `node` and its own path as positional test patterns, match nothing, and exit
+  "No tests found" — a green-looking run that tested zero code. Always invoke
+  `node ./node_modules/jest/bin/jest.js`-style entry points under TSan.
+
+The Linux harness drives the actually-threaded paths: saturated libuv-threadpool
+`AsyncWorker`s, the debug globals mutated while those workers run, explicit worker termination
+with native work in flight, and several `worker_thread` `napi_env`s sharing
+`BlkidCache::mutex_`. macOS DiskArbitration locking is not covered by this Linux-only TSan job.
 
 ### Suppression discipline (this one is a trap)
 
@@ -133,6 +152,17 @@ or libraries. The LSan file covers exact Node 26/OpenSSL and Jest-context leaves
 native resolver library; broad Node/libuv/pthread stack-frame rules also match ordinary
 first-party addon allocation stacks and can hide real leaks. Suppression counts remain visible
 in the job output.
+
+TSan's `race:` rules match **any frame in the reported stacks**. Every AsyncWorker race unwinds
+through `node::ThreadPoolWork::ScheduleWork` -> `napi` -> `FSMeta::...`, and its thread-creation
+stack contains `uv_thread_create_ex`. So a rule like `race:node::`, `race:uv_`, `race:napi_` or
+`race:Napi::` **silences the addon's own data races** — the exact defects the job exists to find.
+
+This is not hypothetical: an early version of `.tsan-suppressions.txt` contained `race:node::`
+and `race:uv_`, and a deliberately injected unguarded `static int` increment in
+`LinuxMetadataWorker::Execute()` was **not reported**. With the current function-specific rules
+it _is_ reported. If you add a suppression, re-run that check: inject a race, confirm TSan still
+catches it.
 
 ## Static analysis
 

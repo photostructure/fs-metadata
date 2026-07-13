@@ -1,0 +1,50 @@
+# ThreadSanitizer suppressions for @photostructure/fs-metadata
+#
+# DISCIPLINE: suppress only exact external functions that cannot be rebuilt
+# with instrumentation.
+#
+# CRITICAL -- do NOT add `race:node::`, `race:uv_`, `race:uv__`, `race:napi_` or
+# `race:Napi::`. TSan's `race:` rules match against ANY frame in the reported
+# stacks, and every AsyncWorker race unwinds through
+# node::ThreadPoolWork::ScheduleWork -> napi -> FSMeta::...  Such a rule
+# therefore silences the addon's OWN data races -- the exact defects this job
+# exists to find. This was verified empirically: with `race:node::` present, a
+# deliberately injected unguarded `static int` increment in
+# LinuxMetadataWorker::Execute() was NOT reported. With the rules below it IS
+# reported. Keep it that way.
+#
+# Format: <suppression_type>:<function pattern>  (substring match)
+# https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+
+# Stock Node 26's uninstrumented V8 background paths produce allocator races.
+# Keep these pinned to the exact observed class/function: namespace-wide V8
+# rules can mask first-party binding calls whose JavaScript stacks enter V8.
+race:v8::internal::CancelableTaskManager::CancelAndWait
+race:v8::base::RegionAllocator::Split
+race:BaselineBatchCompilerJob
+race:v8::internal::compiler::CompilationDependencies
+race:v8::internal::Scavenger::
+race:v8::internal::ScavengerWeakObjectsProcessor::ProcessJSWeakRefs
+race:v8::internal::ScavengerCollector::CollectGarbage
+race:v8::internal::PooledPage
+race:v8::internal::CompactionSpaceCollection::
+race:v8::platform::tracing::TracingController::GetCategoryGroupEnabled
+race:absl::container_internal::PrepareInsertSmallNonSoo
+race:v8::internal::CodeRangeAddressHint::NotifyFreedCodeRange
+race:v8::internal::MutablePage::ReleaseAllocatedMemoryNeededForWritableChunk
+race:v8::internal::MutablePage::MutablePage
+race:v8::internal::FutexWaitListNode::NotifyWake
+race:v8::internal::GlobalBackingStoreRegistry::Purge
+race:std::_Hashtable<v8::internal::MemoryChunk
+race:v8::internal::NormalPage::ReleaseFreeListCategories
+race:cppgc::internal::HeapRegistry::UnregisterHeap
+
+# libuv, likewise compiled into `node` without instrumentation. This is a
+# specific false positive between two libuv worker threads at startup: io_uring
+# setup (uv__iou_init) reads an fd that uv__slurp/uv__open_cloexec wrote.
+#
+# NOTE the function-level precision. `race:uv_` or `race:uv__` would ALSO match
+# `uv_thread_create_ex`, which appears in the thread-creation stack of every
+# libuv-threadpool race -- including ours -- and would silently mask first-party
+# findings. Keep these rules pinned to exact function names.
+race:uv__iou_init
