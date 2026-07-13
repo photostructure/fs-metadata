@@ -105,7 +105,9 @@ WarningsAsErrors: >
   clang-analyzer-windows.*,
   bugprone-use-after-move
 
-HeaderFilterRegex: '^((?!/usr/include/)(?!C:\\\\Program Files)(?!C:\\\\Users\\\\.*\\\\AppData).)*$'
+# Inherit the root project-only HeaderFilterRegex. The previous override used
+# negative lookaheads, which llvm::Regex does not support, and therefore hid
+# shared headers analyzed under the Windows preprocessor context.
 FormatStyle: none
 SystemHeaders: false
 

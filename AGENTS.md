@@ -115,14 +115,17 @@ Traditional Windows tools **do not work** with Node.js native modules:
 
 Use JavaScript-based memory testing (`src/windows-memory-check.test.ts`) instead.
 
-### Static Analysis (clang-tidy) Limitations
+### Static Analysis (clang-tidy) on Windows
 
-**clang-tidy on Windows** has limited effectiveness due to MSVC header incompatibility:
+**Windows clang-tidy diagnostics are authoritative and are not filtered.** The generated
+compilation database includes the MSVC standard library and Windows SDK using argument arrays,
+so paths containing spaces remain intact and this project's `src/windows/string.h` cannot shadow
+the CRT's `<string.h>`.
 
-- Generates many false errors about missing std namespace members
-- Still provides valuable warnings about your code
-- See `doc/windows-clang-tidy.md` for details
-- Consider using Visual Studio Code Analysis as an alternative
+- Treat diagnostics in first-party code as actionable.
+- Missing MSVC or SDK include directories fail compilation-database generation instead of
+  producing misleading cascades of standard-library errors.
+- See `doc/windows-clang-tidy.md` and `doc/native-hardening.md` before changing the setup.
 
 ### WSL Development
 
@@ -140,7 +143,7 @@ Run `npm run check:memory` for comprehensive platform-specific testing:
 - **All platforms**: JavaScript memory tests with GC triggers
 - **Windows**: Handle count monitoring via `process.report`
 - **Linux**: Valgrind + AddressSanitizer/LeakSanitizer
-- **macOS**: AddressSanitizer (may fail due to SIP - expected)
+- **macOS**: AddressSanitizer + UBSan; runtime-load/SIP interceptor failures fail the check
 
 ## CI/CD Test Reliability
 

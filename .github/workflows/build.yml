@@ -23,7 +23,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest]
+        # macos-14 is here so clang-tidy actually analyzes src/darwin/*. Because
+        # scripts/clang-tidy.ts excludes the non-host platform's sources, a
+        # Linux+Windows-only matrix meant the darwin tree -- the most RAII-dense
+        # code in the project (CoreFoundation/IOKit/DiskArbitration) -- was
+        # linted on no CI leg at all.
+        os: [ubuntu-24.04, windows-latest, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -33,6 +38,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-tidy bear build-essential libblkid-dev uuid-dev
+
+      # macOS: clang-tidy + bear are not preinstalled. Use Homebrew LLVM's
+      # clang-tidy; scripts/clang-tidy.ts points it at the Xcode SDK sysroot.
+      - if: runner.os == 'macOS'
+        run: brew install llvm bear
 
       # Windows clang-tidy installation
       - if: runner.os == 'Windows'

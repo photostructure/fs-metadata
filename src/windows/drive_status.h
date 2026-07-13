@@ -141,16 +141,20 @@ private:
                 e.what());
       try {
         task->promise->set_exception(std::current_exception());
-      } catch (...) {
-        // The promise may already have been satisfied.
+      } catch (...) { // NOLINT(bugprone-empty-catch)
+        // Deliberate: set_exception throws promise_already_satisfied if the
+        // promise was already fulfilled. There is nothing to do, and throwing
+        // out of this worker thread would call std::terminate.
       }
     } catch (...) {
       DEBUG_LOG("[DriveStatusChecker] Unknown exception in "
                 "CheckDriveInternal");
       try {
         task->promise->set_exception(std::current_exception());
-      } catch (...) {
-        // The promise may already have been satisfied.
+      } catch (...) { // NOLINT(bugprone-empty-catch)
+        // Deliberate: set_exception throws promise_already_satisfied if the
+        // promise was already fulfilled. There is nothing to do, and throwing
+        // out of this worker thread would call std::terminate.
       }
     }
   }
@@ -165,9 +169,9 @@ public:
     auto future = promise->get_future();
 
     // Pin this addon DLL for the callback's lifetime. GetModuleHandleEx with
-    // FROM_ADDRESS takes a reference (refcount++) that the callback releases via
-    // FreeLibraryWhenCallbackReturns, so a Node Worker teardown cannot unmap
-    // code the process thread pool is still running. Fail closed if the
+    // FROM_ADDRESS takes a reference (refcount++) that the callback releases
+    // via FreeLibraryWhenCallbackReturns, so a Node Worker teardown cannot
+    // unmap code the process thread pool is still running. Fail closed if the
     // reference cannot be taken rather than risk a use-after-unload.
     HMODULE module = nullptr;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
@@ -189,7 +193,7 @@ public:
                              std::to_string(error))));
       return future;
     }
-    task.release(); // callback owns and deletes the task
+    (void)task.release(); // callback owns and deletes the task
 
     return future;
   }

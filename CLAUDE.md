@@ -128,14 +128,17 @@ Traditional Windows tools **do not work** with Node.js native modules:
 
 Use JavaScript-based memory testing (`src/windows-memory-check.test.ts`) instead.
 
-### Static Analysis (clang-tidy) Limitations
+### Static Analysis (clang-tidy) on Windows
 
-**clang-tidy on Windows** has limited effectiveness due to MSVC header incompatibility:
+**Windows clang-tidy diagnostics are authoritative and are not filtered.** The generated
+compilation database includes the MSVC standard library and Windows SDK using argument arrays,
+so paths containing spaces remain intact and this project's `src/windows/string.h` cannot shadow
+the CRT's `<string.h>`.
 
-- Generates many false errors about missing std namespace members
-- Still provides valuable warnings about your code
-- See `doc/windows-clang-tidy.md` for details
-- Consider using Visual Studio Code Analysis as an alternative
+- Treat diagnostics in first-party code as actionable.
+- Missing MSVC or SDK include directories fail compilation-database generation instead of
+  producing misleading cascades of standard-library errors.
+- See `doc/windows-clang-tidy.md` and `doc/native-hardening.md` before changing the setup.
 
 ### WSL Development
 
@@ -146,14 +149,41 @@ cmd.exe /c "cd C:\\Users\\matth\\src\\fs-metadata && npm test"
 # Or create helper: echo 'cmd.exe /c "cd C:\\Users\\matth\\src\\fs-metadata && $@"' > ~/bin/win-run
 ```
 
-## Memory Leak Detection
+## Native Build Hardening & Analysis
+
+**IMPORTANT: Read `doc/native-hardening.md` before modifying `binding.gyp`, the sanitizer
+scripts, or `.clang-tidy`.** It documents the OpenSSF-based flag matrix, the GCC 10.2 / glibc
+2.31 toolchain floor that gates several flags, and a set of verified traps where the obvious
+change silently breaks the build or silently disables a check.
+
+The highest-value things to know:
+
+- **`-Werror=format-security` hard-errors without `-Wformat`** — the two must stay paired
+  (`-Wformat=2` supplies it).
+- **On macOS, gyp ignores `cflags`/`cflags_cc`** — only `xcode_settings` reaches the compiler.
+  And `OTHER_CPLUSPLUSFLAGS` must keep `"$(inherited)"`, or the C++ TUs lose every
+  `OTHER_CFLAGS` hardening flag.
+- **`_FORTIFY_SOURCE` must be OFF under ASan.** `binding.gyp` keys this off the
+  `FS_METADATA_SANITIZE` env var; the sanitizer scripts set it.
+- **`_FORTIFY_SOURCE=3` silently degrades to level 2** on our Bullseye/GCC 10.2 floor, so `=2`
+  is intentional.
+- **Sanitizer suppressions must never match first-party frames.** TSan `race:` rules match any
+  frame in the stack, so `race:node::` / `race:uv_` / `race:napi_` would silence _our own_ data
+  races. Keep them function-specific, and re-verify by injecting a race.
+
+## Memory Leak & Race Detection
 
 Run `npm run check:memory` for comprehensive platform-specific testing:
 
 - **All platforms**: JavaScript memory tests with GC triggers
 - **Windows**: Handle count monitoring via `process.report`
-- **Linux**: Valgrind + AddressSanitizer/LeakSanitizer
-- **macOS**: AddressSanitizer (may fail due to SIP - expected)
+- **Linux**: Valgrind + AddressSanitizer/LeakSanitizer/**UndefinedBehaviorSanitizer**
+- **macOS**: AddressSanitizer + UBSan; runtime-load/SIP interceptor failures fail the check
+
+Run `npm run check:tsan` for **ThreadSanitizer** (Linux). It is a separate job because TSan
+cannot share a binary with ASan, and it drives `src/test-utils/tsan-stress.ts` rather than the
+Jest suite — TSan's `LD_PRELOAD` is inherited by child processes and breaks the process-spawning
+debuglog tests. See `doc/native-hardening.md`.
 
 ## CI/CD Test Reliability
 

@@ -112,8 +112,11 @@ inline void SafeResolve(const Napi::Promise::Deferred &deferred,
                         napi_value value) {
   try {
     deferred.Resolve(value);
-  } catch (...) {
-    // Env is tearing down; the JS-side promise is unobservable anyway.
+  } catch (...) { // NOLINT(bugprone-empty-catch)
+    // Swallowing is the POINT of this function: env is tearing down, the
+    // JS-side promise is unobservable, and letting the Napi::Error escape an
+    // AsyncWorker callback would cross the C ABI into a libuv cleanup frame
+    // with no catch -> terminate()/SIGABRT. See the file header.
   }
 }
 
@@ -121,8 +124,8 @@ inline void SafeReject(const Napi::Promise::Deferred &deferred,
                        napi_value value) {
   try {
     deferred.Reject(value);
-  } catch (...) {
-    // Env is tearing down; the JS-side promise is unobservable anyway.
+  } catch (...) { // NOLINT(bugprone-empty-catch)
+    // Deliberate: see SafeResolve above.
   }
 }
 
@@ -139,35 +142,43 @@ public:
   }
 
   void OnWorkComplete(Napi::Env env, napi_status status) override {
-    if (status != napi_cancelled && !IsShuttingDown()) {
-      try {
-        Napi::HandleScope scope(env);
-        if (status != napi_ok) {
-          OnError(Napi::Error::New(env));
-        } else if (error_.empty()) {
-          OnOK();
-        } else {
-          OnError(Napi::Error::New(env, error_));
-        }
-      } catch (...) {
-        // Env teardown can make value construction, handle scopes, or deferred
-        // resolution fail. The JS promise is no longer observable then.
-      }
+    if (IsShuttingDown()) {
+      Destroy();
+      return;
     }
-    Destroy();
+
+    try {
+      // node-addon-api treats every non-cancelled status alike. Preserve the
+      // stronger behavior this wrapper historically provided: a failed async
+      // work status must reject even when Execute() did not set an error.
+      if (status != napi_ok && status != napi_cancelled) {
+        Napi::HandleScope scope(env);
+        OnError(Napi::Error::New(env));
+        Destroy();
+        return;
+      }
+
+      // Keep node-addon-api's error storage and completion behavior as the
+      // single source of truth. The qualified call still dispatches the
+      // virtual OnOK/OnError implementations in concrete workers.
+      Napi::AsyncWorker::OnWorkComplete(env, status);
+    } catch (...) { // NOLINT(bugprone-empty-catch)
+      // Deliberate: env teardown can make value construction, handle scopes,
+      // or deferred resolution fail. The JS promise is no longer observable,
+      // and an escaping C++ exception here would abort the process. Destroy()
+      // is needed because node-addon-api could not reach its final cleanup.
+      Destroy();
+    }
   }
 
 protected:
   explicit SafeAsyncWorker(Napi::Env env)
       : Napi::AsyncWorker(env), shutdownState_(GetShutdownState(env)) {}
 
-  void SetError(const std::string &error) { error_ = error; }
-
   bool IsShuttingDown() const { return FSMeta::IsShuttingDown(shutdownState_); }
 
 private:
   std::shared_ptr<ShutdownState> shutdownState_;
-  std::string error_;
 };
 
 } // namespace FSMeta

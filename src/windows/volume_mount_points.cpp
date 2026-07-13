@@ -1,9 +1,9 @@
 // src/windows/volume_mount_points.cpp
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
-#include "../common/error_utils.h"
 #include "../common/shutdown.h"
 #include "drive_status.h"
+#include "error_utils.h"
 #include "fs_meta.h"
 #include "security_utils.h"
 #include "string.h"
@@ -46,15 +46,13 @@ public:
       DEBUG_LOG("[GetVolumeMountPoints] logical drive strings size: %lu", size);
 
       if (!size) {
-        throw FSException(
-            CreateErrorMessage("GetLogicalDriveStrings", GetLastError()));
+        throw FSException("GetLogicalDriveStrings", GetLastError());
       }
 
       DriveStringsBuffer drives(size);
       DEBUG_LOG("[GetVolumeMountPoints] getting logical drive strings");
       if (!GetLogicalDriveStringsW(size, drives.buffer.get())) {
-        throw FSException(
-            CreateErrorMessage("GetLogicalDriveStrings", GetLastError()));
+        throw FSException("GetLogicalDriveStrings", GetLastError());
       }
 
       // First collect all valid drives and their types

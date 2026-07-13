@@ -2,71 +2,42 @@
 
 ## Status
 
-clang-tidy has limited support on Windows due to fundamental incompatibilities between clang and MSVC headers. While we've implemented Windows support in our unified `scripts/clang-tidy.ts`, users should be aware of the limitations.
+Windows clang-tidy is a required, authoritative CI check. Diagnostics are not filtered: warnings
+and errors in first-party code must be investigated rather than dismissed as MSVC-header noise.
 
-## Current Implementation
+## How it works
 
-1. **Unified Script**: `scripts/clang-tidy.ts` works on all platforms including Windows
-2. **Automatic Detection**: Finds Node.js headers, MSVC includes, and Windows SDK paths
-3. **Configuration**: Windows-specific checks in `src/windows/.clang-tidy`
-4. **Fallback**: Minimal configuration (`.clang-tidy-windows-minimal`) for basic checks
+`scripts/clang-tidy.ts` generates a JSON compilation database that:
 
-## Known Issues
+1. Locates the active Node.js, MSVC, and Windows SDK headers.
+2. Uses the `arguments` array form so include paths containing spaces are passed verbatim.
+3. Adds `src`—not `src/windows`—to the angle-bracket include path. This prevents
+   `src/windows/string.h` from shadowing the CRT's `<string.h>`.
+4. Applies the Windows checks in `src/windows/.clang-tidy` while inheriting the root project's
+   first-party header filter.
 
-### Header Compatibility
+If the MSVC or Windows SDK include directory cannot be found, compilation-database generation
+fails. Continuing without those directories would create misleading cascades of missing `std`
+members and hide whether first-party code was actually analyzed.
 
-- clang-tidy cannot fully parse MSVC STL headers, resulting in errors like:
-  - `no member named 'max' in namespace 'std'`
-  - `unknown type name 'namespace'`
-  - `no template named 'pointer_traits'`
+## Running it
 
-### Root Cause
-
-- MSVC headers use Microsoft-specific extensions that clang doesn't fully support
-- Node.js native addon headers add additional complexity
-- Even with clang-cl mode, full compatibility isn't achieved
-
-## Recommendations
-
-### For Windows Developers
-
-1. **Use Visual Studio Code Analysis**: The built-in Code Analysis in Visual Studio provides better Windows-specific checking
-2. **Focus on Warnings**: Despite header errors, clang-tidy still catches many issues:
-   - Uninitialized variables
-   - RAII violations
-   - Member initialization issues
-   - Ownership problems
-
-3. **Run Anyway**: Even with errors, the warnings are valuable:
-   ```bash
-   npm run lint:native
-   ```
-
-### For CI/CD
-
-Consider skipping clang-tidy on Windows in CI to avoid noise:
-
-```bash
-# In CI scripts
-if [ "$OS" != "Windows_NT" ]; then
-  npm run lint:native
-fi
+```powershell
+npm run lint:native
 ```
 
-## Future Improvements
+The script discovers LLVM's `clang-tidy.exe` in standard LLVM and Visual Studio locations, then
+falls back to `clang-tidy` on `PATH`. Install LLVM if no supported executable is found.
 
-- Monitor clang-tidy development for better MSVC support
-- Consider using Visual Studio's built-in clang-tidy integration
-- Investigate using `clangd` as an alternative
+## Troubleshooting
 
-## What Still Works
+- Do not add message-text filtering for standard-library or missing-header diagnostics.
+- Do not skip the Windows lint leg in CI.
+- Verify that the generated `compile_commands.json` uses `arguments`, contains the selected MSVC
+  and Windows SDK include directories, and uses `-I<checkout>\\src` rather than
+  `-I<checkout>\\src\\windows`.
+- If toolchain discovery fails, fix the discovered paths or runner installation instead of
+  allowing analysis to continue with an incomplete compilation database.
 
-Despite the header issues, clang-tidy on Windows can still detect:
-
-- Uninitialized variables
-- Missing RAII usage
-- Resource leaks in your code (not system headers)
-- Code style issues
-- Many security vulnerabilities
-
-The key is to focus on warnings in your own code files, not system header errors.
+See `doc/native-hardening.md` for the cross-platform analyzer rationale, enforced checks, header
+filter design, and the failure modes that motivated this configuration.

@@ -23,11 +23,19 @@ namespace {
 // faccessat() on a dead network mount is reused by later calls instead of
 // spawning another thread, so at most one probe thread exists per distinct
 // hung path — repeated getVolumeMountPoints() polling cannot accumulate
-// stuck threads without bound. Deliberately leaked (never destroyed):
-// detached probe threads may still touch these during process exit.
-std::mutex *const g_probeMutex = new std::mutex();
-auto *const g_inflightProbes =
-    new std::unordered_map<std::string, std::shared_future<bool>>();
+// stuck threads without bound.
+struct ProbeState {
+  std::mutex mutex;
+  std::unordered_map<std::string, std::shared_future<bool>> inflight;
+};
+
+ProbeState *GetProbeState() {
+  // Allocate lazily so allocation failure is caught by Execute(), rather than
+  // throwing during addon load. Deliberately leaked: detached probe threads
+  // may still access this process-lifetime state during static destruction.
+  static ProbeState *const state = new ProbeState();
+  return state;
+}
 
 // Returns a future answering "is path readable?", reusing any in-flight
 // probe for the same path. std::async is deliberately avoided: the
@@ -36,16 +44,17 @@ auto *const g_inflightProbes =
 // reported. A promise + detached-thread pair yields futures whose
 // destructors never block.
 std::shared_future<bool> StartAccessProbe(const std::string &path) {
-  std::lock_guard<std::mutex> lock(*g_probeMutex);
-  auto it = g_inflightProbes->find(path);
-  if (it != g_inflightProbes->end()) {
+  ProbeState *const state = GetProbeState();
+  std::lock_guard<std::mutex> lock(state->mutex);
+  auto it = state->inflight.find(path);
+  if (it != state->inflight.end()) {
     return it->second;
   }
   auto promise = std::make_shared<std::promise<bool>>();
   std::shared_future<bool> future = promise->get_future().share();
-  g_inflightProbes->emplace(path, future);
+  state->inflight.emplace(path, future);
   try {
-    std::thread([promise, path]() {
+    std::thread([promise, path, state]() {
       // faccessat is preferred over access() for security:
       // - AT_FDCWD: Use current working directory as base
       // - AT_EACCESS: Check using effective user/group IDs (not real IDs)
@@ -53,8 +62,8 @@ std::shared_future<bool> StartAccessProbe(const std::string &path) {
       bool accessible =
           faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
       {
-        std::lock_guard<std::mutex> lock(*g_probeMutex);
-        g_inflightProbes->erase(path);
+        std::lock_guard<std::mutex> lock(state->mutex);
+        state->inflight.erase(path);
         // set_value under the same lock as erase: otherwise a concurrent
         // StartAccessProbe() for this path could observe the erased entry
         // before the value is set and spawn a redundant probe.
@@ -65,7 +74,7 @@ std::shared_future<bool> StartAccessProbe(const std::string &path) {
     // Thread construction can throw under resource exhaustion. Remove the
     // just-inserted entry (still under the lock) so later calls retry
     // instead of forever reusing a future that will never be satisfied.
-    g_inflightProbes->erase(path);
+    state->inflight.erase(path);
     throw;
   }
   return future;

@@ -22,6 +22,22 @@ inline void SetDebugPrefix(const std::string &prefix) {
   debugPrefix = prefix;
 }
 
+// Tell GCC/Clang that DebugLog is printf-style. This does two things:
+//   1. Enables format/argument checking at every DEBUG_LOG() call site, so a
+//      mismatched specifier is a compile-time diagnostic instead of UB.
+//   2. Suppresses -Wformat-nonliteral (part of -Wformat=2) inside DebugLog
+//      itself: forwarding a `format` parameter to vsnprintf is only flagged
+//      when the compiler does not know the parameter IS a format string.
+// MSVC has no equivalent attribute; it uses SAL, which we do not need here.
+#if defined(__GNUC__) || defined(__clang__)
+#define FSMETA_PRINTF_FORMAT(fmt_index, args_index)                            \
+  __attribute__((format(printf, fmt_index, args_index)))
+#else
+#define FSMETA_PRINTF_FORMAT(fmt_index, args_index)
+#endif
+
+inline void DebugLog(const char *format, ...) FSMETA_PRINTF_FORMAT(1, 2);
+
 inline void DebugLog(const char *format, ...) {
   if (!enableDebugLogging.load(std::memory_order_relaxed)) {
     return;

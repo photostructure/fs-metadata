@@ -99,8 +99,8 @@ public:
     WCHAR fstype[VOLUME_NAME_SIZE] = {0};
 
     valid = GetVolumeInformationW(
-        mountPoint.c_str(), volumeName, VOLUME_NAME_SIZE, &serialNumber,
-        &maxComponentLen, &fsFlags, fstype, VOLUME_NAME_SIZE);
+                mountPoint.c_str(), volumeName, VOLUME_NAME_SIZE, &serialNumber,
+                &maxComponentLen, &fsFlags, fstype, VOLUME_NAME_SIZE) != FALSE;
 
     if (!valid && GetLastError() != ERROR_NOT_READY) {
       throw FSException("GetVolumeInformation", GetLastError());
@@ -130,7 +130,7 @@ class DiskSpaceInfo {
 public:
   explicit DiskSpaceInfo(const std::wstring &mountPoint) {
     valid = GetDiskFreeSpaceExW(mountPoint.c_str(), &freeBytes, &totalBytes,
-                                &totalFreeBytes);
+                                &totalFreeBytes) != FALSE;
 
     if (!valid && GetLastError() != ERROR_NOT_READY) {
       throw FSException("GetDiskFreeSpaceEx", GetLastError());
@@ -197,7 +197,7 @@ private:
                     mountPoint.c_str(), e.what());
           metadata.uuid = FormatVolumeSerialNumber(volInfo.getSerialNumber());
           DEBUG_LOG("[GetVolumeMetadata] %s Backfilling UUID with "
-                    "lpVolumeSerialNumber %d {uuid: %s}",
+                    "lpVolumeSerialNumber %lu {uuid: %s}",
                     mountPoint.c_str(), volInfo.getSerialNumber(),
                     metadata.uuid.c_str());
         }

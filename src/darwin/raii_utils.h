@@ -4,6 +4,7 @@
 #include <DiskArbitration/DiskArbitration.h>
 #include <IOKit/IOKitLib.h>
 #include <sys/mount.h>
+#include <utility> // for std::move() in the move ctor/assignment below
 
 // RAII (Resource Acquisition Is Initialization) utilities for macOS APIs.
 // These wrappers ensure proper cleanup of system resources even in the

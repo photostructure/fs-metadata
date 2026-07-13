@@ -28,16 +28,6 @@ const colors = {
   dim: "\x1b[2m",
 } as const;
 
-// Platform-specific warnings
-if (isMacOS) {
-  console.log(
-    "Note: clang-tidy on macOS with Homebrew LLVM may report false positives",
-  );
-  console.log(
-    "due to header path issues. Set SKIP_CLANG_TIDY=1 to skip this check.",
-  );
-}
-
 // Check for required tools (non-Windows only)
 function checkCommand(command: string, installHint: string): boolean {
   if (isWindows) return true; // Skip on Windows
@@ -230,37 +220,76 @@ async function generateWindowsCompileCommands(): Promise<boolean> {
       }
     }
 
-    // Create compile commands with absolute paths
+    // Fail loudly rather than emitting a compile database with no C/C++ standard
+    // library on the include path. That produces thousands of bogus cascading
+    // errors in our own headers, which is exactly the condition the old output
+    // filtering was invented to paper over.
+    if (!msvcInclude) {
+      throw new Error(
+        `Could not locate the MSVC include directory. Searched:\n  ${msvcPaths.join("\n  ")}`,
+      );
+    }
+    if (!sdkVersion) {
+      throw new Error(
+        `Could not locate a Windows SDK version under ${sdkBase}`,
+      );
+    }
+
+    // Create compile commands with absolute paths.
+    //
+    // NOTE: this uses the `arguments` ARRAY form of the JSON compilation
+    // database, NOT the `command` string form.
+    //
+    // The string form is shell-quoted, and every MSVC/Windows-SDK include path
+    // contains spaces ("C:\Program Files (x86)\..."). Joining them with " " and
+    // no quoting made clang split each path into garbage arguments:
+    //     error: no such file or directory: 'Files'
+    //     error: no such file or directory: '(x86)\Windows'
+    // so the MSVC and SDK include directories were never actually passed. <cstring>
+    // and friends then failed to resolve, which cascaded into bogus errors like
+    // "use of undeclared identifier 'DEBUG_LOG'" in our own headers. Those bogus
+    // errors are exactly what the old output filtering existed to hide.
+    //
+    // The `arguments` array is passed through verbatim -- no quoting, no splitting.
     const commands = sources.map((source: string) => ({
       directory: process.cwd(),
       file: source,
-      command: [
+      arguments: [
         "clang++", // Use clang++ for clang-tidy compatibility
         "-c",
         source,
-        `-I${process.cwd()}/src/windows`,
-        `-I${process.cwd()}/node_modules/node-addon-api`,
-        `-I${nodeGyp}/include/node`,
+        // `src`, NOT `src/windows` -- this MUST match binding.gyp's
+        // include_dirs. Putting src/windows on the angle-bracket search path is
+        // actively harmful: MSVC's <cstring> does `#include <string.h>`, which
+        // then resolves to our own src/windows/string.h instead of the UCRT's.
+        // The C library then appears to have no memchr/strlen/..., cascading
+        // into bogus "use of undeclared identifier 'DEBUG_LOG'" errors in our
+        // headers. Files inside src/windows include each other with quote-form
+        // includes, which resolve relative to the including file and need no -I.
+        `-I${join(process.cwd(), "src")}`,
+        `-I${join(process.cwd(), "node_modules", "node-addon-api")}`,
+        `-I${join(nodeGyp, "include", "node")}`,
         msvcInclude ? `-I${msvcInclude}` : "",
-        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\ucrt` : "",
-        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\shared` : "",
-        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\um` : "",
-        sdkVersion ? `-I${sdkBase}\\${sdkVersion}\\winrt` : "",
+        sdkVersion ? `-I${join(sdkBase, sdkVersion, "ucrt")}` : "",
+        sdkVersion ? `-I${join(sdkBase, sdkVersion, "shared")}` : "",
+        sdkVersion ? `-I${join(sdkBase, sdkVersion, "um")}` : "",
+        sdkVersion ? `-I${join(sdkBase, sdkVersion, "winrt")}` : "",
         "-DWIN32",
         "-D_WINDOWS",
         "-D_WIN64",
         "-D_M_X64=1",
         "-D_AMD64_=1",
-        "-DNAPI_VERSION=8",
+        // Keep these in step with binding.gyp: NAPI_VERSION=9, and C++20 (which
+        // Node's common.gypi gives the real MSVC build via /std:c++20).
+        "-DNAPI_VERSION=9",
+        "-DNAPI_CPP_EXCEPTIONS",
         "-DNODE_ADDON_API_DISABLE_DEPRECATED",
         "-DBUILDING_NODE_EXTENSION",
-        "-std=c++17",
+        "-std=c++20",
         "-fms-compatibility",
         "-fms-extensions",
         "-Wno-microsoft-include",
-      ]
-        .filter((arg) => arg)
-        .join(" "),
+      ].filter((arg) => arg),
     }));
 
     writeFileSync("compile_commands.json", JSON.stringify(commands, null, 2));
@@ -341,167 +370,35 @@ async function getSourceFiles(): Promise<string[]> {
   }
 }
 
-// Filter out known macOS Homebrew LLVM header issues
-function filterMacOSHeaderErrors(output: string): {
-  filteredOutput: string;
-  errors: number;
-  warnings: number;
-  filtered: number;
-} {
-  const lines = output.split("\n");
-  const filteredLines: string[] = [];
-  let errors = 0;
-  let warnings = 0;
-  let filtered = 0;
-
-  // Patterns for known Homebrew LLVM vs Apple clang header mismatches
-  const knownHeaderErrors = [
-    // Standard library headers not found
-    /'(functional|chrono|cstring|iostream|string|vector|memory|algorithm|map|set|iterator)' file not found/,
-    // Apple framework headers not found when using Homebrew clang-tidy
-    /'CoreFoundation\/CoreFoundation\.h' file not found/,
-    /'DiskArbitration\/DiskArbitration\.h' file not found/,
-    // LLVM-specific errors that don't affect actual compilation
-    /unknown type name '_LIBCPP_/,
-    /no member named '\w+' in namespace 'std'/,
-    /no template named '\w+' in namespace 'std'/,
-  ];
-
-  for (const line of lines) {
-    let isKnownError = false;
-
-    // Check if this is a known header error
-    if (line.includes(" error:")) {
-      for (const pattern of knownHeaderErrors) {
-        if (pattern.test(line)) {
-          isKnownError = true;
-          filtered++;
-          break;
-        }
-      }
-    }
-
-    if (!isKnownError) {
-      filteredLines.push(line);
-
-      // Count errors and warnings
-      if (line.includes(" error:")) {
-        errors++;
-      }
-      if (line.includes(" warning:")) {
-        warnings++;
-      }
-    }
-  }
-
-  return {
-    filteredOutput: filteredLines.join("\n"),
-    errors,
-    warnings,
-    filtered,
-  };
-}
-
-// Filter out known Windows header issues
-function filterWindowsHeaderErrors(output: string): {
-  filteredOutput: string;
+/**
+ * Count errors and warnings in clang-tidy output.
+ *
+ * There is deliberately NO message-text filtering here on any platform.
+ *
+ * The previous implementation dropped diagnostic lines matching patterns like
+ * "no member named 'x' in namespace 'std'" or "'foo' file not found" to hide
+ * toolchain/header mismatches. Those same patterns describe REAL bugs in
+ * first-party code, and the filtering was hiding two of them plus the fact that
+ * the analysis was fundamentally broken on both macOS and Windows (a bad
+ * -isysroot, and a compile database whose MSVC include paths were mangled by
+ * shell-quoting and which shadowed <string.h> with our own src/windows/string.h).
+ *
+ * Both root causes are fixed, so there is nothing legitimate left to filter.
+ * If toolchain noise reappears, fix the toolchain configuration -- do not
+ * reintroduce output filtering, which cannot distinguish it from a real defect.
+ */
+function tallyDiagnostics(output: string): {
+  output: string;
   errors: number;
   warnings: number;
 } {
-  const lines = output.split("\n");
-  const filteredLines: string[] = [];
   let errors = 0;
   let warnings = 0;
-  let skipNextLine = false;
-  let inSystemHeader = false;
-
-  // Patterns for known header issues that we want to filter out
-  const systemHeaderPatterns = [
-    // System header paths - match the entire error line
-    /C:\\Program Files.*:\d+:\d+: (error|warning):/,
-    /C:\\Users\\.*\\AppData.*:\d+:\d+: (error|warning):/,
-    /\.node-gyp.*:\d+:\d+: (error|warning):/,
-    /Windows Kits.*:\d+:\d+: (error|warning):/,
-  ];
-
-  // Known system header error messages that appear in user files
-  const systemHeaderErrors = [
-    // File not found errors - these are the most common MSVC header issues
-    /'(chrono|functional|windows\.h|iostream|string|vector|memory|algorithm|map|set|unordered_map|iterator|utility|tuple|type_traits|cstddef|cstdint|exception|new|limits|stdexcept)' file not found/,
-    /no member named '\w+' in the global namespace/,
-    /no member named '\w+' in namespace 'std'/,
-    /no template named '\w+' in namespace 'std'/,
-    /no template named 'pointer_traits'/,
-    /unknown type name 'stream(pos|off)'/,
-    /no type named 'string' in namespace 'std'/,
-    /use of undeclared identifier '_Elem'/,
-    /use of undeclared identifier 'tuple'/,
-    /cannot initialize return object of type 'int' with an lvalue of type 'const char/,
-    /expected ';' after expression/,
-    /unknown type name 'namespace'/,
-    /expected unqualified-id/,
-    /no type named 'type' in/,
-    /declaration of anonymous struct must be a definition/,
-  ];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (skipNextLine) {
-      skipNextLine = false;
-      continue;
-    }
-
-    // Check if this is a system header location
-    let isSystemHeader = false;
-    for (const pattern of systemHeaderPatterns) {
-      if (pattern.test(line)) {
-        isSystemHeader = true;
-        inSystemHeader = true;
-        break;
-      }
-    }
-
-    // Check if this is a known system header error in a user file
-    if (!isSystemHeader && line.includes(" error:")) {
-      for (const pattern of systemHeaderErrors) {
-        if (pattern.test(line)) {
-          isSystemHeader = true;
-          break;
-        }
-      }
-    }
-
-    // Reset inSystemHeader flag when we see a new file
-    if (line.match(/^[^:]+\.(cpp|h|hpp):\d+:\d+: (error|warning):/)) {
-      inSystemHeader = false;
-      for (const pattern of systemHeaderPatterns) {
-        if (pattern.test(line)) {
-          inSystemHeader = true;
-          break;
-        }
-      }
-    }
-
-    if (!isSystemHeader && !inSystemHeader) {
-      // Only add non-header errors to output
-      filteredLines.push(line);
-
-      // Count errors and warnings
-      if (line.includes(" error:")) {
-        errors++;
-      }
-      if (line.includes(" warning:")) {
-        warnings++;
-      }
-    }
+  for (const line of output.split("\n")) {
+    if (line.includes(" warning:")) warnings++;
+    if (line.includes(" error:")) errors++;
   }
-
-  return {
-    filteredOutput: filteredLines.join("\n"),
-    errors,
-    warnings,
-  };
+  return { output, errors, warnings };
 }
 
 // Run clang-tidy on a single file
@@ -513,7 +410,6 @@ async function runClangTidyOnFile(
   output: string;
   errors: number;
   warnings: number;
-  filtered?: number;
 }> {
   try {
     let extraArgs = "";
@@ -525,86 +421,34 @@ async function runClangTidyOnFile(
       if (existsSync(configPath)) {
         extraArgs = `--config-file=${configPath}`;
       }
-    } else if (isMacOS && clangTidy.includes("/opt/")) {
-      // macOS with Homebrew LLVM needs extra paths
-      // The compile_commands.json uses Apple's /usr/bin/cc, but we're running
-      // Homebrew's clang-tidy which needs Homebrew's C++ stdlib
+    } else if (isMacOS) {
+      // Homebrew's clang-tidy consumes a compile_commands.json produced by
+      // Apple's /usr/bin/cc. All it needs is the macOS SDK sysroot -- it then
+      // finds its OWN resource headers (stddef.h -> size_t/ptrdiff_t) and the
+      // SDK's C headers and frameworks correctly.
+      //
+      // Do NOT reintroduce -nostdinc++ / -isystem <brew>/opt/llvm/include/c++/v1
+      // / -isystem <sdk>/usr/include. That combination is what BREAKS the run:
+      // it shadows clang's builtin include dir, so Apple's own <sys/_types.h>
+      // fails with "unknown type name 'size_t'" and the analysis collapses into
+      // hundreds of bogus errors. Measured on src/darwin/hidden.cpp:
+      //   -isysroot only ............................ 0 errors
+      //   -nostdinc++ + manual -isystem paths ...... 20 errors
+      // Those bogus errors are precisely what the old message-text filtering
+      // existed to hide. Fix the sysroot; don't filter the analyzer's output.
       const sdkPath = execSync("xcrun --show-sdk-path", {
         encoding: "utf8",
       }).trim();
-
-      // Extract Homebrew prefix from clang-tidy path
-      const brewPrefix = clangTidy.includes("/opt/homebrew")
-        ? "/opt/homebrew"
-        : "/usr/local";
-
-      extraArgs =
-        `--extra-arg=-nostdinc++ ` + // Ignore built-in C++ paths
-        `--extra-arg=-isystem${brewPrefix}/opt/llvm/include/c++/v1 ` +
-        `--extra-arg=-isysroot${sdkPath} ` +
-        `--extra-arg=-isystem${sdkPath}/usr/include ` +
-        `--extra-arg=-F${sdkPath}/System/Library/Frameworks`;
+      extraArgs = `--extra-arg=-isysroot${sdkPath}`;
     }
 
     const { stdout, stderr } = await exec(
       `${isWindows ? `"${clangTidy}"` : clangTidy} -p . ${extraArgs} "${file}" 2>&1`,
     );
-    let output = stdout + stderr;
-
-    let errors = 0;
-    let warnings = 0;
-    let filteredCount = 0;
-
-    // Filter platform-specific header errors
-    if (isWindows) {
-      const filtered = filterWindowsHeaderErrors(output);
-      output = filtered.filteredOutput;
-      errors = filtered.errors;
-      warnings = filtered.warnings;
-    } else if (isMacOS && clangTidy.includes("/opt/")) {
-      // Filter Homebrew LLVM errors on macOS
-      const filtered = filterMacOSHeaderErrors(output);
-      output = filtered.filteredOutput;
-      errors = filtered.errors;
-      warnings = filtered.warnings;
-      filteredCount = filtered.filtered;
-    } else {
-      const lines = output.split("\n");
-      for (const line of lines) {
-        if (line.includes(" warning:")) warnings++;
-        if (line.includes(" error:")) errors++;
-      }
-    }
-
-    return { file, output, errors, warnings, filtered: filteredCount };
+    return { file, ...tallyDiagnostics(stdout + stderr) };
   } catch (error: any) {
-    let output = error.stdout || error.stderr || error.message;
-    let errors = 0;
-    let warnings = 0;
-    let filteredCount = 0;
-
-    // Filter platform-specific header errors
-    if (isWindows) {
-      const filtered = filterWindowsHeaderErrors(output);
-      output = filtered.filteredOutput;
-      errors = filtered.errors;
-      warnings = filtered.warnings;
-    } else if (isMacOS && clangTidy.includes("/opt/")) {
-      // Filter Homebrew LLVM errors on macOS
-      const filtered = filterMacOSHeaderErrors(output);
-      output = filtered.filteredOutput;
-      errors = filtered.errors;
-      warnings = filtered.warnings;
-      filteredCount = filtered.filtered;
-    } else {
-      const lines = output.split("\n");
-      for (const line of lines) {
-        if (line.includes(" warning:")) warnings++;
-        if (line.includes(" error:")) errors++;
-      }
-    }
-
-    return { file, output, errors, warnings, filtered: filteredCount };
+    const raw: string = error.stdout || error.stderr || error.message;
+    return { file, ...tallyDiagnostics(raw) };
   }
 }
 
@@ -779,44 +623,12 @@ async function main(): Promise<void> {
 
   if (isWindows) {
     console.log(
-      `\n${colors.dim}Windows: Using src/windows/.clang-tidy with header error filtering${colors.reset}`,
+      `\n${colors.dim}Windows: analyzed ${files.length} files; diagnostics are not filtered${colors.reset}`,
     );
+  } else if (isMacOS) {
     console.log(
-      `${colors.dim}Note: System header errors are automatically filtered out${colors.reset}`,
+      `\n${colors.dim}macOS: analyzed ${files.length} files (src/darwin + src/common) against the Xcode SDK sysroot${colors.reset}`,
     );
-  } else if (isMacOS && clangTidy.includes("/opt/")) {
-    console.log(
-      `\n${colors.dim}macOS: Using Homebrew LLVM clang-tidy with header error filtering${colors.reset}`,
-    );
-    console.log(
-      `${colors.dim}Note: Standard library header errors from toolchain mismatch are filtered out${colors.reset}`,
-    );
-
-    // Show filtering statistics for transparency
-    const totalFilesChecked = files.length;
-    const totalFilteredErrors = results.reduce(
-      (sum, r) => sum + (r.filtered || 0),
-      0,
-    );
-
-    if (totalFilteredErrors > 0) {
-      console.log(
-        `${colors.dim}Filtered ${totalFilteredErrors} known header incompatibility error(s)${colors.reset}`,
-      );
-    }
-
-    // Sanity check: If we analyzed files and found zero issues after filtering, show validation
-    if (totalErrors === 0 && totalWarnings === 0 && totalFilesChecked > 0) {
-      if (totalFilteredErrors > 0) {
-        console.log(
-          `${colors.dim}✓ Verified: ${totalFilesChecked} files analyzed cleanly (${totalFilteredErrors} known issues filtered)${colors.reset}`,
-        );
-      } else {
-        console.log(
-          `${colors.dim}✓ Verified: ${totalFilesChecked} files analyzed with no issues${colors.reset}`,
-        );
-      }
-    }
   }
 
   process.exit(totalErrors > 0 ? 1 : 0);

@@ -14,6 +14,98 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## 2.2.1 - 2026-07-13
+
+No API changes. This release hardens the shipped native binaries and fixes the
+build/analysis tooling that was silently not working.
+
+### Security
+
+- **Hardened native binaries on every platform**, following the [OpenSSF Compiler
+  Options Hardening Guide](https://best.openssf.org/Compiler-Hardening-Guides/Compiler-Options-Hardening-Guide-for-C-and-C++.html).
+  Verified in the shipped artifacts, not just on the command line:
+
+  - **Linux:** full RELRO (`-Wl,-z,relro -Wl,-z,now`), non-executable stack,
+    `-fstack-clash-protection`, `-D_GLIBCXX_ASSERTIONS`, and
+    `-Wall -Wextra -Wformat=2 -Werror=format-security`.
+  - **macOS:** `-fstack-protector-strong`, the same warning set, and libc++
+    hardening (`_LIBCPP_HARDENING_MODE_FAST`). The previous `cflags` in the macOS
+    branch were dead code — gyp ignores them there — so several of these flags had
+    never actually reached the compiler.
+  - **Windows:** `/Qspectre` is now also applied to **ARM64**. It is not
+    x64-only (MSVC has supported it on ARM64 since VS 2017 15.7), so the ARM64
+    build was under-hardened against Spectre v1.
+  - **All POSIX targets:** symbol visibility is now hidden, so first-party
+    implementation symbols are no longer exported. Required Node-API
+    registration and platform/runtime metadata symbols remain visible.
+
+  `_FORTIFY_SOURCE` stays at level 2: level 3 requires GCC 12 + glibc 2.34 and
+  silently degrades to level 2 on this project's oldest supported build
+  toolchain (Debian 11 / GCC 10.2).
+
+### Fixed
+
+Several of the project's own quality gates could not fail. Each is fixed, and
+each fix was verified by injecting a defect and confirming it is now caught.
+
+- **The macOS AddressSanitizer job could pass while the sanitizer was inert.** A
+  SIP interceptor-startup failure — meaning ASan never hooked anything — was
+  explicitly classified as an allowed outcome. It is now a hard failure, and a
+  preflight check asserts the ASan runtime was actually loaded into the Node
+  process before any test runs.
+- **The macOS `leaks` check never gated.** Failures were printed and then ignored
+  ("the leaks tool can have false positives"). It now fails the run, against a
+  dedicated workload.
+- **Valgrind exited 0 on errors.** `--error-exitcode` was never passed, so the
+  run's pass/fail rested entirely on grepping the log. Errors now fail the job.
+- **The sanitizer log analyzer was blind to UBSan and TSan.** It matched only
+  `ERROR: AddressSanitizer` / `ERROR: LeakSanitizer`. ThreadSanitizer reports data
+  races under a **`WARNING:`** header, and UndefinedBehaviorSanitizer's recoverable
+  form is `runtime error:` — both would have been ignored even once those jobs
+  existed.
+- **LeakSanitizer suppressions were dangerously broad** (51 rules, including
+  `leak:node::`, `leak:v8::internal::`, `leak:uv_` and libc startup). Those frames
+  appear in the addon's _own_ allocation stacks, so such rules can mask real
+  first-party leaks. Narrowed to 5 exact external leaf functions. The new
+  ThreadSanitizer suppressions follow the same discipline, and document the
+  empirical check that proves they do not hide an injected race.
+- **`src/darwin/raii_utils.h` was missing `#include <utility>`** despite using
+  `std::move`. The header only compiled because another header happened to pull
+  `<utility>` in first.
+- **Windows/macOS static analysis never actually ran.** clang-tidy was
+  misconfigured on both platforms (a bad macOS sysroot; a Windows compile database
+  whose MSVC include paths were mangled by shell-quoting and which shadowed the C
+  library's `<string.h>` with this project's own `src/windows/string.h`). Its
+  output filtering then hid the resulting failures — along with real first-party
+  diagnostics. Both root causes are fixed and all output filtering is removed.
+- **clang-tidy analyzed no headers at all.** `HeaderFilterRegex` used a negative
+  lookahead, which `llvm::Regex` does not support, so it matched nothing —
+  excluding most of this project's logic, which lives in headers.
+
+### Changed
+
+- **macOS now compiles as C++20**, matching Linux and Windows (which already
+  inherited it from Node's headers). `MACOSX_DEPLOYMENT_TARGET` remains 10.15.
+- **clang-tidy now fails the build** on high-signal lifetime/ownership checks
+  (`bugprone-use-after-move`, `clang-analyzer-cplusplus.NewDeleteLeaks`,
+  `cppcoreguidelines-special-member-functions`, …). It was previously advisory
+  only, so findings could never block a merge.
+- **`src/darwin/*` is now linted in CI.** It was analyzed on no CI leg at all.
+- **UndefinedBehaviorSanitizer and ThreadSanitizer added to CI.** UBSan runs with
+  `-fno-sanitize-recover` (it is recoverable by default and would otherwise report
+  undefined behavior while still exiting 0). TSan runs as a separate job against a
+  dedicated concurrency stress harness, since it cannot share a binary with ASan.
+- **`_FORTIFY_SOURCE` is now disabled in sanitizer builds**, where its libc
+  interceptors collide with the sanitizers' and produce false results.
+- **arm64 coverage in CI.** The memory-test matrix now includes `ubuntu-24.04-arm`,
+  and ThreadSanitizer runs on both x64 and arm64.
+- **`SafeAsyncWorker` no longer shadows `Napi::AsyncWorker::SetError`.** It kept a
+  parallel error store alongside node-addon-api's, which only worked because the
+  completion callback was also overridden. It now delegates to node-addon-api as
+  the single source of truth. No behavior change.
+- **Removed dead sanitizer config.** `.asan-options` and `.asan-suppressions.txt`
+  were never loaded by any script.
+
 ## 2.2.0 - 2026-07-11
 
 ### Changed

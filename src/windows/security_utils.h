@@ -139,7 +139,7 @@ public:
                                       sizeof(elevation), &size);
 
     CloseHandle(token);
-    return result && elevation.TokenIsElevated;
+    return result != FALSE && elevation.TokenIsElevated != 0;
   }
 
   // Safe string conversion with validation
@@ -221,7 +221,7 @@ public:
   }
 
   explicit operator bool() const {
-    return handle && handle != INVALID_HANDLE_VALUE;
+    return handle != nullptr && handle != INVALID_HANDLE_VALUE;
   }
 };
 

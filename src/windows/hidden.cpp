@@ -82,7 +82,7 @@ public:
           (wpath.length() == 3 && wpath[1] == L':' && wpath[2] == L'\\');
       if (isRoot) {
         DEBUG_LOG(
-            "[GetHiddenWorker] Root directory detected: %s, attributes: 0x%X",
+            "[GetHiddenWorker] Root directory detected: %s, attributes: 0x%lX",
             path.c_str(), attributes);
         // Windows may report root directories as hidden/system, but we'll
         // report the actual state The tests will need to be updated to reflect
