@@ -5,8 +5,8 @@
  *
  * This script handles all platform-specific memory testing:
  * - JavaScript memory tests on all platforms (via standalone runner)
- * - Valgrind and ASAN/LSAN tests on Linux
- * - AddressSanitizer tests on macOS
+ * - Valgrind and ASan/LSan/UBSan tests on Linux
+ * - ASan/UBSan and the `leaks` tool on macOS
  *
  * JavaScript memory tests use src/test-utils/memory-test-runner.ts directly,
  * bypassing Jest for more accurate measurements and avoiding worker issues.
@@ -111,11 +111,11 @@ if (platform === "linux") {
     console.log(color(colors.YELLOW, "\nValgrind not available. Skipping."));
   }
 
-  // Run AddressSanitizer and LeakSanitizer
+  // Run AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer
   console.log(
     color(
       colors.YELLOW,
-      "\nRunning AddressSanitizer and LeakSanitizer tests...",
+      "\nRunning AddressSanitizer, LeakSanitizer and UBSan tests...",
     ),
   );
   try {
@@ -126,11 +126,11 @@ if (platform === "linux") {
 
     execFileSync("bash", [asanScript], { stdio: "inherit", shell: false });
     console.log(
-      color(colors.GREEN, "✓ AddressSanitizer and LeakSanitizer tests passed"),
+      color(colors.GREEN, "✓ AddressSanitizer, LeakSanitizer and UBSan passed"),
     );
   } catch (error) {
     console.log(
-      color(colors.RED, "✗ AddressSanitizer or LeakSanitizer tests failed"),
+      color(colors.RED, "✗ AddressSanitizer, LeakSanitizer or UBSan failed"),
     );
     if (error instanceof Error) {
       console.log(color(colors.RED, `  Error: ${error.message}`));
@@ -138,9 +138,9 @@ if (platform === "linux") {
     exitCode = 1;
   }
 } else if (platform === "darwin") {
-  // Run macOS AddressSanitizer
+  // Run macOS AddressSanitizer, UndefinedBehaviorSanitizer, and leaks.
   console.log(
-    color(colors.YELLOW, "\nRunning macOS AddressSanitizer tests..."),
+    color(colors.YELLOW, "\nRunning macOS sanitizer and leak tests..."),
   );
   try {
     const macosAsanScript = path.join(__dirname, "macos-asan.sh");
@@ -152,12 +152,10 @@ if (platform === "linux") {
     }
 
     execFileSync("bash", [macosAsanScript], { stdio: "inherit" });
-    console.log(color(colors.GREEN, "✓ macOS AddressSanitizer tests passed"));
+    console.log(color(colors.GREEN, "✓ macOS sanitizer and leak tests passed"));
   } catch (error) {
-    // macos-asan.sh already converts the one known SIP interceptor failure to
-    // success. Every remaining nonzero exit is a real build, test, or
-    // sanitizer failure and must fail CI.
-    console.log(color(colors.RED, "✗ macOS AddressSanitizer tests failed"));
+    // Every nonzero exit is a build, test, leak-tool, or sanitizer failure.
+    console.log(color(colors.RED, "✗ macOS sanitizer or leak tests failed"));
     if (error instanceof Error) {
       console.log(color(colors.RED, `  Error: ${error.message}`));
     }

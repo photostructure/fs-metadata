@@ -1,4 +1,4 @@
-# macOS AddressSanitizer and System Integrity Protection (SIP) Issue
+# macOS AddressSanitizer and System Integrity Protection (SIP)
 
 ## Problem
 
@@ -11,7 +11,10 @@ A jest worker process was terminated by another process: signal=SIGABRT, exitCod
 
 ## Root Cause
 
-macOS System Integrity Protection (SIP) strips `DYLD_*` environment variables (including `DYLD_INSERT_LIBRARIES`) from child processes for security reasons. Since Jest spawns worker processes to run tests in parallel, these workers don't inherit the ASAN library injection, causing them to abort.
+macOS System Integrity Protection (SIP) strips `DYLD_*` environment variables (including
+`DYLD_INSERT_LIBRARIES`) when a protected executable is launched. A package-manager shim with a
+`#!/usr/bin/env node` shebang takes a protected `/usr/bin/env` hop and can lose the ASan runtime
+before Node starts.
 
 ## Verification
 
@@ -26,10 +29,11 @@ node -e "require('./build/Release/fs_metadata.node').getVolumeMountPoints().then
 
 ### 1. Run Tests in Single Process Mode (Recommended)
 
-The easiest workaround is to run Jest in single-process mode:
+Run Jest in single-process mode and invoke its JavaScript entry point with the setup-node binary
+directly:
 
 ```bash
-npm test -- --runInBand --maxWorkers=1
+node node_modules/jest/bin/jest.js --runInBand
 ```
 
 This has been implemented in `scripts/macos-asan.sh`.
@@ -48,27 +52,24 @@ The Linux ASAN tests in CI don't have this limitation and can catch most memory 
 
 ## Current Implementation
 
-The `scripts/macos-asan.sh` script now:
+The `scripts/macos-asan.sh` script:
 
-1. Builds with ASAN flags
-2. Runs tests with `--runInBand` to avoid worker processes
-3. Detects the known "Interceptors are not working"/"interceptors not
-   installed" startup error and treats only that SIP condition as expected;
-   mixed output containing a sanitizer report or Jest failure still fails
-4. Falls back to the macOS `leaks` tool for additional memory checking
-5. Provides clear messaging about the SIP limitation
+1. Builds with ASan and UBSan instrumentation
+2. Resolves the matching runtime from Apple clang and proves that Node loaded it
+3. Invokes Jest's JavaScript entry point directly with `--runInBand`
+4. Treats interceptor startup failures, sanitizer reports, and test failures as gating errors
+5. Rebuilds without sanitizer instrumentation, then runs a checked-in TypeScript workload under
+   the macOS `leaks` tool; leaks and tool failures are gating errors
 
 The `scripts/check-memory.ts` script:
 
 1. Runs JavaScript memory tests before platform-native checks
-2. Invokes the macOS ASAN script, which classifies the known SIP startup error
-3. Propagates every other build, test, or sanitizer failure to CI
-4. Still runs the `leaks` tool for native memory checking
+2. Invokes the macOS ASAN script
+3. Propagates every build, test, leak-tool, or sanitizer failure to CI
 
 ## CI Considerations
 
-- The GitHub Actions workflow runs ASAN tests on both Linux and macOS
+- The GitHub Actions workflow runs ASAN tests on Linux x64/ARM64 and macOS
 - Linux ASAN tests are more reliable due to no SIP restrictions
-- Only the known macOS SIP interceptor-startup failure is treated as a warning;
-  other ASAN/test failures fail CI
-- macOS tests still provide value through the `leaks` tool and JavaScript memory tests
+- A macOS run that cannot load the ASan runtime fails rather than silently passing
+- macOS also gates on the `leaks` tool and JavaScript memory tests

@@ -14,10 +14,10 @@ describe("sanitizer script failure propagation", () => {
     ]);
   });
 
-  it("captures a nonzero macOS test result before classifying SIP", () => {
+  it("captures a nonzero macOS test result before analysis", () => {
     const disableErrexit = macosAsanSource.indexOf("set +e");
     const runTests = macosAsanSource.indexOf(
-      "TEST_OUTPUT=$(TEST_ESM=0 ./node_modules/.bin/jest",
+      'TEST_OUTPUT=$(TEST_ESM=0 "$NODE_BIN" node_modules/jest/bin/jest.js',
     );
     const captureStatus = macosAsanSource.indexOf("TEST_EXIT_CODE=$?");
     const restoreErrexit = macosAsanSource.indexOf("set -e", captureStatus);
@@ -25,7 +25,6 @@ describe("sanitizer script failure propagation", () => {
     expect(runTests).toBeGreaterThan(disableErrexit);
     expect(captureStatus).toBeGreaterThan(runTests);
     expect(restoreErrexit).toBeGreaterThan(captureStatus);
-    expect(macosAsanSource).toContain("--allow-macos-sip");
     expect(macosAsanSource).toContain("ANALYSIS_EXIT_CODE=$?");
   });
 
@@ -35,7 +34,7 @@ describe("sanitizer script failure propagation", () => {
     // scanned, mirroring the unconditional analysis in sanitizers-test.sh.
     const analyze = macosAsanSource.indexOf("analyze-sanitizer-output.ts");
     const analysisStatus = macosAsanSource.indexOf("ANALYSIS_EXIT_CODE=$?");
-    const exitCodeBranch = macosAsanSource.indexOf("TEST_EXIT_CODE -eq 0");
+    const exitCodeBranch = macosAsanSource.indexOf("ANALYSIS_EXIT_CODE -ne 0");
     expect(analyze).toBeGreaterThan(-1);
     // Analyzer runs, its status is captured, and only then does the exit-code
     // branch pick the success wording — the analysis is never bypassed.
@@ -45,7 +44,7 @@ describe("sanitizer script failure propagation", () => {
 
   it("propagates macOS sanitizer-script failures from the orchestrator", () => {
     const failureMessage = checkMemorySource.indexOf(
-      "macOS AddressSanitizer tests failed",
+      "macOS sanitizer or leak tests failed",
     );
     const failureStatus = checkMemorySource.indexOf(
       "exitCode = 1",

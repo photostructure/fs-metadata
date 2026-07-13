@@ -1,66 +1,14 @@
-# LeakSanitizer suppressions for @photostructure/fs-metadata
-# This file filters out known false positives from Node.js/V8 internals
+# Node 26/OpenSSL retains its built-in compression-method registry for the
+# lifetime of the process (observed as one 24-byte allocation at shutdown).
+# This exact external leaf cannot match ordinary fs-metadata allocation stacks.
+leak:ossl_load_builtin_compressions
 
-# V8 internal allocations
-leak:v8::internal::Isolate::
-leak:v8::internal::Heap::
-leak:v8::internal::Factory::
-leak:v8::internal::Deserializer
-leak:v8::internal::TypedSlots::
-leak:v8::internal::Scavenger::
-leak:v8::internal::CodeSerializer::
-leak:v8::internal::Compiler::
-leak:v8::internal::BodyDescriptorBase::
-leak:v8::internal::BaseNameDictionary
-leak:v8::internal::HashTable
-leak:v8::internal::WasmTrustedInstanceData::
-leak:v8::internal::wasm::
-leak:v8::internal::Runtime_
-leak:v8::platform::DefaultJobWorker::
+# Jest's vm contexts are retained by Node 26's cppgc bridge at process exit.
+# These exact Node contextify leaves cannot match addon-owned allocations.
+leak:node::CppgcMixin::Wrap<node::contextify::ContextifyContext>
+leak:node::CppgcMixin::Wrap<node::contextify::ContextifyScript>
 
-# Node.js internal allocations
-leak:node::
-leak:node::builtins::BuiltinLoader::
-leak:node::StartExecution
-leak:node::LoadEnvironment
-leak:node::NodeMainInstance::Run
-leak:node::Start
-
-# System library allocations
-leak:__libc_start
-leak:start_thread
-leak:pthread_create
-
-# libuv allocations
-leak:uv_
-leak:uv__work_submit
-
-# Third-party Node.js module leaks
-# @unrs/resolver (jest-resolve dependency) - https://github.com/unrs/unrs-resolver
+# @unrs/resolver is Jest's native resolver dependency. Its N-API references are
+# outside this addon and the library-specific rule cannot match fs_metadata.node.
 leak:resolver.linux-x64-gnu.node
-leak:napi_register_module_v1
-
-# Python interpreter leaks - false positives from build process
-leak:PyMem_RawMalloc
-leak:PyObject_Malloc
-leak:_PyObject_Malloc
-leak:new_keys_object
-leak:dictresize
-leak:insertdict
-leak:insertion_resize
-leak:PyDict_SetDefault
-leak:type_add_getset
-leak:type_ready_fill_dict
-leak:type_ready
-leak:PyType_Ready
-leak:_PyType_FromMetaclass_impl
-leak:collections_exec
-leak:PyModule_ExecDef
-leak:import_find_and_load
-leak:PyImport_ImportModuleLevelObject
-leak:import_name
-leak:_PyEval_EvalFrameDefault
-leak:builtin_exec_impl
-leak:builtin_exec
-leak:cfunction_vectorcall_FASTCALL_KEYWORDS
-leak:cfunction_vectorcall_O
+leak:resolver.linux-arm64-gnu.node

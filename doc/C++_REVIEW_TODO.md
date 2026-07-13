@@ -167,10 +167,11 @@ This document outlines a comprehensive review of all C++ files in the fs-metadat
 1. [x] Run valgrind, LeakSanitizer, and AddressSanitizer on Linux builds
    - **Implemented**: Comprehensive memory testing infrastructure
    - Valgrind and AddressSanitizer: `npm run check:memory`
-   - LeakSanitizer: Integrated with ASan, suppressions in `.lsan-suppressions.txt`
+   - LeakSanitizer: Integrated with ASan, with narrow observed Node/Jest suppressions and no
+     broad Node/libuv/pthread stack-frame suppressions
    - All tests show 0 memory leaks in fs-metadata code
 2. [ ] Use Application Verifier on Windows
-3. [ ] Enable address sanitizer for macOS builds
+3. [x] Enable AddressSanitizer, UBSan, and the `leaks` gate for macOS builds
 4. [x] Run existing memory.test.ts with extended iterations
    - All memory tests (JavaScript, ASAN, valgrind, etc.): `npm run check:memory`
 

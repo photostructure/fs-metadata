@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Valgrind memory leak detection script for CI/CD
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -60,10 +60,16 @@ if [ ! -f "$SUPP_FILE" ]; then
 fi
 
 # Run valgrind with appropriate options
-VALGRIND_OPTS="--leak-check=full --show-leak-kinds=definite,indirect,possible --track-origins=yes --suppressions=$SUPP_FILE"
+VALGRIND_OPTS=(
+    --leak-check=full
+    "--show-leak-kinds=definite,indirect,possible"
+    --track-origins=yes
+    --error-exitcode=99
+    "--suppressions=$SUPP_FILE"
+)
 
 echo "Running valgrind tests..."
-if valgrind $VALGRIND_OPTS node "$VALGRIND_TEST" 2>&1 | tee "$ROOT_DIR/valgrind.log"; then
+if valgrind "${VALGRIND_OPTS[@]}" node "$VALGRIND_TEST" 2>&1 | tee "$ROOT_DIR/valgrind.log"; then
     # Check the log for actual leaks
     if grep -q "definitely lost: 0 bytes in 0 blocks" "$ROOT_DIR/valgrind.log" && \
        grep -q "indirectly lost: 0 bytes in 0 blocks" "$ROOT_DIR/valgrind.log"; then

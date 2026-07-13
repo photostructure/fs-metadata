@@ -106,6 +106,34 @@ full warning set on our own code. `FSMeta::Debug::DebugLog` carries
 `__attribute__((format(printf, 1, 2)))`, which both enables format checking at every
 `DEBUG_LOG()` call site and suppresses `-Wformat-nonliteral` on its own `vsnprintf` forward.
 
+## Sanitizers
+
+`_FORTIFY_SOURCE` **must be off** under AddressSanitizer — its libc interceptors collide with
+ASan's, producing false positives and negatives. Rather than depending on env-var ordering,
+`binding.gyp` reads `FS_METADATA_SANITIZE`:
+
+```bash
+FS_METADATA_SANITIZE=1   # -> binding.gyp emits -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0
+```
+
+The sanitizer scripts set it for you.
+
+| Job              | Command                              | Notes                                                                                                                                                                                                                                                   |
+| ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ASan + **UBSan** | `npm run check:memory` (Linux/macOS) | `-fsanitize=address,undefined -fno-sanitize-recover=undefined`. LSan runs where supported; macOS also gates on Apple's `leaks` tool. Without `-fno-sanitize-recover`, UBSan is _recoverable_: it prints `runtime error:` and the process still exits 0. |
+| Valgrind         | part of `check:memory` (Linux)       |                                                                                                                                                                                                                                                         |
+
+UBSan's `vptr` check is inert here: it needs RTTI, and Node's `common.gypi` builds addons with
+`-fno-rtti`; clang silently omits `vptr` from the `undefined` group in that case.
+
+### Suppression discipline (this one is a trap)
+
+Sanitizer suppressions must name **only** specific, empirically observed third-party functions
+or libraries. The LSan file covers exact Node 26/OpenSSL and Jest-context leaves plus Jest's
+native resolver library; broad Node/libuv/pthread stack-frame rules also match ordinary
+first-party addon allocation stacks and can hide real leaks. Suppression counts remain visible
+in the job output.
+
 ## Static analysis
 
 `.clang-tidy` **gates**: findings in the checks under `WarningsAsErrors` fail `npm run lint`.

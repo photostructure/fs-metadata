@@ -4,9 +4,14 @@ export type SanitizerOutputAnalysis = {
   testFailure: boolean;
 };
 
-function hasHeaderPrefix(line: string, prefix: string): boolean {
+function hasHeaderPrefix(
+  line: string,
+  prefix: string,
+  requireColon = false,
+): boolean {
   if (!line.startsWith(prefix)) return false;
   const boundary = line[prefix.length];
+  if (requireColon) return boundary === ":";
   return (
     boundary == null ||
     boundary === ":" ||
@@ -15,9 +20,44 @@ function hasHeaderPrefix(line: string, prefix: string): boolean {
   );
 }
 
-function hasSanitizerErrorHeader(output: string): boolean {
-  return output.split("\n").some((line) => {
-    line = line.trimStart();
+type ReportHeader = {
+  prefix: string;
+  /** Require a `:` immediately after the prefix, so prose doesn't match. */
+  requireColon?: boolean;
+};
+
+/**
+ * Headers that mean a sanitizer found something. A run can print any of these
+ * and still exit 0, so the exit code alone is never a sufficient gate.
+ */
+const ReportHeaders: readonly ReportHeader[] = [
+  { prefix: "ERROR: AddressSanitizer" },
+  { prefix: "ERROR: LeakSanitizer" },
+  { prefix: "ERROR: ThreadSanitizer" },
+  { prefix: "ERROR: UndefinedBehaviorSanitizer" },
+  { prefix: "ERROR: MemorySanitizer" },
+  // ThreadSanitizer reports data races and lock-order inversions under a
+  // WARNING: header -- NOT ERROR: -- and exits 0 unless halt_on_error is set.
+  // Gating only on "ERROR:" would let every race through silently. The colon is
+  // required so prose like "WARNING: ThreadSanitizer is slow" does not match.
+  { prefix: "WARNING: ThreadSanitizer", requireColon: true },
+  { prefix: "SUMMARY: ThreadSanitizer", requireColon: true },
+  { prefix: "SUMMARY: UndefinedBehaviorSanitizer", requireColon: true },
+];
+
+/**
+ * UndefinedBehaviorSanitizer's *recoverable* form: it prints
+ * `<file>:<line>:<col>: runtime error: <what>` and CONTINUES, leaving the
+ * process to exit 0 with real undefined behavior found. Anchoring on the
+ * file:line:col prefix keeps prose like "no runtime errors detected" from
+ * matching.
+ */
+const UbsanRuntimeErrorRE = /:\d+:\d+: runtime error: /;
+
+function hasSanitizerReport(output: string): boolean {
+  return output.split("\n").some((raw) => {
+    let line = raw.trimStart();
+    if (UbsanRuntimeErrorRE.test(line)) return true;
     if (line.startsWith("==")) {
       const prefixEnd = line.indexOf("==", 2);
       const pid = prefixEnd < 0 ? "" : line.slice(2, prefixEnd);
@@ -28,19 +68,10 @@ function hasSanitizerErrorHeader(output: string): boolean {
         line = line.slice(prefixEnd + 2).trimStart();
       }
     }
-    return (
-      hasHeaderPrefix(line, "ERROR: AddressSanitizer") ||
-      hasHeaderPrefix(line, "ERROR: LeakSanitizer")
+    return ReportHeaders.some((header) =>
+      hasHeaderPrefix(line, header.prefix, header.requireColon),
     );
   });
-}
-
-const MacosSipFailureRE =
-  /^==\d+==ERROR: Interceptors are not working\. This may be because AddressSanitizer is loaded too late \(e\.g\. via dlopen\)\. Please launch the executable with:\nDYLD_INSERT_LIBRARIES=[^\n]+\/libclang_rt\.asan_osx_dynamic\.dylib\n"interceptors not installed" && 0$/;
-
-/** True only when a failed macOS run is the known three-line SIP error. */
-export function isKnownMacosSipFailure(output: string): boolean {
-  return MacosSipFailureRE.test(output.replaceAll("\r\n", "\n"));
 }
 
 /** Decide whether one sanitizer test run must fail CI. */
@@ -48,7 +79,7 @@ export function analyzeSanitizerOutput(
   output: string,
   testExitCode: number,
 ): SanitizerOutputAnalysis {
-  const sanitizerReport = hasSanitizerErrorHeader(output);
+  const sanitizerReport = hasSanitizerReport(output);
   const testFailure = testExitCode !== 0;
   return {
     failed: sanitizerReport || testFailure,
@@ -60,7 +91,6 @@ export function analyzeSanitizerOutput(
 export type SanitizerCliArgs = {
   outputFile: string;
   testExitCode: number;
-  allowMacosSip: boolean;
 };
 
 /**
@@ -77,21 +107,19 @@ export type SanitizerCliArgs = {
 export function parseSanitizerCliArgs(
   args: readonly string[],
 ): SanitizerCliArgs {
-  const [outputFile, rawExitCode, mode] = args;
+  const [outputFile, rawExitCode] = args;
   if (
-    (args.length !== 2 && args.length !== 3) ||
+    args.length !== 2 ||
     outputFile == null ||
     rawExitCode == null ||
-    !/^-?\d+$/.test(rawExitCode) ||
-    (mode != null && mode !== "--allow-macos-sip")
+    !/^-?\d+$/.test(rawExitCode)
   ) {
     throw new TypeError(
-      "Usage: analyze-sanitizer-output.ts <output-file> <test-exit-code> [--allow-macos-sip]",
+      "Usage: analyze-sanitizer-output.ts <output-file> <test-exit-code>",
     );
   }
   return {
     outputFile,
     testExitCode: Number(rawExitCode),
-    allowMacosSip: mode === "--allow-macos-sip",
   };
 }

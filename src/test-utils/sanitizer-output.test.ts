@@ -1,12 +1,7 @@
 import {
   analyzeSanitizerOutput,
-  isKnownMacosSipFailure,
   parseSanitizerCliArgs,
 } from "./sanitizer-output";
-
-const MacosSipOutput = `==38863==ERROR: Interceptors are not working. This may be because AddressSanitizer is loaded too late (e.g. via dlopen). Please launch the executable with:
-DYLD_INSERT_LIBRARIES=/Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.asan_osx_dynamic.dylib
-"interceptors not installed" && 0`;
 
 describe("analyzeSanitizerOutput", () => {
   it("fails on a multiline AddressSanitizer report", () => {
@@ -32,20 +27,45 @@ SUMMARY: AddressSanitizer: 32 byte(s) leaked
     expect(analyzeSanitizerOutput(output, 0).failed).toBe(true);
   });
 
-  it("recognizes the known macOS SIP interceptor failure", () => {
-    expect(isKnownMacosSipFailure(MacosSipOutput)).toBe(true);
+  // ThreadSanitizer reports data races under a *WARNING:* header, not ERROR:.
+  // Gating only on "ERROR:" would let every race through with a zero exit.
+  it("fails on a ThreadSanitizer data race (WARNING header)", () => {
+    const output = `==================
+WARNING: ThreadSanitizer: data race (pid=1234)
+  Write of size 1 at 0x5555 by thread T2:
+    #0 FSMeta::Debug::SetDebugPrefix /workspace/src/common/debug_log.h:21
+  Previous read of size 1 at 0x5555 by main thread:
+    #0 FSMeta::Debug::enableDebugLogging /workspace/src/binding.cpp:27
+SUMMARY: ThreadSanitizer: data race /workspace/src/common/debug_log.h:21
+==================
+`;
+    expect(analyzeSanitizerOutput(output, 0)).toMatchObject({
+      failed: true,
+      sanitizerReport: true,
+    });
   });
 
-  it("does not allow SIP text to mask a sanitizer report", () => {
-    const output = `${MacosSipOutput}
-==42== ERROR: AddressSanitizer heap-use-after-free`;
-    expect(isKnownMacosSipFailure(output)).toBe(false);
+  it("fails on a ThreadSanitizer lock-order-inversion", () => {
+    const output = `WARNING: ThreadSanitizer: lock-order-inversion (potential deadlock) (pid=99)
+SUMMARY: ThreadSanitizer: lock-order-inversion`;
+    expect(analyzeSanitizerOutput(output, 0).failed).toBe(true);
   });
 
-  it("does not allow SIP text to mask a Jest failure", () => {
-    const output = `${MacosSipOutput}
-No tests found, exiting with code 1`;
-    expect(isKnownMacosSipFailure(output)).toBe(false);
+  // UBSan is *recoverable by default*: it prints "runtime error:" and keeps
+  // going, so the process can still exit 0 with real undefined behavior found.
+  it("fails on a recoverable UndefinedBehaviorSanitizer runtime error", () => {
+    const output = `/workspace/src/linux/volume_metadata.cpp:88:22: runtime error: signed integer overflow: 9223372036854775807 + 1 cannot be represented in type 'long'
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /workspace/src/linux/volume_metadata.cpp:88:22 in
+`;
+    expect(analyzeSanitizerOutput(output, 0)).toMatchObject({
+      failed: true,
+      sanitizerReport: true,
+    });
+  });
+
+  it("fails on a halting UndefinedBehaviorSanitizer error header", () => {
+    const output = `==42==ERROR: UndefinedBehaviorSanitizer: undefined-behavior /workspace/src/binding.cpp:12:3`;
+    expect(analyzeSanitizerOutput(output, 0).failed).toBe(true);
   });
 
   it("fails when the test pipeline exits nonzero", () => {
@@ -61,6 +81,15 @@ No tests found, exiting with code 1`;
     ).toBe(false);
   });
 
+  it.each([
+    "Running ThreadSanitizer tests...",
+    "Building with UndefinedBehaviorSanitizer...",
+    "WARNING: ThreadSanitizer is slow", // not a report header
+    "no runtime errors detected",
+  ])("does not false-positive on benign line: %s", (line) => {
+    expect(analyzeSanitizerOutput(line, 0).failed).toBe(false);
+  });
+
   it("passes clean output with a successful test status", () => {
     expect(analyzeSanitizerOutput("All tests passed", 0)).toEqual({
       failed: false,
@@ -74,7 +103,7 @@ describe("parseSanitizerCliArgs", () => {
   // Regression: `Number("")` and `Number(" ")` are both 0, so a blank exit-code
   // argument would otherwise be accepted as a passing run and mask a real
   // failure. Verified against the CLI before the fix:
-  //   tsx scripts/analyze-sanitizer-output.ts <clean-file> "" --allow-macos-sip
+  //   tsx scripts/analyze-sanitizer-output.ts <clean-file> ""
   //   -> exit 0 (masked). After the fix the blank argument is rejected.
   it("rejects a blank exit-code argument", () => {
     expect(() => parseSanitizerCliArgs(["out.log", ""])).toThrow(TypeError);
@@ -94,28 +123,12 @@ describe("parseSanitizerCliArgs", () => {
     expect(() => parseSanitizerCliArgs(["out.log", "1", "--bogus"])).toThrow(
       TypeError,
     );
-    expect(() =>
-      parseSanitizerCliArgs([
-        "out.log",
-        "1",
-        "--allow-macos-sip",
-        "--bogus",
-      ]),
-    ).toThrow(TypeError);
   });
 
-  it("accepts an integer exit code, with or without the SIP flag", () => {
+  it("accepts an integer exit code", () => {
     expect(parseSanitizerCliArgs(["out.log", "0"])).toEqual({
       outputFile: "out.log",
       testExitCode: 0,
-      allowMacosSip: false,
-    });
-    expect(
-      parseSanitizerCliArgs(["out.log", "1", "--allow-macos-sip"]),
-    ).toEqual({
-      outputFile: "out.log",
-      testExitCode: 1,
-      allowMacosSip: true,
     });
   });
 });
