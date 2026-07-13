@@ -21,6 +21,11 @@ fi
 echo -e "${YELLOW}Cleaning previous builds...${NC}"
 npm run clean:native
 
+# Tell binding.gyp this is a sanitizer build so it drops _FORTIFY_SOURCE.
+# FORTIFY's libc interceptors collide with ASan's, producing false positives and
+# false negatives (OpenSSF Compiler Options Hardening Guide).
+export FS_METADATA_SANITIZE=1
+
 # Configure build with ASan flags
 echo -e "${YELLOW}Building with AddressSanitizer enabled...${NC}"
 export CFLAGS="-fsanitize=address -g -O1 -fno-omit-frame-pointer"

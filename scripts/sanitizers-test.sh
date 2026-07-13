@@ -38,6 +38,12 @@ if [[ "$CLEAN_BUILD" == "1" ]]; then
 fi
 rm -f "$OUTPUT_FILE"
 
+# Tell binding.gyp this is a sanitizer build so it drops _FORTIFY_SOURCE.
+# FORTIFY's libc interceptors collide with ASan's, producing false positives and
+# false negatives (OpenSSF Compiler Options Hardening Guide). Overriding via env
+# CFLAGS ordering would be fragile; the gyp variable is explicit.
+export FS_METADATA_SANITIZE=1
+
 # Set up build environment
 export CC=clang
 export CXX=clang++
