@@ -48,3 +48,11 @@ race:cppgc::internal::HeapRegistry::UnregisterHeap
 # libuv-threadpool race -- including ours -- and would silently mask first-party
 # findings. Keep these rules pinned to exact function names.
 race:uv__iou_init
+
+# Stock Node 26.5.0 can destroy a Worker environment's libuv rwlock while
+# TSan still observes the main thread's final unlock. Both reported accesses
+# are inside Node's uninstrumented libuv (uv_rwlock_destroy / wrunlock), and
+# this addon neither creates nor uses uv_rwlock_t. Pin the suppression to the
+# destructive access: unlike `race:uv_`, this cannot match ordinary addon
+# worker or thread-creation stacks.
+race:uv_rwlock_destroy

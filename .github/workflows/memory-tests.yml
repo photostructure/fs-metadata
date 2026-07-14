@@ -10,6 +10,7 @@ jobs:
   # Cross-platform memory testing using the central orchestrator script
   memory-tests:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
         node-version: [22, 24, 26]
@@ -62,6 +63,7 @@ jobs:
   #
   thread-sanitizer:
     strategy:
+      fail-fast: false
       matrix:
         arch: [x64, arm64]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}

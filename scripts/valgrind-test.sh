@@ -85,7 +85,12 @@ else
     RESULT=1
 fi
 
-# Cleanup log file only (keep the committed suppression file)
-rm -f "$ROOT_DIR/valgrind.log"
+# Successful logs are noise, but a failed log is an input to the CI artifact
+# upload and must remain available for diagnosis.
+if [ "$RESULT" -eq 0 ]; then
+    rm -f "$ROOT_DIR/valgrind.log"
+else
+    echo -e "${YELLOW}Valgrind output retained at $ROOT_DIR/valgrind.log${NC}"
+fi
 
 exit $RESULT

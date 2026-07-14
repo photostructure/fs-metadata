@@ -61,3 +61,21 @@
    fun:ossl_load_builtin_compressions
    ...
 }
+
+# Node 26.5.0 can still be running V8's background pooled-page release task
+# when this harness deliberately exercises abrupt process.exit() teardown.
+# Keep every frame exact and contiguous so first-party allocation stacks cannot
+# match this suppression.
+{
+   Node26-V8-MemoryPool-Background-Task
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:_Znwm
+   fun:_ZN4absl18container_internal12_GLOBAL__N_117AllocBackingArrayERNS0_12CommonFieldsERKNS0_15PolicyFunctionsEmbPv
+   fun:_ZN4absl18container_internal24PrepareInsertSmallNonSooERNS0_12CommonFieldsERKNS0_15PolicyFunctionsENS_11FunctionRefIFmmEEE
+   fun:_ZN2v88internal10MemoryPool8PoolImplINS0_10PooledPageEE11ReleaseUpToEm
+   fun:_ZN2v88internal10MemoryPool23ReleasePooledChunksTask11RunInternalEv
+   fun:_ZN4node12_GLOBAL__N_120PlatformWorkerThreadEPv
+   fun:start_thread
+   fun:clone
+}
