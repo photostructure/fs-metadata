@@ -15,6 +15,13 @@ leak:ossl_load_builtin_compressions
 leak:node::CppgcMixin::Wrap<node::contextify::ContextifyContext>
 leak:node::CppgcMixin::Wrap<node::contextify::ContextifyScript>
 leak:node::contextify::ContextifyContext::ContextifyContext
+leak:node::contextify::ContextifyScript::New
+
+# NOTE: these are pinned to the CREATION functions on purpose. A blanket
+# `leak:node::contextify::` would be unsafe: jest evaluates test code through
+# node::contextify::ContextifyScript::RunInContext, so that frame appears in the
+# allocation stack of essentially every addon allocation, and the rule would
+# silence our own leaks. Constructors/factories cannot appear there.
 
 # @unrs/resolver is Jest's native resolver dependency. Its N-API references are
 # outside this addon and the library-specific rule cannot match fs_metadata.node.

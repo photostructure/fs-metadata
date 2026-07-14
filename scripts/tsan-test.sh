@@ -52,7 +52,24 @@ export LDFLAGS="-fsanitize=thread"
 # halt_on_error stops at the first race. history_size=7 keeps enough per-thread
 # history to recover the second stack of a race (the default often truncates
 # it). Keep matched suppressions visible so they can be audited and pruned.
-export TSAN_OPTIONS="halt_on_error=1:history_size=7:print_suppressions=1:suppressions=$PWD/.tsan-suppressions.txt"
+# ignore_noninstrumented_modules=1 is what makes this job STABLE.
+#
+# Node/V8 are not built with TSan, so TSan cannot see their internal
+# synchronisation and reports false races inside them (V8 snapshot
+# deserialisation, cppgc, the page allocator, libuv's io_uring setup, ...).
+# Enumerating those function-by-function is whack-a-mole: each Node release and
+# each arch surfaces new ones, and a race that only appears under some timings
+# makes the job flaky (it passed on arm64 one run and failed the next with
+# v8::internal::Deserializer::ReadObject).
+#
+# This option restricts reports to races detected in INSTRUMENTED modules --
+# i.e. fs_metadata.node, the only thing we compile with -fsanitize=thread.
+#
+# Verified, not assumed: with this option and NO suppression file at all, the
+# clean tree reports zero races, and a deliberately injected unguarded
+# `static int` increment in LinuxMetadataWorker::Execute() is STILL reported
+# (exit 66). It suppresses Node's noise without weakening detection of ours.
+export TSAN_OPTIONS="halt_on_error=1:history_size=7:ignore_noninstrumented_modules=1:print_suppressions=1:suppressions=$PWD/.tsan-suppressions.txt"
 
 export NODE_OPTIONS="--max-old-space-size=8192"
 

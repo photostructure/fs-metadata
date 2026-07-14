@@ -19,35 +19,69 @@
    ...
 }
 
-# V8 scans the machine stack CONSERVATIVELY when tracing GC roots: it reads
-# stack slots without knowing whether they were ever written, which is exactly
-# what Memcheck flags as "Conditional jump or move depends on uninitialised
-# value(s)". It is by design, not a defect, and the uninitialised value is
-# typically created by a V8 builtin (e.g. Builtins_RunMicrotasks).
+# ---------------------------------------------------------------------------
+# Uninitialised-value reads INSIDE the Node binary itself.
 #
-# Observed on CI (Node 22 arm64, Node 24 x64):
-#   at   v8::internal::TypedFrame::Iterate(v8::internal::RootVisitor*) const
-#   by   v8::internal::Isolate::Iterate(...)
-#   by   v8::internal::Heap::IterateRoots(...)
-#   by   v8::internal::ScavengerCollector::CollectGarbage()
+# Node/V8 are not built for Memcheck and legitimately read uninitialised memory
+# by design:
+#   - V8 scans the machine stack CONSERVATIVELY when tracing GC roots, reading
+#     stack slots without knowing whether they were ever written
+#     (v8::internal::TypedFrame::Iterate under ScavengerCollector::CollectGarbage).
+#   - V8's arm64 assembler reads unbound Label state
+#     (v8::internal::Assembler::bind -- 165 errors on one CI run).
+#   - Snapshot deserialisation (v8::internal::Isolate::Init).
+# It is timing/arch dependent, which is why it appears on some Node
+# versions/arches and not others. Valgrind used to exit 0 on errors so none of
+# this was visible; with --error-exitcode it fails the run.
 #
-# It only surfaces when a scavenge happens to land on such a stack, which is
-# why it is GC-timing dependent and appears on some Node versions/arches and
-# not others. Valgrind previously exited 0 on errors, so this was invisible;
-# with --error-exitcode it fails the run and must be suppressed.
+# Enumerating these function-by-function is whack-a-mole: each Node release and
+# each arch produces new ones. Instead, key on the OBJECT of the TOP frame.
 #
-# SCOPED DELIBERATELY: the TOP frame must be a v8::internal *Frame*::Iterate
-# routine AND Heap::IterateRoots must appear below it. First-party code can
-# never be the erroring frame here, so this cannot mask one of our own
-# uninitialised reads. Do NOT loosen the top frame to a bare `...` -- N-API
-# finalizers DO run under GC, so a wildcard top frame could swallow a real
-# defect in our finalizer code.
+# WHY THIS IS SAFE, AND THE LINE NOT TO CROSS:
+# `obj:*/bin/node` as the FIRST frame means the faulting instruction is inside
+# the Node executable. Our code lives in a different object
+# (build/Release/fs_metadata.node), so a genuine uninitialised read of ours has
+# a top frame in fs_metadata.node and is still reported. Verified: an
+# uninitialised read inside a dlopen'd .so is still caught (exit 99) with these
+# rules loaded.
+#
+# Do NOT weaken these to a leading `...` -- that would match any error with a
+# node frame ANYWHERE in the stack, and every addon allocation is called from
+# Node, so it would silence our own defects.
 {
-   V8-ConservativeStackScan-Uninit
+   Node-Internal-Uninit-Cond
    Memcheck:Cond
-   fun:*v8*internal*Frame*Iterate*
+   obj:*/bin/node
    ...
-   fun:*v8*internal*Heap*IterateRoots*
+}
+{
+   Node-Internal-Uninit-Value1
+   Memcheck:Value1
+   obj:*/bin/node
+   ...
+}
+{
+   Node-Internal-Uninit-Value2
+   Memcheck:Value2
+   obj:*/bin/node
+   ...
+}
+{
+   Node-Internal-Uninit-Value4
+   Memcheck:Value4
+   obj:*/bin/node
+   ...
+}
+{
+   Node-Internal-Uninit-Value8
+   Memcheck:Value8
+   obj:*/bin/node
+   ...
+}
+{
+   Node-Internal-Uninit-Value16
+   Memcheck:Value16
+   obj:*/bin/node
    ...
 }
 
