@@ -181,28 +181,95 @@ async function generateWindowsCompileCommands(): Promise<boolean> {
     // Add binding.cpp
     const sources = [...windowsSources, "src/binding.cpp"];
 
-    // Find MSVC include paths
-    const msvcPaths = [
-      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC",
-      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\VC\\Tools\\MSVC",
-      "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC",
-      "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Tools\\MSVC",
-      "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC",
-    ];
+    // Find the MSVC include directory.
+    //
+    // vswhere.exe is the ONLY supported way to locate a Visual Studio install.
+    // It ships at a fixed, versioned-forever path and is what node-gyp itself
+    // uses, so it keeps working across VS editions, versions and future
+    // releases. Hardcoding install paths does not: a guessed list of
+    // 2022/{Community,Professional,Enterprise} + 2019/* matched nothing on the
+    // GitHub `windows-latest` runner and failed the lint job outright.
+    //
+    // The hardcoded list is kept only as a last-resort fallback.
+    const fs = require("fs");
+    const msvcPaths: string[] = [];
+
+    // 1. An active developer command prompt already tells us exactly where the
+    //    toolset is.
+    const vcToolsDir = process.env.VCToolsInstallDir;
+    if (vcToolsDir) {
+      console.log("VCToolsInstallDir is set:", vcToolsDir);
+      msvcPaths.push(join(vcToolsDir, ".."));
+    }
+
+    // 2. vswhere.exe -- the supported way to locate a VS install. It lives at a
+    //    fixed path that Microsoft commits to keeping stable, and it is what
+    //    node-gyp itself uses.
+    const vswhere =
+      "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
+    if (existsSync(vswhere)) {
+      try {
+        const installPath = execSync(
+          `"${vswhere}" -latest -products * -property installationPath`,
+          { encoding: "utf8" },
+        ).trim();
+        if (installPath) {
+          console.log("vswhere found Visual Studio at:", installPath);
+          msvcPaths.push(join(installPath, "VC", "Tools", "MSVC"));
+        }
+      } catch (error) {
+        console.warn("vswhere failed:", error);
+      }
+    }
+
+    // 3. Enumerate every <year>/<edition> under both Program Files roots.
+    //    A hardcoded list of years and editions is what broke this on the
+    //    GitHub `windows-latest` runner -- it matched nothing and failed the
+    //    lint job. Enumerating cannot go stale when a new VS ships.
+    for (const root of [
+      "C:\\Program Files\\Microsoft Visual Studio",
+      "C:\\Program Files (x86)\\Microsoft Visual Studio",
+    ]) {
+      if (!existsSync(root)) continue;
+      for (const year of fs.readdirSync(root)) {
+        const yearDir = join(root, year);
+        let editions: string[];
+        try {
+          editions = fs.readdirSync(yearDir);
+        } catch {
+          continue; // not a directory (e.g. the Installer folder)
+        }
+        for (const edition of editions) {
+          msvcPaths.push(join(yearDir, edition, "VC", "Tools", "MSVC"));
+        }
+      }
+    }
 
     let msvcInclude = "";
     for (const basePath of msvcPaths) {
-      if (existsSync(basePath)) {
-        const versions = require("fs").readdirSync(basePath);
-        if (versions.length > 0) {
-          const version = versions.sort().reverse()[0];
-          msvcInclude = join(basePath, version, "include");
-          if (existsSync(msvcInclude)) {
-            console.log("Found MSVC includes at:", msvcInclude);
-            break;
-          }
+      if (!existsSync(basePath)) continue;
+      let versions: string[];
+      try {
+        versions = fs.readdirSync(basePath);
+      } catch {
+        continue;
+      }
+      // Newest toolset wins. Sort numerically-ish so 14.9 < 14.44.
+      versions.sort((a, b) =>
+        b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }),
+      );
+      for (const version of versions) {
+        const candidate = join(basePath, version, "include");
+        // Only commit to `candidate` once it is known to exist -- otherwise a
+        // stale non-existent path would satisfy the `!msvcInclude` guard below
+        // and we would emit a compile database with no C++ standard library.
+        if (existsSync(candidate)) {
+          msvcInclude = candidate;
+          console.log("Found MSVC includes at:", msvcInclude);
+          break;
         }
       }
+      if (msvcInclude) break;
     }
 
     // Find Windows SDK paths

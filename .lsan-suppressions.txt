@@ -3,10 +3,18 @@
 # This exact external leaf cannot match ordinary fs-metadata allocation stacks.
 leak:ossl_load_builtin_compressions
 
-# Jest's vm contexts are retained by Node 26's cppgc bridge at process exit.
-# These exact Node contextify leaves cannot match addon-owned allocations.
+# Jest's vm contexts are retained by Node at process exit. The allocation path
+# differs by Node major, so all of the observed leaves are listed:
+#   - Node 26 wraps the context through the cppgc bridge.
+#   - Node 24 allocates it directly in the ContextifyContext constructor
+#     (CI: memory-tests ubuntu-latest / Node 24 reported 736 bytes in 23 objects
+#     from node::contextify::ContextifyContext::ContextifyContext, with no
+#     first-party frame in the stack).
+# These are exact Node contextify leaves. This addon never allocates inside
+# node::contextify, so none of them can match an addon-owned allocation stack.
 leak:node::CppgcMixin::Wrap<node::contextify::ContextifyContext>
 leak:node::CppgcMixin::Wrap<node::contextify::ContextifyScript>
+leak:node::contextify::ContextifyContext::ContextifyContext
 
 # @unrs/resolver is Jest's native resolver dependency. Its N-API references are
 # outside this addon and the library-specific rule cannot match fs_metadata.node.

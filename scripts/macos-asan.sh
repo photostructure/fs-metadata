@@ -143,7 +143,21 @@ fi
 LEAKS_OUTPUT_FILE=$(mktemp "${TMPDIR:-/tmp}/fs-metadata-macos-leaks.XXXXXX")
 trap 'rm -f "$ASAN_OUTPUT_FILE" "$LEAKS_OUTPUT_FILE"' EXIT
 echo -e "${YELLOW}Executing memory leak test...${NC}"
-if ! leaks --atExit -- "$NODE_BIN" --no-warnings -r tsx/cjs \
+# `leaks --exclude <symbol>` drops leaked blocks whose backtrace contains the
+# symbol. It is this tool's equivalent of an LSan/Valgrind suppression, so the
+# exclusions below MUST mirror the ones already justified in
+# .lsan-suppressions.txt and .valgrind.supp -- and must stay just as narrow:
+# an exact external leaf that can never appear in an addon-owned allocation.
+#
+# ossl_load_builtin_compressions: Node's bundled OpenSSL registers its built-in
+# compression methods in a process-global default library context during
+# node::InitializeOncePerProcessInternal(). The 32-byte block is a one-time
+# global that is never freed. Observed on CI (macos-latest / Node 26) as
+# "1 leak for 32 total leaked bytes" with no first-party frame in the stack;
+# LSan and Valgrind already suppress this exact symbol.
+LEAKS_EXCLUDE=(--exclude ossl_load_builtin_compressions)
+
+if ! leaks --atExit "${LEAKS_EXCLUDE[@]}" -- "$NODE_BIN" --no-warnings -r tsx/cjs \
     src/test-utils/macos-leaks.ts > "$LEAKS_OUTPUT_FILE" 2>&1; then
     echo -e "${RED}✗ Memory leaks detected or leaks tool failed:${NC}"
     cat "$LEAKS_OUTPUT_FILE"
