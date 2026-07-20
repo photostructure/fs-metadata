@@ -162,29 +162,34 @@ describe("zfs GUID enrichment", () => {
   });
 
   it("deduplicates concurrent pool queries but does not retain a stale cache", async () => {
-    let poolCalls = 0;
-    let poolGuid = 100;
-    const run: ZfsCommandRunner = async (command) => {
-      if (command === "zpool") {
-        poolCalls++;
-        return String(poolGuid);
-      }
-      return "200";
-    };
+    jest.useFakeTimers();
+    try {
+      let poolCalls = 0;
+      let poolGuid = 100;
+      const run: ZfsCommandRunner = async (command) => {
+        if (command === "zpool") {
+          poolCalls++;
+          return String(poolGuid);
+        }
+        return "200";
+      };
 
-    const [a, b] = await Promise.all([
-      getZfsGuids({ dataset: "tank/a", timeoutMs: 5000, run }),
-      getZfsGuids({ dataset: "tank/b", timeoutMs: 5000, run }),
-    ]);
-    expect(a.zfsPoolGuid).toBe("100");
-    expect(b.zfsPoolGuid).toBe("100");
-    expect(poolCalls).toBe(1);
+      const [a, b] = await Promise.all([
+        getZfsGuids({ dataset: "tank/a", timeoutMs: 5000, run }),
+        getZfsGuids({ dataset: "tank/b", timeoutMs: 5000, run }),
+      ]);
+      expect(a.zfsPoolGuid).toBe("100");
+      expect(b.zfsPoolGuid).toBe("100");
+      expect(poolCalls).toBe(1);
 
-    poolGuid = 101;
-    await expect(
-      getZfsGuids({ dataset: "tank/a", timeoutMs: 5000, run }),
-    ).resolves.toEqual({ zfsDatasetGuid: "200", zfsPoolGuid: "101" });
-    expect(poolCalls).toBe(2);
+      poolGuid = 101;
+      await expect(
+        getZfsGuids({ dataset: "tank/a", timeoutMs: 5000, run }),
+      ).resolves.toEqual({ zfsDatasetGuid: "200", zfsPoolGuid: "101" });
+      expect(poolCalls).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("does not give an unbounded caller a shorter pool-query budget", async () => {
