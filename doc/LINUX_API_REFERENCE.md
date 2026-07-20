@@ -62,6 +62,8 @@ if (label) {
 - **Docs**: https://man7.org/linux/man-pages/man2/fstatvfs.2.html
 - **Thread Safety**: MT-Safe
 - **Purpose**: Get filesystem statistics via file descriptor (TOCTOU-safe)
+- The descriptor may refer to an open file or directory. This is used for
+  Linux file bind mounts, whose mount target is not a directory.
 
 ```cpp
 int fd = open(path, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
@@ -97,8 +99,15 @@ close(fd);
 | `O_DIRECTORY` | Fail if not a directory           |
 | `O_CLOEXEC`   | Close on exec (prevents fd leaks) |
 | `O_NOFOLLOW`  | Fail if symlink (ELOOP)           |
+| `O_PATH`      | Path-only descriptor (Linux)      |
 
 **Always use `O_CLOEXEC`** in Node.js native modules to prevent fd leaks to child processes.
+
+Volume metadata first opens a mount target with `O_DIRECTORY | O_RDONLY` so
+directory-only filesystem ioctls remain available. If that fails with
+`ENOTDIR`, it retries with `O_PATH`; this avoids read-permission requirements
+and device/FIFO side effects while retaining an fd for `fstatvfs()` and
+`fstatfs()`.
 
 ### errno Thread Safety
 

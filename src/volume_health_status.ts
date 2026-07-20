@@ -37,22 +37,29 @@ export async function directoryStatus(
   dir: string,
   timeoutMs: number,
   canReaddirImpl: typeof canReaddir = canReaddir,
-): Promise<{ status: VolumeHealthStatus; error?: Error }> {
+): Promise<{
+  status: VolumeHealthStatus;
+  error?: Error;
+  isDirectory?: boolean;
+}> {
   try {
     if (await canReaddirImpl(dir, timeoutMs)) {
-      return { status: VolumeHealthStatuses.healthy };
+      return { status: VolumeHealthStatuses.healthy, isDirectory: true };
     }
   } catch (error) {
     debug("[directoryStatus] %s: %s", dir, error);
     let status: VolumeHealthStatus = VolumeHealthStatuses.unknown;
     if (error instanceof TimeoutError) {
       status = VolumeHealthStatuses.timeout;
-    } else if (isObject(error) && error instanceof Error && "code" in error) {
+    } else if (isObject(error) && "code" in error) {
       if (error.code === "EPERM" || error.code === "EACCES") {
         status = VolumeHealthStatuses.inaccessible;
       }
     }
-    return { status, error: toError(error) };
+    const result = { status, error: toError(error) };
+    return isObject(error) && "code" in error && error.code === "ENOTDIR"
+      ? { ...result, isDirectory: false }
+      : result;
   }
   return { status: VolumeHealthStatuses.unknown };
 }

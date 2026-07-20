@@ -111,13 +111,23 @@ async function _getVolumeMetadata(
     }) as VolumeMetadata;
   }
 
-  const { status, error } = await directoryStatus(o.mountPoint, o.timeoutMs);
-  if (status !== VolumeHealthStatuses.healthy) {
+  const pathStatus = await directoryStatus(o.mountPoint, o.timeoutMs);
+  const isNonDirectoryLinuxMount =
+    isLinux && pathStatus.isDirectory === false && mtabInfo != null;
+  if (
+    pathStatus.status !== VolumeHealthStatuses.healthy &&
+    !isNonDirectoryLinuxMount
+  ) {
+    const { error, status } = pathStatus;
     debug("[getVolumeMetadata] directoryStatus error: %s", error);
     throw error ?? new Error("Volume not healthy: " + status);
   }
 
-  debug("[getVolumeMetadata] readdir status: %s", status);
+  const status = isNonDirectoryLinuxMount
+    ? VolumeHealthStatuses.healthy
+    : pathStatus.status;
+
+  debug("[getVolumeMetadata] path status: %s", status);
 
   if (isNotBlank(device)) {
     o.device = device;
@@ -235,7 +245,8 @@ async function _getVolumeMetadataForPath(
   // realpath(), but fstatfs() follows them — handled below.
   const resolved = await resolvePath(pathname);
 
-  // getVolumeMetadataImpl requires a directory path, not a file.
+  // macOS probes the containing directory. Linux/Windows use the original
+  // path below so an exact Linux file bind mount remains distinguishable.
   const resolvedStat = await statAsync(resolved);
   const dir = resolvedStat.isDirectory() ? resolved : dirname(resolved);
 
@@ -295,7 +306,11 @@ export async function findMountPointByDeviceId(
   const mountPoints =
     opts.mountPoints ??
     (await getVolumeMountPointsImpl(
-      { ...opts, includeSystemVolumes: true },
+      {
+        ...opts,
+        includeSystemVolumes: true,
+        includeNonDirectoryMountPoints: true,
+      },
       nativeFn,
     ));
 

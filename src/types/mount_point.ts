@@ -9,7 +9,10 @@ import type { VolumeHealthStatus } from "../volume_health_status";
  */
 export interface MountPoint {
   /**
-   * Mount location (like "/" or "C:\").
+   * Mount location (like "/" or "C:\"). Explicit Linux path queries may
+   * return a file path when that file is itself a bind-mount target. Public
+   * volume enumeration omits detected non-directory targets; unprobed remote
+   * targets are retained when `skipNetworkVolumes` is true.
    */
   mountPoint: string;
 

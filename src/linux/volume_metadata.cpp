@@ -10,7 +10,7 @@
 #include <cstdio>  // for snprintf()
 #include <cstdlib> // for free()
 #include <cstring> // for memset(), strerror()
-#include <fcntl.h> // for open(), O_DIRECTORY, O_RDONLY, O_CLOEXEC
+#include <fcntl.h> // for open(), O_CLOEXEC, O_DIRECTORY, O_PATH, O_RDONLY
 #include <memory>
 #include <sys/statvfs.h>
 #include <sys/vfs.h> // for fstatfs(), struct statfs (f_fsid)
@@ -70,13 +70,22 @@ public:
       // See: Finding #9 in SECURITY_AUDIT_2025.md
       // Reference: https://man7.org/linux/man-pages/man2/open.2.html
       //
-      // O_DIRECTORY: Ensures we're opening a directory, fails if not
-      // O_RDONLY: Read-only access (sufficient for fstatvfs)
-      // O_CLOEXEC: Close on exec (prevents fd leaks in multithreaded programs)
+      // Prefer a directory descriptor so directory-only ioctls continue to
+      // work. Linux also permits bind mounts whose target is a regular file;
+      // retry those with O_PATH. O_PATH avoids requiring read permission and
+      // avoids device/FIFO side effects while still supporting fstatvfs() and
+      // fstatfs() on Linux.
+      //
+      // O_CLOEXEC prevents fd leaks into child processes.
+      bool is_directory = true;
       int fd = open(validated_mount_point.c_str(),
                     O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+      if (fd < 0 && errno == ENOTDIR) {
+        is_directory = false;
+        fd = open(validated_mount_point.c_str(), O_PATH | O_CLOEXEC);
+      }
       if (fd < 0) {
-        int error = errno;
+        const int error = errno;
         DEBUG_LOG("[LinuxMetadataWorker] open failed for %s: %s (%d)",
                   validated_mount_point.c_str(), strerror(error), error);
         throw FSException(
@@ -172,7 +181,7 @@ public:
       //
       // Gated on fstype so we never issue a btrfs ioctl against another
       // filesystem (in particular, never against network mounts).
-      if (options_.fstype == "btrfs") {
+      if (options_.fstype == "btrfs" && is_directory) {
         struct btrfs_ioctl_get_subvol_info_args subvol_info;
         memset(&subvol_info, 0, sizeof(subvol_info));
         // NOTE: on success this ioctl returns a POSITIVE value (observed: 1),
@@ -199,6 +208,10 @@ public:
                     "unavailable for %s: %s",
                     validated_mount_point.c_str(), strerror(errno));
         }
+      } else if (options_.fstype == "btrfs") {
+        DEBUG_LOG("[LinuxMetadataWorker] skipping directory-only btrfs "
+                  "subvolume ioctl for non-directory mount %s",
+                  validated_mount_point.c_str());
       }
 #endif
 

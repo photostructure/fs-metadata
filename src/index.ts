@@ -81,7 +81,10 @@ const nativeFn = defer<Promise<NativeBindings>>(async () => {
 /**
  * List all active local and remote mount points on the system.
  *
- * Only readable directories are included in the results.
+ * Linux file bind mounts are omitted after target probing; explicit path
+ * queries still resolve and inspect them. When `skipNetworkVolumes` is true,
+ * remote targets are not touched, so entries whose target type cannot be
+ * determined are retained.
  *
  * Note that on Windows, `timeoutMs` will be used **per system call** and not
  * for the entire operation.
@@ -101,7 +104,8 @@ export function getVolumeMountPoints(
  * It does not guarantee cancellation of a filesystem request already blocked
  * inside the operating system.
  *
- * @param mountPoint Must be a non-blank string
+ * @param mountPoint Must be a non-blank string. On Linux, this may be a file
+ * that is itself a mount target.
  * @param opts Optional filesystem operation settings, including
  * {@link Options.skipNetworkVolumes} to avoid blocking on unreachable
  * network volumes
@@ -172,7 +176,8 @@ export function getVolumeMetadataForPath(
  *
  * @param pathname Path to any file or directory
  * @param opts Optional settings (timeoutMs, linuxMountTablePaths, mountPoints)
- * @returns The mount point path (e.g., "/", "/System/Volumes/Data", "C:\\")
+ * @returns The mount point path (e.g., "/", "/System/Volumes/Data", "C:\\").
+ * On Linux this may be a file when the input is itself a file bind mount.
  */
 export function getMountPointForPath(
   pathname: string,

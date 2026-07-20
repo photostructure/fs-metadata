@@ -19,10 +19,28 @@ describe("directoryStatus", () => {
   });
 
   it("should return healthy status when directory is accessible", async () => {
-    const { status } = await directoryStatus("/test/dir", 1000, () =>
-      Promise.resolve(true),
+    const { isDirectory, status } = await directoryStatus(
+      "/test/dir",
+      1000,
+      () => Promise.resolve(true),
     );
     expect(status).toBe(VolumeHealthStatuses.healthy);
+    expect(isDirectory).toBe(true);
+  });
+
+  it("should identify a non-directory without treating it as inaccessible", async () => {
+    const error = new Error("Not a directory");
+    Object.assign(error, { code: "ENOTDIR" });
+
+    const result = await directoryStatus("/test/file", 1000, () =>
+      Promise.reject(error),
+    );
+
+    expect(result).toEqual({
+      error,
+      isDirectory: false,
+      status: VolumeHealthStatuses.unknown,
+    });
   });
 
   it("should return timeout status on TimeoutError", async () => {

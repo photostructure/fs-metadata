@@ -27,8 +27,16 @@ export type GetVolumeMountPointOptions = Partial<
     SystemVolumeConfig
 >;
 
+type GetVolumeMountPointImplOptions = Required<GetVolumeMountPointOptions> & {
+  /**
+   * Internal path resolution needs every Linux VFS mount, including file bind
+   * mounts. Public volume enumeration omits detected non-directory targets.
+   */
+  includeNonDirectoryMountPoints?: boolean;
+};
+
 export async function getVolumeMountPointsImpl(
-  opts: Required<GetVolumeMountPointOptions>,
+  opts: GetVolumeMountPointImplOptions,
   nativeFn: NativeBindingsFn,
 ): Promise<MountPoint[]> {
   // Validate before starting any work (including native calls) — also on
@@ -41,7 +49,7 @@ export async function getVolumeMountPointsImpl(
 }
 
 async function _getVolumeMountPoints(
-  o: Required<GetVolumeMountPointOptions>,
+  o: GetVolumeMountPointImplOptions,
   nativeFn: NativeBindingsFn,
 ): Promise<MountPoint[]> {
   debug("[getVolumeMountPoints] gathering mount points with options: %o", o);
@@ -81,6 +89,7 @@ async function _getVolumeMountPoints(
     results.length,
   );
 
+  const nonDirectoryMountPoints = new Set<string>();
   await mapConcurrent({
     maxConcurrency: o.maxConcurrency,
     items: results.filter(
@@ -94,7 +103,11 @@ async function _getVolumeMountPoints(
     ),
     fn: async (mp) => {
       debug("[getVolumeMountPoints] checking status of %s", mp.mountPoint);
-      mp.status = (await directoryStatus(mp.mountPoint, o.timeoutMs)).status;
+      const result = await directoryStatus(mp.mountPoint, o.timeoutMs);
+      mp.status = result.status;
+      if (result.isDirectory === false) {
+        nonDirectoryMountPoints.add(mp.mountPoint);
+      }
       debug(
         "[getVolumeMountPoints] status for %s: %s",
         mp.mountPoint,
@@ -103,9 +116,12 @@ async function _getVolumeMountPoints(
     },
   });
 
+  const visibleResults = o.includeNonDirectoryMountPoints
+    ? results
+    : results.filter((ea) => !nonDirectoryMountPoints.has(ea.mountPoint));
   debug(
     "[getVolumeMountPoints] completed with %d mount points",
-    results.length,
+    visibleResults.length,
   );
-  return results;
+  return visibleResults;
 }

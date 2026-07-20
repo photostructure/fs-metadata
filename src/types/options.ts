@@ -19,6 +19,10 @@ export interface Options {
    *
    * Obtain via `getVolumeMountPoints({ includeSystemVolumes: true })` — system
    * volumes must be included for device ID matching to work correctly.
+   * On Linux that public list intentionally omits detected file mount targets.
+   * Remote targets are not classified when `skipNetworkVolumes` is true. Omit
+   * this option when resolving a path that may itself be a file bind mount, or
+   * include that exact target in a custom array.
    *
    * On Linux and Windows, resolution prefers entries that are path ancestors
    * of the target. If this array contains no ancestor of the target path, a

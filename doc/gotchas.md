@@ -128,6 +128,28 @@ If you see "No Target Architecture" errors when building from source, ensure Vis
 
 ### Linux
 
+#### File Bind Mounts in Containers
+
+Linux permits a regular file to be a mount target. Docker commonly uses this
+for `/etc/hostname`, `/etc/hosts`, and `/etc/resolv.conf`.
+
+`getVolumeMountPoints()` and `getAllVolumeMetadata()` enumerate directory mount
+targets and omit these file mounts. Explicit path operations honor the actual
+mount boundary: `getMountPointForPath("/etc/hosts")` returns `/etc/hosts`, and
+`getVolumeMetadataForPath("/etc/hosts")` returns metadata for the filesystem
+mounted there. `getVolumeMetadata("/etc/hosts")` also works when the file is an
+actual mount target.
+
+When `skipNetworkVolumes: true`, remote mount targets are deliberately not
+probed because even a metadata operation can block indefinitely on a dead
+filesystem. Their target type therefore cannot be determined safely, so
+unprobed remote entries are retained even if a target happens to be a file.
+
+If resolving paths that may be file mounts, do not pass a `mountPoints` array
+created by `getVolumeMountPoints()`, because that public enumeration does not
+contain file targets. Let the resolver read the Linux mount table internally,
+or add the exact file target to a custom array.
+
 #### Docker Containers
 
 The `node:20` Docker image is **not supported** due to GLIBC version requirements:

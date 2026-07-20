@@ -14,6 +14,18 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## unreleased
+
+### Fixed
+
+- **Linux file bind mounts now follow the API's directory-enumeration
+  contract.** `getVolumeMountPoints()` and `getAllVolumeMetadata()` omit
+  detected non-directory targets such as Docker's `/etc/hosts` mounts, while
+  `getMountPointForPath()`, `getVolumeMetadataForPath()`, and direct
+  `getVolumeMetadata()` calls still resolve and inspect those exact mounts.
+  Remote targets remain unprobed when `skipNetworkVolumes` is true and are
+  retained when their target type is unknown.
+
 ## [2.2.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.2.1) (2026-07-13)
 
 No API changes. This release hardens the shipped native binaries and fixes the
