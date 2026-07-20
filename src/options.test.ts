@@ -6,11 +6,13 @@ import {
   OptionsDefault,
   optionsWithDefaults,
 } from "./options";
+import type { Options } from "./types/options";
 
 describe("options()", () => {
   it("should return default FsOptions when no overrides are provided", () => {
     const result = optionsWithDefaults();
     expect(result).toEqual(OptionsDefault);
+    expect(result.includeZfsGuids).toBe(false);
   });
 
   it("should override timeoutMs when provided", () => {
@@ -18,6 +20,21 @@ describe("options()", () => {
     const result = optionsWithDefaults(override);
     expect(result.timeoutMs).toBe(override.timeoutMs);
     expect(result.systemFsTypes).toEqual(OptionsDefault.systemFsTypes);
+  });
+
+  it("should default fields omitted by pre-existing Options values", () => {
+    const options: Options = {
+      timeoutMs: OptionsDefault.timeoutMs,
+      maxConcurrency: OptionsDefault.maxConcurrency,
+      systemPathPatterns: OptionsDefault.systemPathPatterns,
+      systemFsTypes: OptionsDefault.systemFsTypes,
+      linuxMountTablePaths: OptionsDefault.linuxMountTablePaths,
+      networkFsTypes: OptionsDefault.networkFsTypes,
+      includeSystemVolumes: OptionsDefault.includeSystemVolumes,
+      skipNetworkVolumes: OptionsDefault.skipNetworkVolumes,
+    };
+
+    expect(optionsWithDefaults(options).includeZfsGuids).toBe(false);
   });
 
   it("should override excludedFileSystemTypes when provided", () => {
@@ -31,11 +48,13 @@ describe("options()", () => {
     const overrides = {
       timeoutMs: 8000,
       linuxMountTablePaths: ["/etc/mtab"],
+      includeZfsGuids: true,
       onlyDirectories: false,
     };
     const result = optionsWithDefaults(overrides);
     expect(result.timeoutMs).toBe(overrides.timeoutMs);
     expect(result.linuxMountTablePaths).toBe(overrides.linuxMountTablePaths);
+    expect(result.includeZfsGuids).toBe(true);
   });
 
   it("should throw a TypeError if overrides is not an object", () => {

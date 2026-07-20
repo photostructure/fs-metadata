@@ -77,20 +77,39 @@ export interface VolumeMetadata extends RemoteInfo, MountPoint {
   subvolumeUuid?: string;
 
   /**
-   * A stable filesystem identifier read from `statfs(2)`'s `f_fsid`, rendered as
+   * A quick filesystem identifier read from `statfs(2)`'s `f_fsid`, rendered as
    * a 16-character lowercase hex string.
    *
-   * Currently populated on **ZFS**, where `f_fsid` is the dataset's persistent
-   * *fsid GUID* — distinct per dataset and stable across remount, reboot, and
-   * dataset rename (unlike {@link mountFrom}, which is the dataset name). ZFS
-   * datasets otherwise report no {@link uuid} (libblkid cannot resolve a dataset
-   * name to a block device), so this is a lightweight, dependency-free identity
-   * source for them.
+   * Currently populated on **ZFS**, where it is normally distinct per dataset
+   * and stable across remount, reboot, and rename. It is not immutable: OpenZFS
+   * may remap it to resolve an active collision between duplicated datasets.
+   * Treat it as a current identity or fallback, not the sole durable identity.
    *
-   * Note: this is **not** the ZFS `guid` property shown by `zfs get guid` — it is
-   * a separate, equally-stable per-dataset identifier available without libzfs or
-   * a subprocess. Undefined on filesystems where `f_fsid` is not a reliable
-   * stable identifier.
+   * This is not the authoritative ZFS `guid` property. Enable
+   * {@link Options.includeZfsGuids} to populate {@link zfsDatasetGuid} and
+   * {@link zfsPoolGuid}. Undefined on non-ZFS filesystems.
    */
   fsid?: string;
+
+  /**
+   * The authoritative unsigned 64-bit ZFS dataset `guid` property, rendered as
+   * a decimal string to avoid JavaScript precision loss. The GUID does not
+   * change during the dataset's lifetime.
+   *
+   * Linux ZFS only, and populated only when {@link Options.includeZfsGuids} is
+   * true and the external `zfs` command succeeds. Kept separate from
+   * {@link zfsPoolGuid} so consumers can choose lineage or copy-level identity
+   * semantics.
+   */
+  zfsDatasetGuid?: string;
+
+  /**
+   * The authoritative unsigned 64-bit ZFS pool `guid` property, rendered as a
+   * decimal string to avoid JavaScript precision loss.
+   *
+   * Linux ZFS only, and populated only when {@link Options.includeZfsGuids} is
+   * true and the external `zpool` command succeeds. An administrator can change
+   * this value explicitly with `zpool reguid`.
+   */
+  zfsPoolGuid?: string;
 }

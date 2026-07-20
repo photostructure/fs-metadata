@@ -1,369 +1,203 @@
 ---
-title: Subvolume UUIDs for btrfs/zfs (disambiguate volumes that share a filesystem UUID)
+title: Linux subvolume and dataset identity metadata
 status: todo
 created: 2026-07-04
-spans: fs-metadata (this repo) + photostructure (consumer)
 ---
 
-# TPP: Subvolume UUIDs for btrfs / zfs
+# TPP: Linux subvolume and dataset identity metadata
 
 ## Summary
 
-On btrfs (and other file systems, web search and validate and gather a list for our docs), several **mount points** can be distinct subvolumes/datasets of
-**one filesystem**. `libblkid` keys UUID on the block device, so fs-metadata
-reports the _same_ `uuid` for all of them. PhotoStructure derives its volume
-identity (`volsha = shortStringSha(uuid)`) from that UUID, so sibling subvolumes
-**collide on one volsha** — which made `psfile://` URIs resolve to the wrong
-sibling volume. PhotoStructure just added a resolution-time backstop (union of
-all live mounts + `exists()`-pick), but the clean fix is to give fs-metadata a
-way to distinguish subvolumes and expose a per-subvolume identifier **additively**
-(never replacing `uuid`). This TPP covers the fs-metadata feature plus the phased
-PhotoStructure integration.
+Linux filesystems can expose mounted units that do not have a distinct block
+device UUID. Btrfs subvolumes share one filesystem UUID, while ZFS datasets do
+not resolve through libblkid at all. This project needs additive fields that let
+consumers distinguish those units without changing the existing `uuid` field or
+making external commands part of the default path.
 
 ## Current phase
 
-- [x] Research & Planning (this document)
-- [x] Write and validate breaking tests (fs-metadata: btrfs mtab fixtures in
-      `mtab.test.ts` + native `btrfs-subvolume.test.ts`; validated red→green on a live btrfs host)
-- [x] Design review of the additive API shape (field names + header/gating strategy settled — see Lore)
-- [x] Implementation — fs-metadata Phase 1 (mount-option tier) — **done, verified live**
-- [x] Implementation — fs-metadata Phase 2 (btrfs ioctl tier) — **done, verified live**
-- [x] Implementation — PhotoStructure Phase 3 (consume in fallback path) — **done in photostructure repo, verified live; see Session log (Phase 3)**
-- [x] zfs (Phase 4) — **done**: added `fsid` (stable per-dataset id from `statfs` `f_fsid`), verified live on a zfs pool. zfs does not collide; `fsid` fills the no-`uuid` gap without libzfs/shell-out.
-- [ ] URI-carried identity (Phase 5) — deferred, scope only if needed
-- [ ] Review & final integration verification (fs-metadata `npm run all`; then Phase 3)
-
-## Session log (2026-07-04)
-
-fs-metadata Phases 1 & 2 landed and verified on a live btrfs host (`/`=@ /
-`/home`=@home, one device). Result through the real library:
-
-```
-/      { uuid: 9486d442-…, subvolumeUuid: 9ad5ad15-…, subvol: /@,     subvolid: 256 }
-/home  { uuid: 9486d442-…, subvolumeUuid: 3508cb72-…, subvol: /@home, subvolid: 257 }
-→ fs uuid collides: true ; subvolumeUuid distinct: true
-```
-
-Files changed (all in fs-metadata):
-
-- `src/types/mount_point.ts` — added `subvol?: string`, `subvolid?: number`.
-- `src/types/volume_metadata.ts` — added `subvolumeUuid?: string`.
-- `src/types/native_bindings.ts` — added `fstype?` to `GetVolumeMetadataOptions`.
-- `src/linux/mtab.ts` — `parseSubvolInfo()`; wired into `mountEntryToMountPoint`
-  AND `mountEntryToPartialVolumeMetadata` (both entry points carry the fields).
-- `src/volume_metadata.ts` — threads `o.fstype` (from mtab) to native.
-- `src/common/volume_metadata.h` — `fstype` in options (+FromObject); `subvolumeUuid`
-  in the metadata struct (+ToObject, emitted only when non-empty like `volumeRole`).
-- `src/linux/volume_metadata.cpp` — `__has_include(<linux/btrfs.h>)`-guarded
-  `BTRFS_IOC_GET_SUBVOL_INFO` on the reused mount-point fd; canonical UUID format.
-- `src/linux/mtab.test.ts` + new `src/linux/btrfs-subvolume.test.ts` — coverage.
-- `.github/workflows/build.yml` — added `linux-headers` to the Alpine prebuild apk.
-- Docs: new `doc/subvolume-identity.md`; pointers in `CLAUDE.md`, `doc/gotchas.md`.
-
-Verification run: `tsc --noEmit` OK, `eslint` OK, `clang-tidy` OK (both native
-files), `node-gyp rebuild` clean (no warnings), full CJS suite = 493 passed / 76
-skipped, `build:dist` clean (new fields in public `.d.ts`).
-
-**Review fixes (intern pass):**
-
-- [P1] `btrfs-subvolume.test.ts` originally asserted _global_ uniqueness of
-  `subvolumeUuid` across all btrfs mounts — wrong: one subvolume can be mounted at
-  many paths (bind mounts, container storage drivers) and correctly returns the
-  same uuid. Replaced with a `(fs uuid, subvolid)`-consistency invariant: same
-  subvolid → same subvolumeUuid; different subvolid under one fs uuid → different
-  subvolumeUuid. Verified the old assertion failed and the new one holds on a
-  synthetic 6-mount/2-subvolume host.
-- [P2] `parseSubvolInfo` now gates on `fstype === "btrfs"` (was inspecting only the
-  option names), so a non-btrfs mount carrying a stray `subvol=` option no longer
-  leaks the btrfs-only fields — matches the public-type contract. Added an mtab
-  regression test.
-
-Still TODO before commit: full `npm run all` (prettier/full ESM jest) if desired.
-
-## Session log — Phase 3 (2026-07-04, photostructure repo)
-
-Landed in `~/src/photostructure/src/core`, consuming the new fields via a local
-`npm link` of fs-metadata (symlinked into `src/core/node_modules` only; the
-published dep must ship before this can merge). Verified live on speedy-mint.
-
-Baseline (collision, live in the test): `volumes()` reported `/` and `/home`
-both with effective `uuid = 9486d442-…`. After the change:
-
-```
-/      → volsha from subvolumeUuid 9ad5ad15-…   (distinct)
-/home  → volsha from subvolumeUuid 3508cb72-…   (distinct)
-```
-
-Design: identity precedence is now **`.uuid` file → subvolumeUuid → filesystem
-uuid**. New `fallbackVolumeUuid(v) = toVolumeUUID(v.subvolumeUuid) ?? toVolumeUUID(v.uuid)`
-in `src/core/volumes/VolumeUUID.ts`, substituted at every hardware-UUID fallback
-in `addVolumeUUID`/`readVolumeUUID` (the `.uuid`-file and freshly-written-random
-returns are untouched → **no migration** for volumes that already have a `.uuid`).
-`subvolumeUuid` flows for free: `getVolumeMetadata_` already passes the raw
-fs-metadata object to `addVolumeUUID`, and `VolumeLike` gained `subvolumeUuid?`.
-
-Files changed (photostructure):
-
-- `src/core/volumes/VolumeUUID.ts` — `subvolumeUuid` on `VolumeLike`;
-  `fallbackVolumeUuid()`; 4 fallback sites switched to it.
-- `src/core/volumes/VolumesUUIDsInCI.ts` — speedy-mint fixture: `/` and `/home`
-  now assert their distinct subvolume UUIDs (documents the fix end-to-end).
-- `src/core/volumes/VolumeUUID.spec.ts` — `fallbackVolumeUuid()` precedence tests
-  - `readVolumeUUID()` fallback-path tests (settings-gated, deterministic).
-- `src/core/fs/FsMetadata.spec.ts` — portable, skippable "sibling subvolumes get
-  distinct volshas" end-to-end test.
-
-Verification: `tsc` clean; `VolumeUUID.spec` 28 passing; `FsMetadata.spec` 50
-passing / 6 pending; `psfile`/`UriDeleted` specs green. Confirmed the sibling
-test rides the real production path (`getMountPoints` → `getVolumeMetadata`) and
-was red at baseline (both mounts shared one volsha).
-
-Follow-ups before merge: bump + publish fs-metadata, `npm install` it across all
-four photostructure packages (desktop/core/library/account), drop the `npm link`.
-Other btrfs CI hosts' `/` fixtures (deb11vm, hack, pi4, speedy, swift-ubuntu) will
-report subvolume UUIDs once they run — update per host as the existing test intends.
+- [x] Research btrfs and ZFS identity semantics.
+- [x] Add btrfs mount-option and subvolume UUID fields.
+- [x] Add the quick ZFS `fsid` field.
+- [x] Correct the public `fsid` persistence contract.
+- [x] Add opt-in ZFS dataset and pool GUID fields.
+- [x] Run unit, integration, native-build, type, lint, format, and docs checks.
+- [ ] Publish version 2.3.0.
+- [ ] Confirm clean-install CI, then move this TPP to `_done`.
 
 ## Required reading
 
-**fs-metadata (this repo):**
+- `CLAUDE.md`
+- `CONTRIBUTING.md`
+- `doc/gotchas.md`
+- `doc/subvolume-identity.md`
+- `src/types/mount_point.ts`
+- `src/types/volume_metadata.ts`
+- `src/types/options.ts`
+- `src/linux/mtab.ts`
+- `src/linux/volume_metadata.cpp`
+- `src/linux/zfs_guids.ts`
+- `src/volume_metadata.ts`
 
-- `CLAUDE.md` — build/test conventions (jest 30, Node 22/24/26; native N-API build).
-- `doc/system-volume-detection.md` — precedent for surfacing a platform-specific
-  discriminator (`volumeRole`) additively; mirror that discipline.
-- `src/linux/mtab.ts` — `parseMtab()` / `mountEntryToPartialVolumeMetadata()`; the
-  mount-option tier plugs in here.
-- `src/linux/volume_metadata.cpp` — where libblkid sets `uuid`; the btrfs ioctl
-  tier plugs in here.
-- `src/types/volume_metadata.ts`, `src/types/mount_point.ts` — public types to extend.
+## Public API
 
-**PhotoStructure (consumer, `~/src/photostructure`):**
+All fields are additive. `uuid` remains the filesystem or volume UUID.
 
-- `src/core/uri/volsha.ts` — `volsha = memoize(uuid => shortStringSha(uuid))`.
-- `src/core/volumes/VolumeUUID.ts` — `addVolumeUUID` / `readVolumeUUID` identity
-  precedence; **this is the integration point** for Phase 3.
-- `src/core/uri/psfile.ts` — `psfileToNativePath_()` resolution (union + `exists()`).
-- `src/core/fs/FsMetadata.ts` — `volshaToMountPoints()` (the landed backstop) + its spec.
-- Memory: `project_nonunique_volsha_resolution.md`.
+### Btrfs
 
-## Description
+- `MountPoint.subvol?: string`: the `subvol=` mount option.
+- `MountPoint.subvolid?: number`: the `subvolid=` mount option.
+- `VolumeMetadata.subvolumeUuid?: string`: the per-subvolume UUID from
+  `BTRFS_IOC_GET_SUBVOL_INFO`.
 
-Confirmed on a btrfs box (`/` and `/home` are subvolumes `@` / `@home` of one fs):
+The ioctl runs only when the Linux mount table identifies the filesystem as
+btrfs. It is unprivileged on supported kernels and silently leaves the field
+undefined when the ioctl or header is unavailable.
+
+### ZFS quick path
+
+- `VolumeMetadata.fsid?: string`: Linux `statfs(2).f_fsid`, rendered as 16
+  lowercase hexadecimal characters.
+
+This path uses the already-open mountpoint descriptor and no external command.
+The value is normally stable across remount, reboot, import, and dataset rename,
+but OpenZFS may remap it to resolve an active collision. It is a useful current
+identity or fallback, not an immutable identifier.
+
+### ZFS authoritative path
+
+Set `includeZfsGuids: true` to request:
+
+- `VolumeMetadata.zfsDatasetGuid?: string`
+- `VolumeMetadata.zfsPoolGuid?: string`
+
+Both are unsigned 64-bit decimal strings. The dataset query is:
 
 ```
-findmnt:  /      /dev/nvme0n1p2[/@]      btrfs  UUID 9486d442-…
-          /home  /dev/nvme0n1p2[/@home] btrfs  UUID 9486d442-…
-
-fs-metadata getVolumeMetadata:
-  /      { uuid: 9486d442-…, mountFrom: /dev/nvme0n1p2, isSystemVolume: false }
-  /home  { uuid: 9486d442-…, mountFrom: /dev/nvme0n1p2, isSystemVolume: false }
+zfs get -Hp -o value guid <dataset>
 ```
 
-`mountFrom` is the bare device — the `[/@home]` subvol suffix `findmnt` shows is
-**not** in `/proc/self/mounts`' device field; it lives in the **options** field:
+The pool query is:
 
 ```
-/proc/self/mounts:
-  /dev/nvme0n1p2 /     btrfs rw,…,subvolid=256,subvol=/@
-  /dev/nvme0n1p2 /home btrfs rw,…,subvolid=257,subvol=/@home
+zpool get -Hp -o value guid <pool>
 ```
 
-So the discriminator is already in data fs-metadata reads (`parseMtab` → `fs_mntops`),
-plus a stronger one is one ioctl away.
+Commands run with `execFile`, no shell, a 4 KiB output limit, and the remaining
+metadata deadline. Each field fails open. On timeout, the runner sends SIGTERM,
+closes its pipes, unreferences the child, and settles independently of process
+exit; it deliberately does not use SIGKILL. Concurrent pool queries
+share an in-flight process when its remaining timeout budget covers the caller;
+each caller retains its own deadline. No completed result is cached, so a later
+`zpool reguid` remains observable.
 
-## Tribal knowledge
+## Research findings
 
-- **libblkid keys on the device, not the mount.** `blkid_get_tag_value(cache, "UUID",
-device)` (`volume_metadata.cpp:139`) returns the filesystem UUID; all subvolumes of
-  one fs share it. This is the root cause, and it is correct behavior for blkid.
-- **Identifier stability (btrfs), strongest last:**
-  - `subvolid` (256, 257…) — sequential, stable across remount/reboot on that fs,
-    but **not** unique across filesystems and **not** preserved by `btrfs send/receive`.
-  - `subvol` path (`/@home`) — human-meaningful; **breaks on rename/move**.
-  - subvolume **UUID** (16 bytes, from the root item via `BTRFS_IOC_GET_SUBVOL_INFO`,
-    kernel ≥4.18, **unprivileged**) — stable across remount/reboot; `send/receive`
-    keeps the source as `received_uuid`; snapshots get a fresh uuid + `parent_uuid`.
-    This is the one to prefer for identity.
-- **zfs is different and probably doesn't collide the same way:** its `mountFrom` is
-  the dataset name (`tank/home`), already per-dataset. The strong id is the dataset
-  `guid` (via libzfs `zfs_prop_get`, or `zfs get -Hp -o value guid <mp>`). No cheap
-  unprivileged ioctl like btrfs → heavier lift → Phase 4.
-- **PhotoStructure identity precedence** (`readVolumeUUID`): a written `.uuid` file
-  (`writeVolumeUuidFiles` default **true**) wins over the hardware UUID; `/` is
-  hardcoded to the hardware UUID and never writes `.uuid`; `volumeUuidNotExpected`
-  also short-circuits system volumes / docker `/`. **The collision only bites the
-  hardware-UUID fallback path** — mounts that already have a `.uuid` are unaffected.
-- **Migration hazard:** `volsha` is embedded in every stored `psfile://` URI. Changing
-  what feeds `shortStringSha` invalidates stored URIs. Keep `.uuid` primacy so only
-  _fallback-path_ mounts change — and for those, the current volsha is already the
-  ambiguous/buggy one, so it's correcting broken identity, not breaking good identity.
-- **Why exposing subvol UUID does not retroactively fix stored psfiles:** the URI
-  encodes only `<volsha>` + a mount-relative path; it never recorded the subvolume.
-  Subvol UUID only helps _future_ identity (Phase 3) or a _new URI form_ (Phase 5).
-- **The one case the `exists()` backstop genuinely can't get right:** btrfs snapshots.
-  If `/home` and a snapshot both expose the same relative path, `exists()` matches both
-  and tie-breaks by shortest path — can pick the wrong subvolume. Subvolume-aware
-  identity is the only real fix; call this out as the correctness argument.
+### Btrfs
 
-### Validated empirically (2026-07-04, live btrfs box, kernel 6.17, non-root)
+- Libblkid keys on the block device, so sibling subvolumes correctly share the
+  same filesystem `uuid`.
+- `subvol` paths change on rename. `subvolid` is local to one filesystem and is
+  not preserved by send/receive.
+- `BTRFS_IOC_GET_SUBVOL_INFO` provides the strongest local subvolume identity.
+  The ioctl returns a positive value on success on the verified host, so only a
+  negative return indicates failure.
+- `<linux/btrfs.h>` is not universally installed. The implementation uses an
+  `__has_include` guard, and Alpine prebuilds install `linux-headers`.
 
-- **`BTRFS_IOC_GET_SUBVOL_INFO` is unprivileged — confirmed as euid 1000.** But
-  `btrfs subvolume show <mp>` FAILS unprivileged ("Could not search B-tree:
-  Operation not permitted") because it uses the privileged `TREE_SEARCH` ioctl.
-  Do **not** shell out to `btrfs`; the `GET_SUBVOL_INFO` ioctl is the right path.
-- **The ioctl returns a POSITIVE value on success (observed `1`), not `0`.**
-  `errno` is 0 and the struct is fully populated. So the C++ success check MUST be
-  `ret < 0 → failure` (a `ret != 0` check would wrongly discard good data). Verified
-  via `strace`: `ioctl(...BTRFS_IOC_GET_SUBVOL_INFO...) = 1`.
-- **`<linux/btrfs.h>` is NOT guaranteed present.** glibc/Debian gets it from
-  `linux-libc-dev` (a `build-essential` dep). Alpine's build image installs only
-  `util-linux-dev`, so the header is **absent** there → a bare include would break
-  the musl prebuild. Fix: `__has_include` guard (compiles either way; feature off if
-  absent) **plus** add `linux-headers` to the Alpine prebuild apk so shipped
-  prebuilds have it.
-- struct `btrfs_ioctl_get_subvol_info_args` is 504 bytes; `uuid` is `__u8[16]`;
-  `parent_uuid`/`received_uuid` are all-zero for plain (non-snapshot, non-received)
-  subvolumes — matches the send/receive/snapshot semantics documented above.
+### ZFS
 
-### Design decisions (settled this session)
+- A mounted dataset appears in the Linux mount table as a source such as
+  `tank/home`. Libblkid cannot resolve that dataset name to a block device, so
+  ZFS metadata normally has no `uuid`.
+- Linux ZFS copies `dmu_objset_fsid_guid()` into `statfs().f_fsid`.
+  `ds_fsid_guid` is a 56-bit collision-avoiding value that OpenZFS may replace
+  and later persist when duplicate active datasets collide.
+- `zfs get guid` returns the dataset GUID. Split replicas initially retain the
+  same dataset lineage, so consumers that need copy-specific identity can
+  combine it with `zpool get guid`.
+- `zpool reguid` is an explicit administrative operation. Routine reboot,
+  import, scrub, resilver, and disk replacement do not invoke it.
 
-- **Field names:** `subvol`/`subvolid` mirror the literal btrfs mount-option tokens
-  (btrfs-only by construction); `subvolumeUuid` is deliberately generic so a future
-  zfs impl can populate the same field from the dataset `guid`. Documented a full
-  **cross-platform** filesystem survey in `doc/subvolume-identity.md` — **only btrfs
-  exhibits the block-device-UUID collision**:
-  - Linux: zfs `mountFrom` is the dataset name (already distinct); bcachefs subvols
-    are subdirs of one mount; nilfs2 `cp=` is point-in-time; Stratis snapshots each
-    get their own UUID; CephFS subvols are network dirs.
-  - macOS: APFS volumes share a container's space (btrfs-like) but **each has its own
-    volume UUID** → no collision; sealed `/` snapshot handled by system-volume-detection.
-  - Windows: ReFS block-cloning / Storage Spaces have no subvolume namespace; each
-    volume has its own GUID.
-  - **Distinct hazard (not fixed here):** LVM/dm snapshots duplicate the origin's fs
-    UUID across _two devices_ (blkid "duplicate UUID"); fix is `nouuid`/`xfs_admin -U`.
-- **Gating:** thread `fstype` (from mtab) into native `VolumeMetadataOptions` and only
-  attempt the ioctl when `fstype == "btrfs"` — avoids speculative btrfs ioctls on
-  other filesystems (notably network mounts).
-- **fd reuse:** the ioctl runs on the mount-point fd already opened for `fstatvfs`
-  (RAII `FdGuard`) — no extra `open()`.
-- **UUID format:** raw 16 bytes rendered as canonical lowercase hyphenated UUID
-  (matches the existing `uuid` field's presentation).
+## Implementation notes
 
-## Solutions
+### Btrfs phases, shipped in 2.1.0
 
-### Option A (preferred): additive `subvolumeUuid` + fallback-path consumption
+- `src/linux/mtab.ts` parses `subvol` and `subvolid` only for btrfs entries and
+  carries them through both mountpoint and metadata conversion paths.
+- `src/linux/volume_metadata.cpp` reuses the mountpoint file descriptor for
+  `BTRFS_IOC_GET_SUBVOL_INFO` and formats the UUID canonically.
+- `src/linux/btrfs-subvolume.test.ts` checks consistency for repeated mounts of
+  one subvolume and distinction between sibling subvolume IDs.
 
-**fs-metadata** — extend `MountPoint`/`VolumeMetadata` with optional, additive fields
-(undefined off-btrfs/zfs; no consumer breaks). Two tiers:
+### ZFS `fsid`, shipped in 2.1.0
 
-1. **Mount-option tier (cheap, no new syscalls):** parse `subvol=` / `subvolid=` from
-   `fs_mntops` in `mtab.ts`. Surface as `subvol` (path) and `subvolid` (number). Gives
-   `(uuid, subvolid)` — enough to _distinguish_ siblings locally today.
-2. **Ioctl tier (robust):** in `volume_metadata.cpp`, when `fstype === "btrfs"`, open the
-   mountpoint and call `BTRFS_IOC_GET_SUBVOL_INFO`; set `subvolumeUuid` from `args.uuid`.
-   Unprivileged; degrade to undefined on `ENOTTY`/`EPERM`/old kernel.
+- `src/linux/volume_metadata.cpp` gates `fstatfs()` on `fstype === "zfs"` and
+  reconstructs the two 32-bit words into the documented hexadecimal string.
+- The original docs overstated this value as persistent. The contract is now
+  corrected in types, comments, changelog, gotchas, and subvolume docs.
 
-**PhotoStructure** — in `readVolumeUUID`, when falling back to the hardware UUID (no
-`.uuid` file), prefer `subvolumeUuid ?? uuid`. Keeps `.uuid` primacy (no migration for
-`.uuid` mounts), kills the `/`-vs-`/home` collision at the source for new/rescanned
-libraries, and leaves the landed `union + exists()` backstop for legacy rows, zfs, and
-bind-mount cases. Do **not** change the primary volsha derivation wholesale.
+### Opt-in GUID enrichment, pending 2.3.0
 
-Pros: additive/reversible in fs-metadata; smallest migration blast radius; solves the
-common case at the source. Cons: legacy stored psfiles on fallback mounts still rely on
-the `exists()` backstop (incl. the snapshot ambiguity) until re-scanned.
+- `src/linux/zfs_guids.ts` validates dataset input, parses GUIDs without number
+  precision loss, runs both commands in parallel, and handles failures per
+  field.
+- A separate promise deadline protects the fail-open contract even if a command
+  ignores SIGTERM or is stuck in uninterruptible kernel IO. Timed-out production
+  children have their pipes closed and are unreferenced so they cannot hold the
+  Node process open.
+- Containers that see host ZFS mounts without `/dev/zfs` skip the commands
+  immediately.
+- `src/volume_metadata.ts` starts enrichment only for Linux ZFS metadata with a
+  nonblank dataset source. It preserves the absolute deadline established by
+  `getVolumeMetadataForPath()` and leaves 250 ms for timeout cleanup and
+  final result assembly.
+- `includeZfsGuids` defaults to `false` and is accepted by
+  `getVolumeMetadata()`, `getVolumeMetadataForPath()`, and
+  `getAllVolumeMetadata()`.
+- The new flag is optional on the existing `Options` interface for source
+  compatibility. `ResolvedOptions` requires it after defaults are applied.
 
-### Option B (deferred): URI-carried subvolume identity (Phase 5)
+## Live verification
 
-Record `subvolumeUuid` as a _second, optional_ identifier that new psfiles carry
-alongside the volsha; resolve new rows by exact subvol match, fall back to
-`union + exists()` for legacy. Closes the snapshot ambiguity for new libraries with no
-forced migration, but is a backward-compatible URI/schema extension — more surface.
-Only pursue if a feature needs exact per-subvolume identity for legacy rows.
+The local host has three mounted ZFS datasets:
 
-### Non-goal
+```
+/mnt/zfstest
+/mnt/zfstest/alpha
+/mnt/zfstest/beta
+```
 
-Replacing `uuid` or the primary `volsha` derivation, or shelling out per-filesystem in
-the hot path. `subvolumeUuid` is additive; `uuid` stays the fs UUID.
+An end-to-end lookup of `/mnt/zfstest/alpha` returned:
 
-## Tasks
+```
+fsid:           0068b05f38645c29
+zfsDatasetGuid: 1179593054938739425
+zfsPoolGuid:    456694310884881729
+```
 
-### Phase 1 — fs-metadata: mount-option tier ✅ (2026-07-04)
+The root, alpha, and beta datasets share the pool GUID and have distinct dataset
+GUIDs. The default lookup leaves both opt-in fields undefined.
 
-- [x] Add optional `subvol?: string` and `subvolid?: number` to `MountPoint`
-      (`src/types/mount_point.ts`), documented as btrfs-only.
-- [x] Parse them via `parseSubvolInfo()` in `src/linux/mtab.ts`; wired into **both**
-      `mountEntryToPartialVolumeMetadata` and `mountEntryToMountPoint` (so both
-      `getVolumeMetadata()` and `getVolumeMountPoints()` carry the fields). Added
-      btrfs cases to `src/linux/mtab.test.ts` using real `/proc/self/mounts` lines.
-- [x] Verify: `npx jest src/linux/mtab.test.ts` (13 pass); live check confirmed `/`
-      and `/home` return distinct `subvol`/`subvolid`.
+## Verification completed
 
-### Phase 2 — fs-metadata: btrfs ioctl tier ✅ (2026-07-04)
+- Targeted ZFS/options tests passed, including parsing, exact command arguments,
+  partial failure, malformed input, timeout isolation, and in-flight caching.
+- The live ZFS integration test passed with host `/dev/zfs` access.
+- Complete CJS suite: 42 suites passed, 569 tests passed, 76 skipped.
+- Complete ESM suite: 42 suites passed, 569 tests passed, 76 skipped.
+- `npx tsc --noEmit --pretty false` passed.
+- Targeted ESLint and Prettier checks passed.
+- Distribution declarations built and `npm run check:exports` found no export
+  or module-format problems.
+- `npm run node-gyp-rebuild` passed.
+- TypeDoc generated with its existing unrelated `HideMethods` warning.
 
-- [x] Add optional `subvolumeUuid?: string` to `VolumeMetadata` (`src/types/volume_metadata.ts`),
-      documented (stable id; not the fs `uuid`; send/receive & snapshot semantics).
-- [x] In `src/linux/volume_metadata.cpp`, for `fstype === "btrfs"` (threaded via
-      options) call `BTRFS_IOC_GET_SUBVOL_INFO` on the **reused** mountpoint fd; format
-      the 16-byte uuid canonically; set `metadata.subvolumeUuid`. `__has_include`-guarded;
-      degrades silently on `ret < 0` (ENOTTY/EPERM/unsupported/missing header).
-- [x] Tests: `src/linux/btrfs-subvolume.test.ts` — host-conditional skip-guard;
-      confirmed `/` and `/home` return **different** `subvolumeUuid` on this btrfs host.
-- [x] Verify: `node-gyp rebuild` clean + `npx jest src/linux/` (16 pass). Added
-      `linux-headers` to the Alpine prebuild (`.github/workflows/build.yml`).
+## Release tasks
 
-### Phase 3 — PhotoStructure: consume in the fallback path
-
-- [ ] In `readVolumeUUID` (`src/core/volumes/VolumeUUID.ts`), when returning the hardware
-      UUID fallback, use `v.subvolumeUuid ?? v.uuid` (thread `subvolumeUuid` through
-      `VolumeLike` and `getVolumeMetadata_` in `FsMetadata.ts`).
-- [ ] Confirm `.uuid`-file mounts are unchanged (no volsha drift → no migration).
-- [ ] Keep the landed `volshaToMountPoints` union + `exists()` backstop.
-- [ ] Tests: extend `src/core/fs/FsMetadata.spec.ts`; on this btrfs box, assert `/` and
-      `/home` now yield **distinct** volshas when neither has a `.uuid`.
-- [ ] Verify: `cd src/core && node dist/core/test/mocha-runner.js dist/core/fs/FsMetadata.spec.js`.
-
-### Phase 4 — zfs ✅ (2026-07-06: `fsid` field from statfs f_fsid)
-
-- [x] **Evaluate whether zfs collides at all.** Conclusion: **it does not**, so the
-      btrfs collision this TPP fixes does not apply to zfs.
-  - zfs mounts surface in `/proc/mounts` as `<dataset-name> <mp> zfs …`, so
-    `fs_spec`/`mountFrom` is the **dataset name** (`tank/home`) — already
-    per-dataset distinct. No sibling collision on `mountFrom`.
-  - fs-metadata passes that dataset name to `blkid` as the "device"; blkid can't
-    resolve a dataset name → zfs datasets get **no `uuid` at all** today. (The only
-    zfs UUID blkid knows is the **pool** guid on the underlying vdev — shared by all
-    datasets in the pool, so it would itself collide, and it isn't even reached.)
-  - Net: read-write zfs datasets fall to PhotoStructure's `.uuid`-file path
-    (`writeVolumeUuidFiles` default true → per-mount unique) — no collision, working
-    identity. The only theoretical gap is **read-only** datasets/snapshots where a
-    `.uuid` can't be written and there's no hardware uuid.
-- [x] **Cheap-guid feasibility — negative.** The rename-stable dataset `guid` is only
-      reachable via **libzfs** (heavy runtime dep, versioned ABI, absent on non-zfs
-      hosts) or `zfs get -Hp -o value guid <mp>` (**a per-filesystem hot-path
-      shell-out — an explicit Non-goal above**). The one cheap procfs source
-      (`/proc/spl/kstat/zfs/<pool>/objset-<id>`) exposes only the **objsetid**, which
-      is _weak_ (not preserved by send/receive, reusable after delete) and is not
-      universally present.
-- [x] **Cheap path found after all — `statfs(2)` `f_fsid`.** The initial "negative"
-      only considered the _`ds_guid`_; it missed that `statfs` `f_fsid` on zfs is
-      `dmu_objset_fsid_guid` — a **stable, per-dataset id from one syscall**, no
-      libzfs/shell-out. Empirically verified on a live pool: distinct per dataset,
-      nonzero, and **identical across a 2-day/remount gap** (alpha
-      `005856b559015c97`, beta `001aa61033935cd6`). It is _not_ the `ds_guid` (user
-      confirmed that's fine — they want stability, not the specific guid value).
-- [x] **Implemented** as a new `VolumeMetadata.fsid` field (16-hex `f_fsid`), gated
-      on `fstype === "zfs"`, reusing the mount-point fd (`fstatfs`), `undefined`
-      elsewhere. Chose a **new field** (not `subvolumeUuid`) because `f_fsid` is a
-      64-bit int, not a UUID. Files: `src/common/volume_metadata.h`,
-      `src/linux/volume_metadata.cpp`, `src/types/volume_metadata.ts`,
-      `src/linux/zfs-fsid.test.ts`. Verified live via `getVolumeMetadata` +
-      `stat -f`; native rebuild clean; clang-tidy/tsc/eslint OK.
-  - **Reboot-stability confirmed (2026-07-06):** `zpool export`/`import` (re-reads
-    pool state from disk, as a reboot does) left `fsid` **identical** —
-    alpha `005856b559015c97`, beta `001aa61033935cd6`.
-- [ ] Note: the `ds_guid` (via libzfs / `zfs get`) remains deferred — `fsid` meets
-      the stated need. Revisit only if the exact `zfs get guid` value is ever required.
-
-### Phase 5 — URI-carried subvolume identity (deferred, Option B)
-
-- [ ] Only if legacy-row exactness / snapshot disambiguation becomes a real requirement.
+- [ ] Update the package version through the normal release process.
+- [ ] Run `npm run prepare-release` and the clean package/export checks.
+- [ ] Publish 2.3.0 and verify the registry tarball exposes the new option and
+      fields in both CJS and ESM declarations.
+- [ ] Confirm release CI on supported Linux, macOS, and Windows targets.
+- [ ] Move this file to `_done`.

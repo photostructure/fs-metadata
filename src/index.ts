@@ -29,7 +29,7 @@ import type { SystemVolumeConfig } from "./system_volume";
 import type { HiddenMetadata } from "./types/hidden_metadata";
 import type { MountPoint } from "./types/mount_point";
 import { NativeBindings } from "./types/native_bindings";
-import type { Options } from "./types/options";
+import type { Options, ResolvedOptions } from "./types/options";
 import type { VolumeMetadata } from "./types/volume_metadata";
 import type { VolumeHealthStatus } from "./volume_health_status";
 import { VolumeHealthStatuses } from "./volume_health_status";
@@ -47,6 +47,7 @@ export type {
   HideMethod,
   MountPoint,
   Options,
+  ResolvedOptions,
   SetHiddenResult,
   StringEnum,
   StringEnumKeys,
@@ -119,6 +120,7 @@ export function getVolumeMetadata(
       | "skipNetworkVolumes"
       | "networkFsTypes"
       | "linuxMountTablePaths"
+      | "includeZfsGuids"
     >
   >,
 ): Promise<VolumeMetadata> {
@@ -148,6 +150,7 @@ export function getVolumeMetadataForPath(
       | "mountPoints"
       | "skipNetworkVolumes"
       | "networkFsTypes"
+      | "includeZfsGuids"
     >
   >,
 ): Promise<VolumeMetadata> {

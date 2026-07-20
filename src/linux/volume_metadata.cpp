@@ -218,12 +218,12 @@ public:
       // zfs: datasets of one pool never collide the way btrfs subvolumes do
       // (each mounts under its own dataset name), but they get no libblkid uuid
       // — blkid cannot resolve a dataset name to a block device. statfs(2)'s
-      // f_fsid on zfs is dmu_objset_fsid_guid: a persistent, per-dataset id
-      // that is stable across remount, reboot, and rename. Expose it as a
-      // 16-hex-char string so consumers have a dependency-free stable identity
-      // for datasets. (This is NOT the `zfs get guid` ds_guid, which needs
-      // libzfs / a subprocess.) We reuse the mount-point fd already opened
-      // above.
+      // f_fsid on zfs is dmu_objset_fsid_guid: a quick per-dataset id that is
+      // normally stable across remount, reboot, and rename, but may be remapped
+      // by OpenZFS to resolve a collision. Expose it as a 16-hex-char fallback.
+      // The opt-in authoritative dataset/pool GUID properties are queried by
+      // the TypeScript layer because they require `zfs`/`zpool` subprocesses.
+      // We reuse the mount-point fd already opened above.
       if (options_.fstype == "zfs") {
         struct statfs sfs;
         if (fstatfs(fd, &sfs) == 0) {

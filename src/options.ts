@@ -4,7 +4,7 @@ import { availableParallelism } from "node:os";
 import { env } from "node:process";
 import { compactValues, isObject } from "./object";
 import { isWindows } from "./platform";
-import type { Options } from "./types/options";
+import type { Options, ResolvedOptions } from "./types/options";
 
 const DefaultTimeoutMs = 5_000;
 
@@ -231,11 +231,17 @@ export const IncludeSystemVolumesDefault = isWindows;
 export const SkipNetworkVolumesDefault = false;
 
 /**
+ * Default value for {@link Options.includeZfsGuids}. The authoritative ZFS
+ * GUID path uses external commands, so it is deliberately opt-in.
+ */
+export const IncludeZfsGuidsDefault = false;
+
+/**
  * Default {@link Options} object.
  *
  * @see {@link optionsWithDefaults} for creating an options object with default values
  */
-export const OptionsDefault: Options = {
+export const OptionsDefault: ResolvedOptions = {
   timeoutMs: getTimeoutMsDefault(),
   maxConcurrency: availableParallelism(),
   systemPathPatterns: [...SystemPathPatternsDefault],
@@ -244,6 +250,7 @@ export const OptionsDefault: Options = {
   networkFsTypes: [...NetworkFsTypesDefault],
   includeSystemVolumes: IncludeSystemVolumesDefault,
   skipNetworkVolumes: SkipNetworkVolumesDefault,
+  includeZfsGuids: IncludeZfsGuidsDefault,
 } as const;
 
 /**
@@ -252,7 +259,7 @@ export const OptionsDefault: Options = {
  */
 export function optionsWithDefaults<T extends Options>(
   overrides: Partial<T> = {},
-): T {
+): T & ResolvedOptions {
   if (!isObject(overrides)) {
     throw new TypeError(
       "options(): expected an object, got " +
@@ -265,5 +272,5 @@ export function optionsWithDefaults<T extends Options>(
   return {
     ...OptionsDefault,
     ...(compactValues(overrides) as T),
-  };
+  } as T & ResolvedOptions;
 }

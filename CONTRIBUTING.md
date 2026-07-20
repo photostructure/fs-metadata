@@ -72,6 +72,10 @@ npx jest --no-coverage src/linux/zfs-fsid.test.ts
 sudo zpool destroy zfstest && rm -f /tmp/zfstest.img
 ```
 
+The same integration test exercises `includeZfsGuids: true` when `/dev/zfs`
+and the `zfs` / `zpool` commands are available. Containers that can see host ZFS
+mounts but not `/dev/zfs` intentionally skip the external GUID queries.
+
 ## Before submitting your PR
 
 Run `npm run all`, which:

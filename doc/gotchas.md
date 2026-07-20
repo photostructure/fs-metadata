@@ -221,7 +221,7 @@ elsewhere): `subvolid` / `subvol` (from mount options), or the strong
 [Subvolume Identity](./subvolume-identity.md) for the full rationale, stability
 semantics, and how zfs/bcachefs differ.
 
-#### ZFS Datasets Have No `uuid` — Use `fsid`
+#### ZFS Datasets Have No `uuid` — `fsid` Is Best-Effort
 
 `libblkid` can't resolve a ZFS dataset name (`tank/home`) to a block device, so
 ZFS datasets report **`uuid: undefined`**:
@@ -231,11 +231,35 @@ const m = await getVolumeMetadata("/tank/home");
 // { uuid: undefined, mountFrom: "tank/home", fstype: "zfs", fsid: "005856b5…" }
 ```
 
-For a stable per-dataset identity, use `fsid` — a 16-hex-char id from
-`statfs` `f_fsid` (the dataset's persistent fsid GUID), distinct per dataset and
-stable across remount, reboot, and rename. It is **not** the `zfs get guid`
-value, and `stat -f %i` prints the two halves in the opposite order. Populated on
-ZFS only. See [Subvolume Identity](./subvolume-identity.md#zfs-identity-via-fsid).
+`fsid` is a 16-hex-character identifier from `statfs` `f_fsid`. It is normally
+stable across remount, reboot, and rename, but it is **not immutable**: OpenZFS
+may remap it to resolve a collision when duplicate datasets become active, such
+as with copied or split pools. Treat it as a current identity or fallback, not
+as the sole durable identifier; persist an application-owned identity where
+possible.
+
+This is separate from the pool GUID. [`zpool reguid`](https://openzfs.github.io/openzfs-docs/man/master/8/zpool-reguid.8.html)
+is a rare, explicit administrative operation, not something performed by normal
+reboots, imports, scrubs, resilvers, or disk replacements. `fsid` is **not** the
+`zfs get guid` value, and `stat -f %i` prints its two halves in the opposite
+order. Populated on ZFS only. See
+[Subvolume Identity](./subvolume-identity.md#zfs-identity-via-fsid).
+
+For stronger, copy-specific identity, opt into the external OpenZFS queries:
+
+```typescript
+const m = await getVolumeMetadata("/tank/home", {
+  includeZfsGuids: true,
+});
+// { zfsDatasetGuid: "9801903932522705432",
+//   zfsPoolGuid: "14889780885664284089", ... }
+```
+
+These unsigned 64-bit values are strings to preserve precision. The option is
+off by default, requires the `zfs` / `zpool` commands, and leaves either field
+undefined if its bounded query fails. A timed-out command receives SIGTERM and
+is detached from the metadata request; the library deliberately does not
+SIGKILL OpenZFS commands, so one blocked in kernel IO may outlive the call.
 
 #### GVfs/FUSE Mounts
 

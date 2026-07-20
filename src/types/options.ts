@@ -113,4 +113,25 @@ export interface Options {
    *   cannot hang lookups for unrelated local paths.
    */
   skipNetworkVolumes: boolean;
+
+  /**
+   * On Linux ZFS volumes, query the external `zfs` and `zpool` commands for
+   * their authoritative 64-bit GUID properties and expose them as
+   * {@link VolumeMetadata.zfsDatasetGuid} and
+   * {@link VolumeMetadata.zfsPoolGuid}.
+   *
+   * Defaults to `false`. Enabling this adds subprocess overhead and requires
+   * the OpenZFS command-line tools. Query failures leave the optional fields
+   * undefined without failing the metadata request.
+   */
+  includeZfsGuids?: boolean;
 }
+
+/**
+ * Options after defaults have been applied.
+ *
+ * `mountPoints` remains optional because it is caller-provided cached data,
+ * not a defaulted setting.
+ */
+export type ResolvedOptions = Options &
+  Required<Pick<Options, "includeZfsGuids">>;

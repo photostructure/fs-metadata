@@ -13,6 +13,7 @@ import {
   type MtabVolumeMetadata,
   mountEntryToPartialVolumeMetadata,
 } from "./linux/mtab";
+import { getZfsGuids, zfsEnrichmentTimeoutMs } from "./linux/zfs_guids";
 import { compactValues } from "./object";
 import { IncludeSystemVolumesDefault, optionsWithDefaults } from "./options";
 import { isAncestorOrSelf, normalizePath } from "./path";
@@ -34,6 +35,7 @@ import { getVolumeMountPointsImpl } from "./volume_mount_points";
 export async function getVolumeMetadataImpl(
   o: GetVolumeMetadataOptions & Options,
   nativeFn: NativeBindingsFn,
+  operationDeadlineMs?: number,
 ): Promise<VolumeMetadata> {
   if (isBlank(o.mountPoint)) {
     throw new TypeError(
@@ -43,11 +45,14 @@ export async function getVolumeMetadataImpl(
 
   // Validate before starting any work (including native calls) — also on
   // Windows, where the native health probe also receives this timeout.
-  validateTimeoutMs(o.timeoutMs, "getVolumeMetadata()");
-  const p = _getVolumeMetadata(o, nativeFn);
+  const timeoutMs = validateTimeoutMs(o.timeoutMs, "getVolumeMetadata()");
+  const deadlineMs =
+    operationDeadlineMs ??
+    (timeoutMs === 0 ? undefined : Date.now() + timeoutMs);
+  const p = _getVolumeMetadata(o, nativeFn, deadlineMs);
   return withTimeout({
     desc: "getVolumeMetadata()",
-    timeoutMs: o.timeoutMs,
+    timeoutMs,
     promise: p,
   });
 }
@@ -55,6 +60,7 @@ export async function getVolumeMetadataImpl(
 async function _getVolumeMetadata(
   o: GetVolumeMetadataOptions & Options,
   nativeFn: NativeBindingsFn,
+  deadlineMs: number | undefined,
 ): Promise<VolumeMetadata> {
   o = optionsWithDefaults(o);
   const norm = normalizePath(o.mountPoint);
@@ -185,6 +191,30 @@ async function _getVolumeMetadata(
     result.label ??= (await getLabelFromDevDisk(device)) ?? "";
   }
 
+  if (
+    isLinux &&
+    o.includeZfsGuids &&
+    result.fstype === "zfs" &&
+    isNotBlank(result.mountFrom)
+  ) {
+    // Reserve part of the whole-operation deadline for command-timeout cleanup
+    // and final result assembly. If earlier filesystem work consumed
+    // the budget, optional enrichment is skipped instead of racing the public
+    // timeout. A timeout of zero deliberately disables both deadlines.
+    const commandTimeoutMs = zfsEnrichmentTimeoutMs(deadlineMs, Date.now());
+    if (commandTimeoutMs != null) {
+      Object.assign(
+        result,
+        await getZfsGuids({
+          dataset: result.mountFrom,
+          timeoutMs: commandTimeoutMs,
+        }),
+      );
+    } else {
+      debug("[getVolumeMetadata] skipping ZFS GUIDs: deadline exhausted");
+    }
+  }
+
   assignSystemVolume(result, o);
 
   // Fix microsoft's UUID format:
@@ -221,17 +251,28 @@ export async function getVolumeMetadataForPathImpl(
   // Validate before any path work: with a caller-supplied opts.mountPoints
   // this route can otherwise finish (or fail for unrelated reasons) without
   // ever reaching a timeoutMs check.
-  validateTimeoutMs(opts.timeoutMs, "getVolumeMetadataForPath()");
+  const timeoutMs = validateTimeoutMs(
+    opts.timeoutMs,
+    "getVolumeMetadataForPath()",
+  );
 
   // This deadline wraps the WHOLE operation, including realpath()/stat() and the
   // nested getVolumeMetadataImpl() call inside _getVolumeMetadataForPath().
   // getVolumeMetadataImpl() has its own withTimeout(), but that inner one only
   // starts after path resolution, so this outer wrapper is what bounds a hung
   // realpath(). The two are intentional — don't drop this as "redundant".
+  const operationDeadlineMs =
+    timeoutMs === 0 ? undefined : Date.now() + timeoutMs;
   return withTimeout({
     desc: "getVolumeMetadataForPath()",
-    timeoutMs: opts.timeoutMs,
-    promise: _getVolumeMetadataForPath(pathname, opts, nativeFn, resolvePath),
+    timeoutMs,
+    promise: _getVolumeMetadataForPath(
+      pathname,
+      opts,
+      nativeFn,
+      resolvePath,
+      operationDeadlineMs,
+    ),
   });
 }
 
@@ -240,6 +281,7 @@ async function _getVolumeMetadataForPath(
   opts: Options,
   nativeFn: NativeBindingsFn,
   resolvePath: typeof realpath,
+  operationDeadlineMs: number | undefined,
 ): Promise<VolumeMetadata> {
   // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
   // realpath(), but fstatfs() follows them — handled below.
@@ -258,6 +300,7 @@ async function _getVolumeMetadataForPath(
     const probe = await getVolumeMetadataImpl(
       { ...opts, mountPoint: dir },
       nativeFn,
+      operationDeadlineMs,
     );
     const canonicalMountPoint = isNotBlank(probe.mountName)
       ? probe.mountName
@@ -266,6 +309,7 @@ async function _getVolumeMetadataForPath(
     return getVolumeMetadataImpl(
       { ...opts, mountPoint: canonicalMountPoint },
       nativeFn,
+      operationDeadlineMs,
     );
   }
 
@@ -279,7 +323,11 @@ async function _getVolumeMetadataForPath(
     nativeFn,
   );
 
-  return getVolumeMetadataImpl({ ...opts, mountPoint }, nativeFn);
+  return getVolumeMetadataImpl(
+    { ...opts, mountPoint },
+    nativeFn,
+    operationDeadlineMs,
+  );
 }
 
 /**

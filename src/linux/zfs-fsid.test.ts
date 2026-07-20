@@ -1,7 +1,7 @@
 // src/linux/zfs-fsid.test.ts
 //
-// Integration coverage for the ZFS `fsid` field: a stable, per-dataset
-// identifier read from statfs(2)'s f_fsid (the dataset's persistent fsid GUID).
+// Integration coverage for the quick ZFS `fsid` field and the opt-in,
+// authoritative dataset/pool GUID properties.
 //
 // Host-conditional by nature. The typical CI runner has no ZFS, so the zfs-only
 // tests no-op there and only the "never on non-zfs" invariant runs. On a host
@@ -13,6 +13,7 @@ import type { MountPoint } from "../types/mount_point";
 import type { VolumeMetadata } from "../types/volume_metadata";
 
 const HEX16 = /^[0-9a-f]{16}$/;
+const DECIMAL_GUID = /^[1-9]\d{0,19}$/;
 
 describePlatform("linux")("zfs fsid", () => {
   let mountPoints: MountPoint[] = [];
@@ -67,6 +68,58 @@ describePlatform("linux")("zfs fsid", () => {
     for (const mp of nonZfs) {
       const m = await getVolumeMetadata(mp.mountPoint).catch(() => undefined);
       if (m != null) expect(m.fsid).toBeUndefined();
+    }
+  });
+
+  it("only queries authoritative ZFS GUIDs when explicitly enabled", async () => {
+    if (zfs.length === 0) {
+      console.log("[zfs-fsid.test] no zfs mounts on host; skipping");
+      return;
+    }
+
+    for (const mp of zfs) {
+      const quick = await getVolumeMetadata(mp.mountPoint);
+      expect(quick.zfsDatasetGuid).toBeUndefined();
+      expect(quick.zfsPoolGuid).toBeUndefined();
+
+      const enriched = await getVolumeMetadata(mp.mountPoint, {
+        includeZfsGuids: true,
+      });
+      // A host can mount ZFS without making the userland commands available to
+      // this process. Enrichment deliberately fails open in that environment.
+      if (enriched.zfsDatasetGuid != null) {
+        expect(enriched.zfsDatasetGuid).toMatch(DECIMAL_GUID);
+      }
+      if (enriched.zfsPoolGuid != null) {
+        expect(enriched.zfsPoolGuid).toMatch(DECIMAL_GUID);
+      }
+    }
+  });
+
+  it("returns one pool GUID and distinct dataset GUIDs on a multi-dataset pool", async () => {
+    if (zfs.length < 2) return;
+
+    const enriched = await Promise.all(
+      zfs.map((mp) =>
+        getVolumeMetadata(mp.mountPoint, { includeZfsGuids: true }),
+      ),
+    );
+    const complete = enriched.filter(
+      (m) => m.zfsDatasetGuid != null && m.zfsPoolGuid != null,
+    );
+    for (const a of complete) {
+      for (const b of complete) {
+        const aPool = a.mountFrom?.split("/", 1)[0];
+        const bPool = b.mountFrom?.split("/", 1)[0];
+        if (aPool === bPool) {
+          expect(a.zfsPoolGuid).toBe(b.zfsPoolGuid);
+          if (a.mountFrom === b.mountFrom) {
+            expect(a.zfsDatasetGuid).toBe(b.zfsDatasetGuid);
+          } else {
+            expect(a.zfsDatasetGuid).not.toBe(b.zfsDatasetGuid);
+          }
+        }
+      }
     }
   });
 });

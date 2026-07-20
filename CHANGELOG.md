@@ -16,6 +16,23 @@ Security in case of vulnerabilities.
 
 ## unreleased
 
+### Added
+
+- **Opt-in authoritative ZFS GUIDs.** `includeZfsGuids: true` adds
+  `zfsDatasetGuid` and `zfsPoolGuid` as decimal strings on Linux ZFS volumes,
+  using bounded, shell-free `zfs` / `zpool` queries. The default remains the
+  fast syscall-only path; missing commands and query failures leave the fields
+  undefined without failing metadata retrieval.
+
+### Changed
+
+- **Corrected the `fsid` persistence contract.** The ZFS `fsid` (from `statfs`
+  `f_fsid`) is documented as normally stable but **not immutable**: OpenZFS may
+  remap it to resolve a collision when duplicated datasets become active (e.g. a
+  split or copied pool). It remains a useful current identity/fallback; for a
+  durable identifier prefer the new opt-in `zfsDatasetGuid` / `zfsPoolGuid`. No
+  code change to how `fsid` is computed — only its documented guarantee.
+
 ### Fixed
 
 - **Linux file bind mounts now follow the API's directory-enumeration
@@ -194,10 +211,9 @@ each fix was verified by injecting a defect and confirming it is now caught.
 
 - **ZFS dataset identity via `fsid` (Linux).** ZFS datasets report no `uuid`
   (libblkid cannot resolve a dataset name to a block device). `VolumeMetadata`
-  now carries `fsid`, a stable per-dataset identifier read from `statfs(2)`'s
-  `f_fsid` (the dataset's persistent fsid GUID) and rendered as a 16-character
-  hex string — distinct per dataset and stable across remount, reboot, and
-  rename, with no libzfs dependency or subprocess. Populated on ZFS only;
+  now carries `fsid`, a normally stable but collision-adjustable per-dataset
+  identifier read from `statfs(2)`'s `f_fsid` and rendered as a 16-character
+  hex string, with no libzfs dependency or subprocess. Populated on ZFS only;
   `undefined` elsewhere. It is not the `zfs get guid` value; see
   [`doc/subvolume-identity.md`](./doc/subvolume-identity.md).
 
