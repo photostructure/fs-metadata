@@ -145,3 +145,28 @@
    fun:start_thread
    fun:clone
 }
+
+# Node 26.5.0 may retain the per-isolate pooled-page map and its first page
+# entry when the process exits immediately after V8 shrinks new space. Both
+# allocations occur wholly inside V8's MemoryPool::Add path. Keep the complete
+# contiguous allocation stacks so addon-owned allocations remain visible.
+{
+   Node26-V8-MemoryPool-IsolateMap
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:_Znwm
+   fun:_ZN4absl18container_internal12_GLOBAL__N_117AllocBackingArrayERNS0_12CommonFieldsERKNS0_15PolicyFunctionsEmbPv
+   fun:_ZN4absl18container_internal24PrepareInsertSmallNonSooERNS0_12CommonFieldsERKNS0_15PolicyFunctionsENS_11FunctionRefIFmmEEE
+   fun:_ZN4absl18container_internal12raw_hash_mapINS0_17FlatHashMapPolicyIPN2v88internal7IsolateESt6vectorINS4_10PooledPageESaIS8_EEEEJEEixIS6_SB_Li0EEEDTclsrT0_5valueclL_ZSt9addressofISt4pairIKS6_SA_EEPT_RSJ_EclL_ZSt7declvalIRSI_EDTcl9__declvalISJ_ELi0EEEvEEEEERKSJ_
+   fun:_ZN2v88internal10MemoryPool3AddEPNS0_7IsolateEPNS0_11MutablePageE
+   fun:_ZN2v88internal9SemiSpace11RewindPagesEi
+}
+{
+   Node26-V8-MemoryPool-PooledPageVector
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:_Znwm
+   fun:_ZNSt6vectorIN2v88internal10PooledPageESaIS2_EE17_M_realloc_appendIJS2_EEEvDpOT_
+   fun:_ZN2v88internal10MemoryPool3AddEPNS0_7IsolateEPNS0_11MutablePageE
+   fun:_ZN2v88internal9SemiSpace11RewindPagesEi
+}
