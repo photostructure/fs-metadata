@@ -57,6 +57,15 @@ Summary:
 - `MNT_DONTBROWSE` is safe to use **only when combined with a non-Data APFS role**. The Data volume (`/System/Volumes/Data`) has `MNT_DONTBROWSE` but role `"Data"`, so it is correctly excluded.
 - Pseudo-filesystems like `devfs` (no IOMedia, no APFS role) are caught by TypeScript fstype/path heuristics.
 
+## Linux Mount Table Stacking
+
+One mount point can appear **several times** in `/proc/self/mounts`: a systemd direct automount keeps its `autofs` trigger entry and mounts the real filesystem over it, and `mount --bind`/overlay stack the same way. The kernel lists entries in mount-tree order, so the **last** entry for a path is the one it resolves.
+
+- Always reduce with `topmostMountEntries()` (`src/linux/mtab.ts`) before matching a mount point. Both `getLinuxMountPoints()` and `getLinuxMtabMetadata()` do.
+- Taking the first match yields `fstype: "autofs"` / `mountFrom: "systemd-1"`, which names no block device — so blkid and `/dev/disk/by-uuid` return nothing and `uuid`/`label` are empty, while `size`/`used` (from `statvfs` on the path, which _does_ follow the overmount) describe the real filesystem. That mismatch is the tell.
+- `autofs` is in `SystemFsTypesDefault`, so the misread also drops the volume from default enumeration.
+- An automount with no media present has no overmount and correctly stays `autofs`. Touching it can block for seconds, which can exceed `timeoutMs`.
+
 ## Subvolume Identity (btrfs)
 
 **Read `doc/subvolume-identity.md` before modifying subvolume logic.** It covers the collision, the additive fields, and a cross-platform survey of why other filesystems don't collide the same way (zfs/bcachefs/Stratis, macOS APFS — each volume has its own UUID, Windows ReFS/Storage Spaces), plus the distinct LVM/dm duplicate-UUID hazard.
