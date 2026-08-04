@@ -35,6 +35,18 @@ Security in case of vulnerabilities.
   did not cover that root — it is now listed too, which matters for callers who
   override `systemFsTypes`. Both values are now in the defaults.
 
+- **Stacked mount points now report the entry mounted on top.** A systemd direct
+  automount keeps its `autofs` trigger in the mount table and mounts the real
+  filesystem over it, so one path appears twice and this library selected the
+  first. Affected volumes reported `fstype: "autofs"` and
+  `mountFrom: "systemd-1"` — which names no block device, so `uuid` and `label`
+  came back empty — and were misclassified as system volumes and dropped from
+  default enumeration, all while `size` and `used` correctly described the real
+  filesystem. `mount --bind` and overlay stacking are fixed the same way.
+  Selection is last-entry-wins: `/proc/self/mounts` carries no mount or parent
+  IDs, so file order is a proxy for stacking order that every appending
+  mechanism satisfies, but `mount --move` can still defeat.
+
 ## [2.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.3.0) (2026-07-20)
 
 ### Added

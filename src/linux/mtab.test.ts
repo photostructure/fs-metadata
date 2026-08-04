@@ -1,6 +1,7 @@
 // src/linux/mtab.test.ts
 import {
   formatMtab,
+  lastMountEntriesByPath,
   mountEntryToMountPoint,
   mountEntryToPartialVolumeMetadata,
   parseMtab,
@@ -506,6 +507,87 @@ tmpfs /run tmpfs rw,nosuid,nodev,mode=755 0 0
       const vm = mountEntryToPartialVolumeMetadata(entry!, {});
       expect(vm).not.toHaveProperty("subvol");
       expect(vm).not.toHaveProperty("subvolid");
+    });
+  });
+
+  describe("lastMountEntriesByPath()", () => {
+    // systemd direct automounts (`/etc/fstab` with `x-systemd.automount`, or a
+    // `.automount` unit) leave the autofs trigger in the mount table and mount
+    // the real filesystem over it. Both entries share a mount point.
+    const autofsMtab = `
+systemd-1 /mnt/12tb autofs rw,relatime,fd=71,pgrp=1,timeout=0,direct 0 0
+systemd-1 /mnt/sata autofs rw,relatime,fd=82,pgrp=1,timeout=0,direct 0 0
+/dev/sda1 /mnt/12tb btrfs rw,relatime,space_cache=v2,subvolid=5,subvol=/ 0 0
+/dev/sdb /mnt/sata ext4 rw,relatime 0 0
+`;
+
+    it("keeps the overmount, not the autofs trigger it shadows", () => {
+      const entries = lastMountEntriesByPath(parseMtab(autofsMtab));
+
+      expect(entries).toEqual([
+        expect.objectContaining({
+          fs_file: "/mnt/12tb",
+          fs_spec: "/dev/sda1",
+          fs_vfstype: "btrfs",
+        }),
+        expect.objectContaining({
+          fs_file: "/mnt/sata",
+          fs_spec: "/dev/sdb",
+          fs_vfstype: "ext4",
+        }),
+      ]);
+    });
+
+    it("retains the btrfs subvolume discriminators of the overmount", () => {
+      const [twelveTb] = lastMountEntriesByPath(parseMtab(autofsMtab));
+
+      expect(mountEntryToMountPoint(twelveTb!)).toEqual({
+        mountPoint: "/mnt/12tb",
+        fstype: "btrfs",
+        isReadOnly: false,
+        subvol: "/",
+        subvolid: 5,
+      });
+    });
+
+    it("keeps the last of three stacked mounts", () => {
+      const entries = lastMountEntriesByPath(
+        parseMtab(`
+/dev/sda1 /mnt/x ext4 rw 0 0
+/dev/sdb1 /mnt/x xfs rw 0 0
+/dev/sdc1 /mnt/x btrfs ro 0 0
+`),
+      );
+
+      expect(entries).toEqual([
+        expect.objectContaining({ fs_spec: "/dev/sdc1", fs_vfstype: "btrfs" }),
+      ]);
+    });
+
+    it("preserves table order and passes through unshadowed entries", () => {
+      const entries = lastMountEntriesByPath(
+        parseMtab(`
+/dev/sda1 / ext4 rw 0 1
+systemd-1 /mnt/data autofs rw 0 0
+proc /proc proc rw 0 0
+/dev/sdb1 /mnt/data btrfs rw 0 0
+tmpfs /run tmpfs rw 0 0
+`),
+      );
+
+      expect(entries.map((ea) => ea.fs_file)).toEqual([
+        "/",
+        "/mnt/data",
+        "/proc",
+        "/run",
+      ]);
+      expect(entries[1]).toEqual(
+        expect.objectContaining({ fs_spec: "/dev/sdb1", fs_vfstype: "btrfs" }),
+      );
+    });
+
+    it("returns an empty array for an empty table", () => {
+      expect(lastMountEntriesByPath([])).toEqual([]);
     });
   });
 

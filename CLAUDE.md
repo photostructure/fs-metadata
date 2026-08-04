@@ -59,12 +59,13 @@ Summary:
 
 ## Linux Mount Table Stacking
 
-One mount point can appear **several times** in `/proc/self/mounts`: a systemd direct automount keeps its `autofs` trigger entry and mounts the real filesystem over it, and `mount --bind`/overlay stack the same way. The kernel lists entries in mount-tree order, so the **last** entry for a path is the one it resolves.
+One mount point can appear **several times** in `/proc/self/mounts`: a systemd direct automount keeps its `autofs` trigger entry and mounts the real filesystem over it, and `mount --bind`/overlay stack the same way. Each of those appends, so the **last** entry for a path is the one that describes what callers reach.
 
-- Always reduce with `topmostMountEntries()` (`src/linux/mtab.ts`) before matching a mount point. Both `getLinuxMountPoints()` and `getLinuxMtabMetadata()` do.
+- Always reduce with `lastMountEntriesByPath()` (`src/linux/mtab.ts`) before matching a mount point. Both `getLinuxMountPoints()` and `getLinuxMtabMetadata()` do.
 - Taking the first match yields `fstype: "autofs"` / `mountFrom: "systemd-1"`, which names no block device — so blkid and `/dev/disk/by-uuid` return nothing and `uuid`/`label` are empty, while `size`/`used` (from `statvfs` on the path, which _does_ follow the overmount) describe the real filesystem. That mismatch is the tell.
 - `autofs` is in `SystemFsTypesDefault`, so the misread also drops the volume from default enumeration.
 - An automount with no media present has no overmount and correctly stays `autofs`. Touching it can block for seconds, which can exceed `timeoutMs`.
+- **Known limitation:** this is last-wins, not a mount-tree evaluation. `/proc/self/mounts` states no parent/child relationship, and `mount --move` re-attaches a mount without reallocating the internal ID that orders the listing, so a moved mount stays in its earlier position while sitting on top. Fixing that needs `/proc/self/mountinfo`. Accepted deliberately: every mechanism above appends.
 
 ## Subvolume Identity (btrfs)
 

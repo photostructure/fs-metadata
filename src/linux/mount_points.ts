@@ -5,7 +5,12 @@ import { toError, WrappedError } from "../error";
 import { optionsWithDefaults } from "../options";
 import { type MountPoint } from "../types/mount_point";
 import type { Options } from "../types/options";
-import { MountEntry, mountEntryToMountPoint, parseMtab } from "./mtab";
+import {
+  lastMountEntriesByPath,
+  MountEntry,
+  mountEntryToMountPoint,
+  parseMtab,
+} from "./mtab";
 
 export async function getLinuxMountPoints(
   opts?: Pick<Options, "linuxMountTablePaths">,
@@ -15,7 +20,7 @@ export async function getLinuxMountPoints(
   for (const input of o.linuxMountTablePaths) {
     try {
       const mtabContent = await readFile(input, "utf8");
-      const results = parseMtab(mtabContent)
+      const results = lastMountEntriesByPath(parseMtab(mtabContent))
         .map((ea) => mountEntryToMountPoint(ea))
         .filter((ea) => ea != null);
       debug("[getLinuxMountPoints] %s mount points: %o", input, results);
@@ -42,7 +47,10 @@ export async function getLinuxMtabMetadata(
   for (const input of inputs) {
     try {
       const mtabContent = await readFile(input, "utf8");
-      for (const ea of parseMtab(mtabContent)) {
+      // lastMountEntriesByPath(): when several mounts stack on `mountPoint`,
+      // the last entry is the one that describes what the caller reaches — for
+      // every stacking mechanism this library targets. See its caveat.
+      for (const ea of lastMountEntriesByPath(parseMtab(mtabContent))) {
         if (ea.fs_file === mountPoint) {
           return ea;
         }

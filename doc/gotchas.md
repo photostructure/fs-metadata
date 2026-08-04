@@ -150,6 +150,43 @@ created by `getVolumeMountPoints()`, because that public enumeration does not
 contain file targets. Let the resolver read the Linux mount table internally,
 or add the exact file target to a custom array.
 
+#### systemd Automounts Appear Twice in the Mount Table
+
+A systemd direct automount (`x-systemd.automount` in `/etc/fstab`, or a
+`.automount` unit) keeps its `autofs` trigger entry in `/proc/self/mounts` and
+mounts the real filesystem **over** it once the path is touched:
+
+```
+systemd-1 /mnt/12tb autofs rw,relatime,fd=71,pgrp=1,timeout=0,direct 0 0
+/dev/sda1 /mnt/12tb btrfs rw,relatime,space_cache=v2,subvolid=5,subvol=/ 0 0
+```
+
+Mounting over an existing mount appends to the table, so this library reports
+the **last** entry for a path: `/mnt/12tb` above comes back as `btrfs` on
+`/dev/sda1` — with a `uuid`, a `label`, and its subvolume fields — not as
+`autofs` on `systemd-1`. The same holds for `mount --bind` onto an existing
+mount point and for overlay stacking.
+
+This is a last-wins rule, not a mount-tree evaluation. `/proc/self/mounts`
+states no parent/child relationship between entries, so file order is a proxy
+for stacking order. `mount --move` breaks that proxy: it re-attaches an
+existing mount without reallocating the internal ID that orders the listing, so
+the moved mount keeps its earlier position even though it is now on top.
+Resolving that would require `/proc/self/mountinfo`. This is a known,
+documented limitation — if you rely on `mount --move`, read `mountinfo`
+yourself rather than trusting `fstype` here.
+
+The same stacking occurs with `mount --bind` onto an existing mount point and
+with overlay mounts. If you parse `/proc/self/mounts` yourself, take the last
+match rather than the first: the `autofs` trigger names no block device, so
+`blkid` and `/dev/disk/by-uuid` have nothing to resolve, and `autofs` is a
+system fstype, so the volume also disappears from default enumeration.
+
+An automount whose device is absent (an empty card reader, an unplugged drive)
+has no overmount, so it correctly remains `autofs`. Touching such a path blocks
+until the kernel gives up — several seconds on some hardware — which can exceed
+`timeoutMs`. See [Configuring the Default Timeout](#configuring-the-default-timeout).
+
 #### Docker Containers
 
 The `node:20` Docker image is **not supported** due to GLIBC version requirements:

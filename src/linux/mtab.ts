@@ -172,6 +172,52 @@ export function parseMtab(content: string): MountEntry[] {
 }
 
 /**
+ * Reduces a mount table to one entry per mount point, keeping the **last**
+ * entry listed for each path.
+ *
+ * One path can appear several times in `/proc/self/mounts`. A systemd direct
+ * automount keeps its `autofs` trigger entry and mounts the real filesystem
+ * *over* it; `mount --bind` and overlay stacking do the same. Each of those
+ * appends, so the stacked mount is listed after the entry it hides, and the
+ * last entry is the one whose device, fstype, and options describe the volume
+ * a caller reaches through `open()`/`statvfs()`.
+ *
+ * Keeping the first entry instead yields `fstype: "autofs"` with
+ * `fs_spec: "systemd-1"`, which names no block device: blkid and
+ * `/dev/disk/by-uuid` then have nothing to resolve, so `uuid` and `label` come
+ * back empty while `size`/`used` (read by `statvfs` from the path, which does
+ * follow the overmount) describe the real filesystem. `autofs` is also in
+ * `SystemFsTypesDefault`, so the volume is misreported as a system volume and
+ * dropped from default enumeration.
+ *
+ * **This is last-wins, not a mount-tree evaluation.** `/proc/self/mounts` states
+ * no parent/child relationship between entries, so "later in the file" is a
+ * proxy for "stacked on top" rather than a guarantee of it. `mount --move`
+ * re-attaches an already-attached mount without reallocating the internal
+ * unique mount ID that orders the listing, so a moved mount keeps its earlier
+ * position and can appear *before* the entry it now covers — this function
+ * would then return the hidden one. Resolving that needs the mount and parent
+ * IDs in `/proc/self/mountinfo`, which this parser does not read.
+ *
+ * That limitation is accepted: every stacking mechanism this library targets
+ * appends, so last-wins is correct for all of them and strictly better than the
+ * first-wins it replaced.
+ *
+ * @param entries Parsed mount table entries, in mount table order
+ * @return One entry per mount point, each the last one listed for that path,
+ * in order of each mount point's first appearance
+ */
+export function lastMountEntriesByPath(entries: MountEntry[]): MountEntry[] {
+  const byMountPoint = new Map<string, MountEntry>();
+  for (const entry of entries) {
+    // Map.set() on an existing key overwrites the value but keeps the original
+    // insertion position, preserving the mount table's overall ordering.
+    byMountPoint.set(entry.fs_file, entry);
+  }
+  return [...byMountPoint.values()];
+}
+
+/**
  * Formats mount entries back into mtab file format
  * @param entries - Array of mount entries
  * @returns Formatted mtab file content
