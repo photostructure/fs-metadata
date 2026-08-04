@@ -49,16 +49,27 @@ export interface Options {
   maxConcurrency: number;
 
   /**
-   * On Linux and macOS, mount point pathnames that matches any of these glob
-   * patterns will have {@link MountPoint.isSystemVolume} set to true.
+   * Mount point pathnames matching any of these glob patterns will have
+   * {@link MountPoint.isSystemVolume} set to true.
+   *
+   * Matching runs on every platform. The defaults describe POSIX system paths,
+   * which no Windows drive letter matches.
    *
    * @see {@link SystemPathPatternsDefault} for the default value
    */
   systemPathPatterns: string[];
 
   /**
-   * On Linux and macOS, volumes whose filesystem matches any of these strings
-   * will have {@link MountPoint.isSystemVolume} set to true.
+   * Volumes whose filesystem type exactly equals any of these strings will
+   * have {@link MountPoint.isSystemVolume} set to true.
+   *
+   * Unlike {@link systemPathPatterns}, these are compared literally: glob
+   * patterns are **not** supported. FUSE subtypes must be spelled in full
+   * (`"fuse.lxcfs"`, not `"fuse"`).
+   *
+   * Matching runs on every platform. The defaults are POSIX pseudo-filesystems,
+   * so nothing matches a Windows volume unless you override this — note that
+   * `["NTFS"]` would mark every NTFS drive a system volume.
    *
    * @see {@link SystemFsTypesDefault} for the default value
    */

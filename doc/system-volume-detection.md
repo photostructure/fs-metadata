@@ -147,16 +147,33 @@ available in TypeScript without a native call.
 The `SystemFsTypesDefault` list in `src/options.ts` identifies pseudo-filesystems
 that don't represent real storage:
 
-| Category                  | Filesystem Types                                                       |
-| ------------------------- | ---------------------------------------------------------------------- |
-| Process/kernel interfaces | `proc`, `sysfs`, `debugfs`, `tracefs`, `configfs`, `securityfs`, `bpf` |
-| Device pseudo-filesystems | `devpts`, `devtmpfs`                                                   |
-| Memory/temporary          | `tmpfs`, `ramfs`, `rootfs`, `hugetlbfs`                                |
-| Cgroups                   | `cgroup`, `cgroup2`                                                    |
-| Boot/firmware             | `efivarfs`, `pstore`, `binfmt_misc`                                    |
-| Automount                 | `autofs`, `fusectl`                                                    |
-| Container/sandbox         | `fuse.lxcfs`, `fuse.portal`, `fuse.snapfuse`, `squashfs`               |
-| Kernel internal           | `nsfs`, `mqueue`, `rpc_pipefs`, `none`                                 |
+| Category                  | Filesystem Types                                                            |
+| ------------------------- | --------------------------------------------------------------------------- |
+| Process/kernel interfaces | `proc`, `sysfs`, `debugfs`, `tracefs`, `configfs`, `securityfs`, `bpf`      |
+| Device pseudo-filesystems | `devpts`, `devtmpfs`                                                        |
+| Memory/temporary          | `tmpfs`, `ramfs`, `rootfs`, `hugetlbfs`                                     |
+| Cgroups                   | `cgroup`, `cgroup2`                                                         |
+| Boot/firmware             | `efivarfs`, `pstore`, `binfmt_misc`                                         |
+| Automount                 | `autofs`, `fusectl`                                                         |
+| Container/sandbox         | `fuse.lxcfs`, `fuse.portal`, `fuse.snapfuse`, `fuse.squashfuse`, `squashfs` |
+| Kernel internal           | `nsfs`, `mqueue`, `rpc_pipefs`, `none`                                      |
+
+Filesystem types are matched **exactly** (`Array.includes`), not as globs — only
+`systemPathPatterns` is glob-compiled. Every fstype must therefore be spelled out
+in full, including each `fuse.` subtype. A `"snap*"` entry lived in this list
+until it was removed as dead configuration: it matched nothing, and no
+filesystem is named `snap`-anything.
+
+Snap mounts are the reason that distinction matters. snapd mounts each snap with
+the kernel's `squashfs` driver, except inside a container (as reported by
+`systemd-detect-virt`) that has `/dev/fuse` and a helper binary, where it uses
+FUSE instead — preferring `squashfuse` over `snapfuse`. It never probes for
+kernel squashfs support, so a container on a squashfs-capable kernel still gets
+FUSE. The fstype is therefore `fuse.squashfuse` or `fuse.snapfuse` depending on
+which binary is installed. All three are listed. The mount root varies too:
+`/snap` on Ubuntu, `/var/lib/snapd/snap` (snapd's `AltSnapMountDir`) where
+`/snap` is absent or is a symlink to it. Mount entries report the resolved path,
+so both roots are listed as path patterns.
 
 ### Path pattern detection
 
@@ -170,7 +187,7 @@ points by path glob:
 | Temporary          | `/tmp`, `/var/tmp`                                                                                                                                            |
 | Container runtimes | `/run/docker/**`, `/var/lib/docker/**`, `/run/containerd/**`, `/var/lib/containerd/**`, `/run/containers/**`, `/var/lib/containers/**`, `/var/lib/kubelet/**` |
 | Linux containers   | `/var/lib/lxc/**`, `/var/lib/lxd/**`                                                                                                                          |
-| Snap/Flatpak       | `/snap/**`, `/run/snapd/**`, `/run/flatpak/**`, `/run/user/*/doc`, `/run/user/*/gvfs`                                                                         |
+| Snap/Flatpak       | `/snap/**`, `/var/lib/snapd/snap/**`, `/run/snapd/**`, `/run/flatpak/**`, `/run/user/*/doc`, `/run/user/*/gvfs`                                               |
 | WSL infrastructure | `/mnt/wslg/distro`, `/mnt/wslg/doc`, `/usr/lib/wsl/drivers`                                                                                                   |
 | Snapshot dirs      | `**/#snapshot`                                                                                                                                                |
 

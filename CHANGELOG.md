@@ -14,6 +14,27 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## Unreleased
+
+### Removed
+
+- **Dropped the inert `"snap*"` entry from `SystemFsTypesDefault`.**
+  `systemFsTypes` is compared exactly — only `systemPathPatterns` is
+  glob-compiled — so the entry never matched anything, and no filesystem is
+  named `snap`-anything. Its real coverage gap is fixed below.
+
+### Fixed
+
+- **Snap mounts are now excluded on every snapd configuration.** Inside a
+  container with `/dev/fuse` and a helper binary, snapd mounts snaps through
+  FUSE rather than the kernel `squashfs` driver, preferring `squashfuse` over
+  `snapfuse`; only the less-likely `fuse.snapfuse` was listed, so
+  `fuse.squashfuse` snaps were reported as ordinary volumes. snapd also mounts
+  under `/var/lib/snapd/snap` wherever `/snap` is absent or a symlink to it
+  (Fedora, openSUSE), and mount entries report the resolved path, so `/snap/**`
+  did not cover that root — it is now listed too, which matters for callers who
+  override `systemFsTypes`. Both values are now in the defaults.
+
 ## [2.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.3.0) (2026-07-20)
 
 ### Added

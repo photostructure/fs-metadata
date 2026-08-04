@@ -43,6 +43,11 @@ export const SystemPathPatternsDefault = [
   "/run/user/*/doc",
   "/run/user/*/gvfs",
   "/snap/**",
+  // snapd's AltSnapMountDir, used wherever /snap is absent or is a symlink to
+  // it (Fedora, openSUSE). Mount entries report the resolved path, so /snap/**
+  // does not cover these.
+  // https://github.com/canonical/snapd/blob/master/dirs/dirs.go
+  "/var/lib/snapd/snap/**",
   "/sys/**",
   "/tmp",
   "/var/tmp",
@@ -98,6 +103,10 @@ export const SystemPathPatternsDefault = [
  * These are pseudo-filesystems that don't represent real storage devices.
  * See /proc/filesystems for the full list supported by the running kernel.
  *
+ * Entries are matched **exactly** by `isSystemVolume()` — this list is not
+ * glob-compiled the way {@link SystemPathPatternsDefault} is, so every fstype
+ * (including each `fuse.` subtype) must be spelled out in full.
+ *
  * @see https://www.kernel.org/doc/html/latest/filesystems/ - Linux kernel filesystem docs
  * @see https://man7.org/linux/man-pages/man5/proc_filesystems.5.html - /proc/filesystems
  */
@@ -121,7 +130,15 @@ export const SystemFsTypesDefault = [
   // XDG Desktop Portal for Flatpak sandboxed app file access
   // https://flatpak.github.io/xdg-desktop-portal/
   "fuse.portal",
+  // snapd mounts each snap with the kernel's squashfs driver, except inside a
+  // container (per `systemd-detect-virt`) that has /dev/fuse and a helper
+  // binary, where it uses FUSE instead — preferring `squashfuse` over
+  // `snapfuse`. It never probes for kernel squashfs support, so a container on
+  // a squashfs-capable kernel still gets FUSE. The fstype is `fuse.` plus
+  // whichever helper it picked, so both subtypes occur in the wild.
+  // https://github.com/canonical/snapd/blob/master/osutil/squashfs/fstype.go
   "fuse.snapfuse",
+  "fuse.squashfuse",
   "hugetlbfs",
   "mqueue",
   "none",
@@ -138,7 +155,10 @@ export const SystemFsTypesDefault = [
   // https://man7.org/linux/man-pages/man8/rpc.gssd.8.html
   "rpc_pipefs",
   "securityfs",
-  "snap*",
+  // The kernel-driver case for snap mounts; see `fuse.snapfuse` /
+  // `fuse.squashfuse` above for the FUSE fallbacks. A `"snap*"` entry used to
+  // sit here and never matched anything: this list is compared exactly, and no
+  // filesystem is named `snap`-anything.
   "squashfs",
   "sysfs",
   "tmpfs",
