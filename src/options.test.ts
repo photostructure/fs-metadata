@@ -1,10 +1,13 @@
 // src/options.test.ts
 
+import { availableParallelism } from "node:os";
 import { env } from "node:process";
 import {
+  getMaxConcurrencyDefault,
   getTimeoutMsDefault,
   OptionsDefault,
   optionsWithDefaults,
+  uvThreadpoolSize,
 } from "./options";
 import type { Options } from "./types/options";
 
@@ -105,5 +108,96 @@ describe("FS_METADATA_TIMEOUT_MS environment variable", () => {
 
     env["FS_METADATA_TIMEOUT_MS"] = "-100";
     expect(getTimeoutMsDefault()).toBe(5000);
+  });
+});
+
+describe("UV_THREADPOOL_SIZE environment variable", () => {
+  const originalValue = env["UV_THREADPOOL_SIZE"];
+
+  afterEach(() => {
+    // Restore original env var
+    if (originalValue === undefined) {
+      delete env["UV_THREADPOOL_SIZE"];
+    } else {
+      env["UV_THREADPOOL_SIZE"] = originalValue;
+    }
+  });
+
+  function withPoolSize(value: string | undefined): number {
+    if (value == null) delete env["UV_THREADPOOL_SIZE"];
+    else env["UV_THREADPOOL_SIZE"] = value;
+    return getMaxConcurrencyDefault();
+  }
+
+  // The parser is asserted directly, BEFORE the availableParallelism() cap.
+  // Through getMaxConcurrencyDefault() alone every expectation collapses to the
+  // core count on a 4-core runner, so these would pass against an
+  // implementation that ignored UV_THREADPOOL_SIZE entirely.
+  describe("uvThreadpoolSize() parsing", () => {
+    function pool(value: string | undefined): number {
+      if (value == null) delete env["UV_THREADPOOL_SIZE"];
+      else env["UV_THREADPOOL_SIZE"] = value;
+      return uvThreadpoolSize();
+    }
+
+    it("should use libuv's default of 4 when not set", () => {
+      expect(pool(undefined)).toBe(4);
+    });
+
+    it("should use a positive value verbatim", () => {
+      expect(pool("2")).toBe(2);
+      expect(pool("8")).toBe(8);
+      expect(pool("1")).toBe(1);
+    });
+
+    // atoi("") and atoi("banana") are 0, which libuv clamps up to 1 thread --
+    // NOT to the 4-thread default. Verified against Node 24 by timing
+    // concurrent pbkdf2 calls.
+    it("should collapse zero and non-numeric values to a single thread", () => {
+      for (const zeroish of ["", "0", "not-a-number"]) {
+        expect(pool(zeroish)).toBe(1);
+      }
+    });
+
+    // libuv assigns atoi()'s result to an unsigned field, so a negative wraps
+    // around and clamps to the 1024 ceiling -- the opposite of a small pool.
+    it("should treat negatives and oversized values as the 1024 ceiling", () => {
+      expect(pool("-3")).toBe(1024);
+      expect(pool("4096")).toBe(1024);
+    });
+
+    it("should stop at the first non-digit, like atoi()", () => {
+      expect(pool("8abc")).toBe(8);
+    });
+
+    // libuv reads the variable into a fixed 16-byte buffer, so a value needing
+    // 16+ bytes makes the read fail and the value is ignored outright rather
+    // than parsed. Measured on Node 24: 15 bytes selects 1 worker, 16 bytes
+    // leaves 4.
+    it("should ignore values too long for libuv's 16-byte buffer", () => {
+      expect("000000000000001".length).toBe(15);
+      expect(pool("000000000000001")).toBe(1);
+      expect(pool("0000000000000002")).toBe(4);
+      expect(pool("9".repeat(64))).toBe(4);
+    });
+  });
+
+  describe("getMaxConcurrencyDefault() capping", () => {
+    it("should add fixed headroom to the pool, bounded by core count", () => {
+      const cores = availableParallelism();
+      for (const p of [1, 2, 4, 8]) {
+        expect(withPoolSize(String(p))).toBe(Math.min(cores, p + 3));
+      }
+    });
+
+    it("should never exceed the core count", () => {
+      // The pool clamps to 1024 before the headroom is added, so on a host
+      // with more than 1027 CPUs the ceiling — not the core count — wins.
+      expect(withPoolSize("4096")).toBe(Math.min(availableParallelism(), 1027));
+    });
+
+    it("should always allow at least one operation", () => {
+      expect(withPoolSize("1")).toBeGreaterThan(0);
+    });
   });
 });

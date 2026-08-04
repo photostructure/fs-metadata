@@ -27,6 +27,110 @@ export function getTimeoutMsDefault(): number {
 }
 
 /**
+ * libuv's thread pool size when `UV_THREADPOOL_SIZE` is unset.
+ *
+ * @see https://docs.libuv.org/en/v1.x/threadpool.html
+ */
+const DefaultUvThreadpoolSize = 4;
+
+/**
+ * Extra in-flight requests allowed beyond the libuv thread pool size. See
+ * {@link getMaxConcurrencyDefault}.
+ *
+ * Holding exactly one request per thread lets threads idle during this
+ * library's event-loop turnaround between completions. A couple of already-
+ * queued requests covers that gap, and the gap is a fixed cost — it does not
+ * grow with the pool — so this is additive rather than a multiplier.
+ *
+ * Measured on a 32-core box (4-thread pool) enumerating 57 volumes: concurrency
+ * 1 took ~57ms, 2 ~37ms, 4 ~29ms, 6 ~31ms, 8 ~25ms, 16 ~22ms, 32 ~21ms. Past
+ * the pool size the curve is nearly flat — single-digit milliseconds separate 6
+ * from 32, and 6/7/8 are indistinguishable from noise — so the remaining
+ * headroom is not worth the queue depth it costs the host application.
+ */
+const UvThreadpoolHeadroom = 3;
+
+/**
+ * Get the default value for {@link Options.maxConcurrency}.
+ *
+ * Every filesystem call this library makes — `stat()`, `readdir()`, and the
+ * native metadata workers — runs on libuv's thread pool, **not** on one thread
+ * per core. That pool holds `UV_THREADPOOL_SIZE` threads (4 unless the embedder
+ * raised it, regardless of core count), it is shared with the rest of the
+ * process, and its queue is FIFO.
+ *
+ * So core count is the wrong unit for this limit: on a 128-core machine
+ * `availableParallelism()` would enqueue 128 requests against those same 4
+ * threads, and any unrelated read the host application issues waits behind the
+ * whole backlog. Scaling with the pool instead keeps queue depth bounded no
+ * matter how large the machine is.
+ *
+ * Set `UV_THREADPOOL_SIZE` in the environment **before Node starts** to raise
+ * both the pool and this default. Assigning `process.env` at runtime happens to
+ * work while the pool is still uncreated, but Node does not guarantee it
+ * affects an already-created pool.
+ *
+ * @returns the pool-aware concurrency limit, at least 1
+ * @see https://nodejs.org/api/cli.html#uv_threadpool_sizesize
+ */
+export function getMaxConcurrencyDefault(): number {
+  return Math.max(
+    1,
+    Math.min(availableParallelism(), uvThreadpoolSize() + UvThreadpoolHeadroom),
+  );
+}
+
+/**
+ * libuv's hard ceiling on the thread pool.
+ *
+ * @see https://docs.libuv.org/en/v1.x/threadpool.html
+ */
+const MaxUvThreadpoolSize = 1024;
+
+/**
+ * Longest `UV_THREADPOOL_SIZE` value libuv can actually read.
+ *
+ * libuv fetches the variable into a fixed 16-byte buffer, so a value needing 16
+ * or more bytes (including the terminator) makes the read fail and the pool
+ * stays at {@link DefaultUvThreadpoolSize} — the value is ignored entirely
+ * rather than parsed.
+ */
+const MaxUvThreadpoolSizeValueBytes = 15;
+
+/**
+ * The pool size libuv will actually use for the current environment.
+ *
+ * This deliberately mirrors libuv's own handling rather than validating the
+ * value, because guessing wrong makes the concurrency limit describe a pool
+ * that does not exist. libuv reads the variable into a fixed 16-byte buffer,
+ * runs the result through `atoi()` — which yields `0` for empty and
+ * non-numeric input — assigns it to an *unsigned* field, then clamps: `0`
+ * becomes 1, and anything above the ceiling (including a negative that wrapped
+ * around) becomes {@link MaxUvThreadpoolSize}.
+ *
+ * Verified against Node 24 by timing concurrent `pbkdf2` calls: unset yields 4
+ * threads, `"0"` and `"banana"` yield 1, `"-3"` yields the 1024 ceiling, a
+ * 15-byte `"000000000000001"` yields 1, and a 16-byte `"0000000000000001"`
+ * falls back to 4 because the read itself fails.
+ */
+export function uvThreadpoolSize(): number {
+  const value = env["UV_THREADPOOL_SIZE"];
+  if (value == null) return DefaultUvThreadpoolSize;
+  // Too long for libuv's buffer: it never sees the value, so neither do we.
+  if (Buffer.byteLength(value, "utf8") > MaxUvThreadpoolSizeValueBytes) {
+    return DefaultUvThreadpoolSize;
+  }
+  // parseInt() stops at the first non-digit like atoi(); NaN stands in for
+  // atoi()'s 0 on wholly non-numeric input.
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed === 0) return 1;
+  // Negative values wrap through libuv's unsigned field into the ceiling.
+  return parsed < 0 || parsed > MaxUvThreadpoolSize
+    ? MaxUvThreadpoolSize
+    : parsed;
+}
+
+/**
  * System paths and globs that indicate system volumes
  */
 export const SystemPathPatternsDefault = [
@@ -263,7 +367,7 @@ export const IncludeZfsGuidsDefault = false;
  */
 export const OptionsDefault: ResolvedOptions = {
   timeoutMs: getTimeoutMsDefault(),
-  maxConcurrency: availableParallelism(),
+  maxConcurrency: getMaxConcurrencyDefault(),
   systemPathPatterns: [...SystemPathPatternsDefault],
   systemFsTypes: [...SystemFsTypesDefault],
   linuxMountTablePaths: [...LinuxMountTablePathsDefault],

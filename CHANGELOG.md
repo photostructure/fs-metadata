@@ -16,6 +16,17 @@ Security in case of vulnerabilities.
 
 ## Unreleased
 
+### Changed
+
+- **`maxConcurrency` now tracks `UV_THREADPOOL_SIZE`, not core count.** It
+  defaults to the libuv pool size plus a small fixed headroom (7 unless the pool
+  was raised), capped by `availableParallelism()`. All filesystem work runs on
+  that shared, FIFO-queued pool rather than one thread per core, so the old
+  core-count default queued up to 128 requests against 4 threads on a large
+  machine and delayed unrelated IO in the host application. Enumeration is a few
+  milliseconds slower for a far shallower queue; raise `UV_THREADPOOL_SIZE` to
+  lift both.
+
 ### Removed
 
 - **Dropped the inert `"snap*"` entry from `SystemFsTypesDefault`.**
@@ -46,6 +57,29 @@ Security in case of vulnerabilities.
   Selection is last-entry-wins: `/proc/self/mounts` carries no mount or parent
   IDs, so file order is a proxy for stacking order that every appending
   mechanism satisfies, but `mount --move` can still defeat.
+
+- **One unreachable mount point no longer taxes every path resolution.**
+  `getMountPointForPath()` and `getVolumeMetadataForPath()` now partition
+  candidates by path ancestry before any IO and stat only the target's
+  ancestors, falling back to the others solely when no ancestor matches the
+  device, and no longer health-probe while building that candidate list. A dead
+  `autofs` trigger or wedged FUSE mount elsewhere on the system is never
+  touched. `fs.promises.stat()` cannot be cancelled, so a blocked call parks a
+  libuv thread until the kernel gives up — not issuing it is the only remedy.
+  Complete on Linux. Windows still status-checks every logical drive natively
+  before path ancestry is considered, so pass a cached `mountPoints` array there
+  to bypass enumeration. macOS resolves paths through targeted native calls
+  rather than enumeration and was never affected.
+
+- **Enumeration no longer fails outright when a single mount point is wedged.**
+  `getVolumeMountPoints()` gave each per-mount `readdir()` probe the same budget
+  as the whole call, so the outer deadline always won the race and one
+  unresponsive volume rejected the entire request. Probes now get a fraction of
+  the budget, making `status: "timeout"` reachable and letting healthy volumes
+  return. Windows is unchanged — `timeoutMs` applies per system call there, with
+  no outer deadline, so its probe keeps the full budget. macOS still runs its
+  native accessibility probes against the whole budget, so that race persists
+  there pending a native fix.
 
 ## [2.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.3.0) (2026-07-20)
 

@@ -30,9 +30,13 @@ export function assertMetadata(metadata: VolumeMetadata | undefined) {
       expect(metadata.size).toBeGreaterThan(0);
       expect(metadata.used).toBeGreaterThanOrEqual(0);
       expect(metadata.available).toBeGreaterThanOrEqual(0);
-      expect(metadata.used! + metadata.available!).toBeLessThanOrEqual(
-        metadata.size!,
-      );
+      // No relationship is asserted between these three. `used` derives from
+      // statvfs f_bfree and `available` from f_bavail, which come from separate
+      // accounting paths: btrfs subtracts its metadata/global-reserve overhead
+      // from f_bfree but not f_bavail, so `used + available` exceeds `size`
+      // there. Bounding each against `size` individually would be a range
+      // assertion on dynamic counters, which this repo's testing guidance
+      // rules out precisely because filesystem accounting varies.
     }
 
     // Optional fields with type checking

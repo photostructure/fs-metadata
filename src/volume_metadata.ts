@@ -6,7 +6,7 @@ import { dirname } from "node:path";
 import { mapConcurrent, validateTimeoutMs, withTimeout } from "./async";
 import { debug } from "./debuglog";
 import { WrappedError } from "./error";
-import { statAsync } from "./fs";
+import { canReaddir, statAsync } from "./fs";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk";
 import { getLinuxMtabMetadata } from "./linux/mount_points";
 import {
@@ -21,6 +21,7 @@ import { isLinux, isMacOS, isWindows } from "./platform";
 import { extractRemoteInfo, isRemoteFsType } from "./remote_info";
 import { isBlank, isNotBlank } from "./string";
 import { assignSystemVolume } from "./system_volume";
+import type { MountPoint } from "./types/mount_point";
 import type {
   GetVolumeMetadataOptions,
   NativeBindingsFn,
@@ -341,14 +342,31 @@ async function _getVolumeMetadataForPath(
  * under /run/user/.../gvfs/), so device ID alone is ambiguous. The longest
  * ancestor wins.
  *
- * The device-only fallback (`deviceMatches`) exists for bind mounts where the
- * canonical mount point may not be a path ancestor of the target.
+ * The device-only fallback exists for bind mounts where the canonical mount
+ * point may not be a path ancestor of the target.
+ *
+ * Resolution runs in two phases because ancestor matches win outright whenever
+ * there are any: the non-ancestor stats cannot change the answer unless no
+ * ancestor is on the target's device. `isAncestorOrSelf()` is pure string work,
+ * so partitioning first costs nothing and normally reduces a full-system list
+ * (57 mount points on a typical Linux desktop) to the 2-3 that are actually
+ * ancestors.
+ *
+ * That matters beyond latency. One unreachable mount point — a dead `autofs`
+ * trigger, an unplugged `x-systemd.automount`, a wedged FUSE mount — blocks
+ * `stat()` for seconds, and `fsp.stat()` has no cancellation: a timeout would
+ * abandon the promise while the libuv thread stays parked. Embedders that have
+ * not raised `UV_THREADPOOL_SIZE` (default 4) would have unrelated filesystem
+ * work starve behind it on every lookup. Not issuing the stat is the only
+ * remedy.
  */
 export async function findMountPointByDeviceId(
   resolved: string,
   resolvedStat: Stats,
   opts: Options,
   nativeFn: NativeBindingsFn,
+  statImpl: typeof statAsync = statAsync,
+  canReaddirImpl: typeof canReaddir = canReaddir,
 ): Promise<string> {
   const targetDev = resolvedStat.dev;
   const mountPoints =
@@ -358,51 +376,71 @@ export async function findMountPointByDeviceId(
         ...opts,
         includeSystemVolumes: true,
         includeNonDirectoryMountPoints: true,
+        // Ancestor-only stat() below is pointless if simply *obtaining* the
+        // candidate list readdir()s every mount first: one dead mount would
+        // still delay every lookup by the probe budget. Nothing here reads
+        // `status`, and includeNonDirectoryMountPoints already disables the
+        // only filter the probe feeds, so the probe is pure cost.
+        skipHealthProbes: true,
       },
       nativeFn,
+      canReaddirImpl,
     ));
 
-  const prefixMatches: string[] = [];
-  const deviceMatches: string[] = [];
-
-  await Promise.all(
-    mountPoints.map(async ({ mountPoint, fstype }) => {
-      const isAncestor = isAncestorOrSelf(mountPoint, resolved);
-      // skipNetworkVolumes: don't stat() non-ancestor remote mount points —
-      // a dead network mount would hang the lookup for an unrelated local
-      // path. Ancestor candidates are still statted: if the target lives
-      // under a remote mount, resolving the target already touched it, and
-      // skipping ancestors would break lookups on healthy network mounts.
-      if (
-        !isAncestor &&
-        opts.skipNetworkVolumes &&
-        isRemoteFsType(fstype, opts.networkFsTypes)
-      ) {
-        return;
-      }
-      try {
-        const mpDev = (await statAsync(mountPoint)).dev;
-        if (mpDev !== targetDev) return;
-        if (isAncestor) {
-          prefixMatches.push(mountPoint);
-        } else {
-          deviceMatches.push(mountPoint);
+  const sameDeviceMountPoints = async (candidates: MountPoint[]) => {
+    const matches: string[] = [];
+    await Promise.all(
+      candidates.map(async ({ mountPoint }) => {
+        try {
+          if ((await statImpl(mountPoint)).dev === targetDev) {
+            matches.push(mountPoint);
+          }
+        } catch {
+          // skip inaccessible mount points
         }
-      } catch {
-        // skip inaccessible mount points
-      }
-    }),
-  );
+      }),
+    );
+    return matches;
+  };
 
-  // Prefer ancestor matches — they're unambiguous. Fall back to device-only
-  // matches only when the mount point isn't an ancestor (e.g. bind mounts).
-  const candidates = prefixMatches.length > 0 ? prefixMatches : deviceMatches;
-  if (candidates.length === 0) {
+  const ancestors: MountPoint[] = [];
+  const nonAncestors: MountPoint[] = [];
+  for (const mp of mountPoints) {
+    (isAncestorOrSelf(mp.mountPoint, resolved) ? ancestors : nonAncestors).push(
+      mp,
+    );
+  }
+
+  // Phase 1: ancestors only. These are all on the path realpath() already
+  // traversed, so they are reachable by construction.
+  const prefixMatches = await sameDeviceMountPoints(ancestors);
+  if (prefixMatches.length > 0) return longestPath(prefixMatches);
+
+  // Phase 2: the bind-mount fallback, reached only when nothing on the target's
+  // own path matched. skipNetworkVolumes: don't stat() non-ancestor remote
+  // mount points — a dead network mount would hang the lookup for an unrelated
+  // local path. Ancestors are exempt above: if the target lives under a remote
+  // mount, resolving it already touched that mount, and skipping ancestors
+  // would break lookups on healthy network volumes.
+  const deviceMatches = await sameDeviceMountPoints(
+    nonAncestors.filter(
+      ({ fstype }) =>
+        !(
+          opts.skipNetworkVolumes && isRemoteFsType(fstype, opts.networkFsTypes)
+        ),
+    ),
+  );
+  if (deviceMatches.length === 0) {
     throw new Error(
       "No mount point found for path: " + JSON.stringify(resolved),
     );
   }
-  return candidates.reduce((a, b) => (a.length >= b.length ? a : b));
+  return longestPath(deviceMatches);
+}
+
+/** The most specific of several matching mount points. */
+function longestPath(paths: string[]): string {
+  return paths.reduce((a, b) => (a.length >= b.length ? a : b));
 }
 
 export async function getAllVolumeMetadataImpl(

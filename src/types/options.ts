@@ -30,12 +30,32 @@ export interface Options {
    * fallback is intentional (it lets bind-mounted paths resolve to their
    * canonical mount point), but it means an incomplete or hand-picked array
    * can match an entry with no path relationship to the target.
+   *
+   * A long array is cheap: only entries that are path ancestors of the target
+   * are `stat()`ed, and the rest are touched solely when no ancestor is on the
+   * target's device. An unreachable entry therefore costs nothing unless the
+   * target actually resolves through the fallback.
    */
   mountPoints?: MountPoint[];
   /**
    * Timeout in milliseconds for filesystem operations.
    *
    * Disable timeouts by setting this to 0.
+   *
+   * This bounds each single-volume operation — `getVolumeMetadata()`,
+   * `getVolumeMetadataForPath()`, `getMountPointForPath()` — and mount point
+   * enumeration. It is **not** one global deadline for
+   * `getAllVolumeMetadata()`, which applies it to enumeration and to each
+   * per-volume call separately.
+   *
+   * Sub-operations that must not consume a whole budget derive a smaller one
+   * from it: the per-mount-point health probe during enumeration takes a
+   * fraction, and the opt-in ZFS GUID queries reserve time for teardown.
+   * Raising `timeoutMs` raises both.
+   *
+   * On Windows this is applied **per system call** by the native layer rather
+   * than as one deadline around enumeration, so the health probe there keeps
+   * the full value instead of a fraction.
    *
    * @see {@link getTimeoutMsDefault}.
    */
@@ -44,7 +64,17 @@ export interface Options {
   /**
    * Maximum number of concurrent filesystem operations.
    *
-   * Defaults to {@link https://nodejs.org/api/os.html#osavailableparallelism | availableParallelism}.
+   * Defaults to `UV_THREADPOOL_SIZE` plus a little headroom (so 7 unless the
+   * pool was raised), capped by
+   * {@link https://nodejs.org/api/os.html#osavailableparallelism | availableParallelism}.
+   * Filesystem work runs on libuv's
+   * shared, FIFO-queued thread pool rather than one thread per core, so this
+   * limit tracks that pool: it bounds how deeply this library can queue ahead
+   * of unrelated IO in the host application.
+   *
+   * Raise it for marginally faster enumeration at the cost of host-application
+   * latency, or raise `UV_THREADPOOL_SIZE` (before any IO happens) to lift
+   * both.
    */
   maxConcurrency: number;
 

@@ -3,6 +3,7 @@
 import { uniqBy } from "./array";
 import { mapConcurrent, validateTimeoutMs, withTimeout } from "./async";
 import { debug } from "./debuglog";
+import { canReaddir } from "./fs";
 import { getLinuxMountPoints } from "./linux/mount_points";
 import { compactValues } from "./object";
 import { isMacOS, isWindows } from "./platform";
@@ -12,7 +13,7 @@ import { assignSystemVolume, SystemVolumeConfig } from "./system_volume";
 import type { MountPoint } from "./types/mount_point";
 import type { NativeBindingsFn } from "./types/native_bindings";
 import type { Options } from "./types/options";
-import { directoryStatus } from "./volume_health_status";
+import { directoryStatus, healthProbeTimeoutMs } from "./volume_health_status";
 
 export type GetVolumeMountPointOptions = Partial<
   Pick<
@@ -33,16 +34,39 @@ type GetVolumeMountPointImplOptions = Required<GetVolumeMountPointOptions> & {
    * mounts. Public volume enumeration omits detected non-directory targets.
    */
   includeNonDirectoryMountPoints?: boolean;
+  /**
+   * Skip the per-mount-point `readdir()` health probe.
+   *
+   * The probe exists to report {@link MountPoint.status} and to detect
+   * non-directory targets. Internal path resolution
+   * ({@link findMountPointByDeviceId}) uses neither: it reads only
+   * `mountPoint` and `fstype`, and it already passes
+   * `includeNonDirectoryMountPoints`, which disables the only filter the probe
+   * feeds. Probing there is pure cost — one unreachable mount would delay
+   * *every* path lookup by the probe budget and occupy a libuv worker for it,
+   * which is exactly the hazard the ancestor-only `stat()` partitioning exists
+   * to avoid.
+   *
+   * This only reaches the TypeScript probe below. Windows enumerates natively
+   * and status-checks every logical drive before returning, which this flag
+   * cannot suppress, so path resolution there is not fully isolated from an
+   * unreachable drive; passing a cached {@link Options.mountPoints} array skips
+   * enumeration outright. macOS never reaches this code path at all — both
+   * macOS path APIs resolve through targeted native calls rather than
+   * enumeration.
+   */
+  skipHealthProbes?: boolean;
 };
 
 export async function getVolumeMountPointsImpl(
   opts: GetVolumeMountPointImplOptions,
   nativeFn: NativeBindingsFn,
+  canReaddirImpl: typeof canReaddir = canReaddir,
 ): Promise<MountPoint[]> {
   // Validate before starting any work (including native calls) — also on
   // Windows, which relies on native timeouts and bypasses withTimeout().
   validateTimeoutMs(opts.timeoutMs, "getVolumeMountPoints");
-  const p = _getVolumeMountPoints(opts, nativeFn);
+  const p = _getVolumeMountPoints(opts, nativeFn, canReaddirImpl);
   return isWindows
     ? p
     : withTimeout({ desc: "getVolumeMountPoints", ...opts, promise: p });
@@ -51,6 +75,7 @@ export async function getVolumeMountPointsImpl(
 async function _getVolumeMountPoints(
   o: GetVolumeMountPointImplOptions,
   nativeFn: NativeBindingsFn,
+  canReaddirImpl: typeof canReaddir,
 ): Promise<MountPoint[]> {
   debug("[getVolumeMountPoints] gathering mount points with options: %o", o);
 
@@ -89,11 +114,28 @@ async function _getVolumeMountPoints(
     results.length,
   );
 
+  // Each probe gets a fraction of the whole-call budget, never all of it: this
+  // call is itself wrapped in withTimeout(o.timeoutMs), so an equal per-probe
+  // budget means the enumeration rejects before any single wedged mount point
+  // can be marked `timeout` and stepped over.
+  //
+  // Windows is exempt: getVolumeMountPointsImpl() returns the raw promise there
+  // (native code enforces its own timeouts), so there is no outer deadline to
+  // lose the race to. Shortening the probe would only make a slow-but-healthy
+  // drive that answers within the caller's budget report `timeout` and be
+  // skipped by getAllVolumeMetadata().
+  const probeTimeoutMs = isWindows
+    ? o.timeoutMs
+    : healthProbeTimeoutMs(o.timeoutMs);
+
   const nonDirectoryMountPoints = new Set<string>();
   await mapConcurrent({
     maxConcurrency: o.maxConcurrency,
     items: results.filter(
       (ea) =>
+        // skipHealthProbes: callers that read neither status nor the
+        // non-directory filter must not pay for — or block on — the probe.
+        !o.skipHealthProbes &&
         // trust but verify
         (isBlank(ea.status) || ea.status === "healthy") &&
         // skipNetworkVolumes: don't health-probe remote volumes — a dead
@@ -103,7 +145,11 @@ async function _getVolumeMountPoints(
     ),
     fn: async (mp) => {
       debug("[getVolumeMountPoints] checking status of %s", mp.mountPoint);
-      const result = await directoryStatus(mp.mountPoint, o.timeoutMs);
+      const result = await directoryStatus(
+        mp.mountPoint,
+        probeTimeoutMs,
+        canReaddirImpl,
+      );
       mp.status = result.status;
       if (result.isDirectory === false) {
         nonDirectoryMountPoints.add(mp.mountPoint);

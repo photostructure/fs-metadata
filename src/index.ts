@@ -210,7 +210,7 @@ export function getMountPointForPath(
  * @param opts.includeSystemVolumes - If true, includes system volumes in the
  * results. Defaults to true on Windows and false elsewhere.
  * @param opts.maxConcurrency - Maximum number of concurrent operations.
- * Defaults to the system's available parallelism: see
+ * Defaults to `UV_THREADPOOL_SIZE` plus a little headroom, capped by
  * {@link https://nodejs.org/api/os.html#osavailableparallelism | os.availableParallelism()}
  * @param opts.timeoutMs - Maximum time to wait for
  * {@link getVolumeMountPointsImpl}, as well as **each** {@link getVolumeMetadataImpl}

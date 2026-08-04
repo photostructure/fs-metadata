@@ -61,6 +61,89 @@ The operating-system request may still remain blocked in a background worker
 because Node's filesystem promises and several platform APIs do not provide
 portable cancellation.
 
+### One Dead Mount Point Must Not Tax Everything Else
+
+A mount point that cannot answer — a dead `autofs` trigger, an unplugged
+`x-systemd.automount`, a wedged FUSE mount — blocks `stat()` and `readdir()`
+until the kernel gives up, which can be many seconds. Two properties keep that
+cost local:
+
+**Path resolution only stats ancestors.** `getMountPointForPath()` and
+`getVolumeMetadataForPath()` partition the candidate mount points by path
+ancestry before doing any IO, and stat only the ancestors of the target. The
+non-ancestors are touched solely when no ancestor is on the target's device
+(the bind-mount fallback). On a typical Linux desktop that is 2 stats rather
+than 57, and an unrelated dead mount is never touched.
+
+**Enumeration gives each health probe a fraction of the budget.** On Linux and
+macOS, `getVolumeMountPoints()` is bounded by `timeoutMs` as a whole, so the
+per-mount-point `readdir()` probe gets a quarter of that. A wedged mount point
+is reported with `status: "timeout"` and enumeration returns everything else,
+instead of the whole call failing on the one bad entry. Windows is exempt —
+`timeoutMs` applies per system call there, with no outer deadline to lose a race
+to, so its probe keeps the full budget.
+
+Note that a timeout **abandons** the operation, it does not cancel it:
+`fs.promises.stat()` has no cancellation, so the libuv worker stays occupied
+until the kernel returns. This is why resolution avoids issuing the stat rather
+than merely bounding it, and why embedders should size `UV_THREADPOOL_SIZE` (see
+below) for the number of volumes they enumerate.
+
+**Known gaps outside Linux.**
+
+- **Windows path resolution** builds its candidate list by status-checking every
+  logical drive natively, before path ancestry is considered, so one
+  disconnected network drive can still delay an unrelated lookup on `C:`. Pass a
+  cached `mountPoints` array to bypass enumeration until this is fixed natively.
+- **macOS enumeration** runs its native accessibility probes with the full
+  `timeoutMs` while the outer deadline is already ticking, so a single wedged
+  mount can still make `getVolumeMountPoints()` reject rather than reporting
+  that mount as `timeout`.
+
+macOS _path resolution_ is unaffected by both: `getMountPointForPath()` and
+`getVolumeMetadataForPath()` resolve through targeted native calls (`fstatfs`)
+rather than enumerating, so they never touch an unrelated volume — and they
+ignore `mountPoints` for resolution, so caching it changes nothing there.
+
+### Concurrency and `UV_THREADPOOL_SIZE`
+
+Every filesystem call here — `stat()`, `readdir()`, and the native metadata
+workers — runs on libuv's thread pool, **not** on one thread per core. That pool
+holds `UV_THREADPOOL_SIZE` threads (**4** by default, regardless of core count)
+and is shared with the rest of your process.
+
+`maxConcurrency` therefore defaults to the pool size plus a small fixed
+headroom (7), not to `availableParallelism()`. Core count is the wrong unit: on
+a 128-core machine it would queue 128 requests against those same 4 threads, and
+any unrelated read your application issues would wait behind the whole backlog.
+The headroom is additive because what it covers — threads idling during this
+library's event-loop turnaround between completions — is a fixed cost that does
+not grow with the pool.
+
+Measured on a 32-core box enumerating 57 volumes:
+
+| `maxConcurrency` | elapsed |
+| ---------------- | ------- |
+| 1                | 57 ms   |
+| 2                | 37 ms   |
+| 4                | 29 ms   |
+| 7 (default)      | ~28 ms  |
+| 8                | 25 ms   |
+| 16               | 22 ms   |
+| 32               | 21 ms   |
+
+Past the pool size the curve is nearly flat, so the default gives up a few
+milliseconds of enumeration time for a much shallower queue. To go faster,
+raise the pool itself — it must be set before any IO, so before requiring this
+module:
+
+```bash
+UV_THREADPOOL_SIZE=16 node app.js
+```
+
+That lifts both the pool and this default. Raising `maxConcurrency` alone buys
+less, and costs your application more latency.
+
 ### Optical Drives
 
 Optical drives (CD/DVD) can take 30+ seconds to spin up:
@@ -257,6 +340,20 @@ elsewhere): `subvolid` / `subvol` (from mount options), or the strong
 `subvolumeUuid` (per-subvolume UUID via ioctl, kernel ≥ 4.18). See
 [Subvolume Identity](./subvolume-identity.md) for the full rationale, stability
 semantics, and how zfs/bcachefs differ.
+
+#### btrfs `used + available` Can Exceed `size`
+
+`used` is derived from `statvfs` `f_bfree` and `available` from `f_bavail`.
+Nothing requires `f_bavail <= f_bfree`. On most filesystems `f_bavail` is the
+smaller of the two (it excludes root-reserved blocks), so the sum lands under
+`size`. btrfs subtracts its metadata and global-reserve overhead from `f_bfree`
+but not from `f_bavail`, so the sum can exceed `size` by that reserve — about
+109 MiB on a 12 TB filesystem.
+
+Do not assume the two partition `size`, and do not bound them against it
+either: these are dynamic counters read from separate accounting paths, and
+filesystem semantics vary enough that any such range check is a latent test
+failure. Check that they exist and are numbers.
 
 #### ZFS Datasets Have No `uuid` — `fsid` Is Best-Effort
 
