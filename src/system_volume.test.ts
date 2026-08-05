@@ -54,6 +54,19 @@ describe("isSystemVolume", () => {
       fstype: "ext4",
       expected: true,
     },
+    // gvfs: excluded by fstype, so both the $XDG_RUNTIME_DIR location and the
+    // documented $HOME/.gvfs fallback are caught.
+    {
+      mountPoint: "/run/user/1000/gvfs",
+      fstype: "fuse.gvfsd-fuse",
+      expected: true,
+    },
+    { mountPoint: "/root/.gvfs", fstype: "fuse.gvfsd-fuse", expected: true },
+    {
+      mountPoint: "/home/alice/.gvfs",
+      fstype: "fuse.gvfsd-fuse",
+      expected: true,
+    },
   ]) {
     it(`should return ${expected} for ${mountPoint} (${fstype})`, () => {
       expect(isSystemVolume(mountPoint, fstype)).toBe(expected);

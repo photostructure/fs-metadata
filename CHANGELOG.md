@@ -81,6 +81,16 @@ Security in case of vulnerabilities.
   native accessibility probes against the whole budget, so that race persists
   there pending a native fix.
 
+- **`fuse.gvfsd-fuse` mounts are now excluded by default.** GVfs does not mount
+  its FUSE bridge with `allow_other`, so FUSE denies access to every user except
+  the owner and cross-user `readdir` calls fail with `EACCES`; the bridge was
+  therefore reported as `inaccessible` rather than as a system volume.
+  `SystemPathPatternsDefault` covered `/run/user/*/gvfs` but missed gvfsd-fuse's
+  documented `$HOME/.gvfs` fallback when `$XDG_RUNTIME_DIR` is unavailable
+  (commonly for root). Matching on fstype covers either location.
+  `includeSystemVolumes: true` restores the aggregate bridge; its individual GIO
+  backends remain subdirectories rather than separate mount-table entries.
+
 ## [2.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.3.0) (2026-07-20)
 
 ### Added

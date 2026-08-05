@@ -228,6 +228,16 @@ export const SystemFsTypesDefault = [
   "devtmpfs",
   "efivarfs",
   "fusectl",
+  // GNOME Virtual File System's FUSE bridge. All GIO backends live beneath one
+  // aggregate mount rather than appearing as separate mount-table entries, so
+  // the bridge does not represent one storage volume with one identity. Match
+  // by fstype because gvfsd-fuse mounts at $XDG_RUNTIME_DIR/gvfs and falls back
+  // to $HOME/.gvfs when $XDG_RUNTIME_DIR is unavailable (commonly for root).
+  // GVfs does not request FUSE's allow_other option, so only the owner can
+  // access the bridge. Callers can restore the aggregate entry with
+  // includeSystemVolumes: true; this does not enumerate its backends.
+  // https://wiki.gnome.org/Projects/gvfs
+  "fuse.gvfsd-fuse",
   // LXC container filesystem virtualization
   // https://linuxcontainers.org/lxcfs/
   "fuse.lxcfs",

@@ -156,6 +156,7 @@ that don't represent real storage:
 | Boot/firmware             | `efivarfs`, `pstore`, `binfmt_misc`                                         |
 | Automount                 | `autofs`, `fusectl`                                                         |
 | Container/sandbox         | `fuse.lxcfs`, `fuse.portal`, `fuse.snapfuse`, `fuse.squashfuse`, `squashfs` |
+| Desktop VFS               | `fuse.gvfsd-fuse`                                                           |
 | Kernel internal           | `nsfs`, `mqueue`, `rpc_pipefs`, `none`                                      |
 
 Filesystem types are matched **exactly** (`Array.includes`), not as globs — only
@@ -174,6 +175,16 @@ which binary is installed. All three are listed. The mount root varies too:
 `/snap` on Ubuntu, `/var/lib/snapd/snap` (snapd's `AltSnapMountDir`) where
 `/snap` is absent or is a symlink to it. Mount entries report the resolved path,
 so both roots are listed as path patterns.
+
+`fuse.gvfsd-fuse` is matched by fstype rather than path because gvfsd-fuse
+mounts at `$XDG_RUNTIME_DIR/gvfs` and falls back to `$HOME/.gvfs` when
+`$XDG_RUNTIME_DIR` is unavailable (commonly for root). GVfs does not request
+FUSE's `allow_other` option, so only the owner can access the bridge; another
+user's request fails with `EACCES` unless parent directory permissions reject it
+first. Its individual GIO backends are subdirectories, not separate mount-table
+entries. Passing `includeSystemVolumes: true` restores the aggregate bridge but
+does not enumerate those backends separately. The `/run/user/*/gvfs` path
+pattern remains as a redundant match for callers that override `systemFsTypes`.
 
 ### Path pattern detection
 

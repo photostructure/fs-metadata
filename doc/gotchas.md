@@ -397,13 +397,38 @@ SIGKILL OpenZFS commands, so one blocked in kernel IO may outlive the call.
 
 #### GVfs/FUSE Mounts
 
-User-mounted volumes (like Google Drive, SMB shares via Nautilus) appear under `/run/user/*/gvfs`:
+GNOME mounts (Google Drive, MTP phones, SMB shares via Nautilus) are exposed by
+a single `fuse.gvfsd-fuse` mount; the individual backends are subdirectories of
+it, not separate mount table entries:
+
+```
+/run/user/1000/gvfs                                    <- the only mount entry
+/run/user/1000/gvfs/smb-share:server=nas,share=docs    <- just a subdirectory
+```
+
+That mount is excluded by default: `fuse.gvfsd-fuse` is in
+`SystemFsTypesDefault`, so `getVolumeMountPoints()` omits it unless you pass
+`includeSystemVolumes: true`.
+
+Opting in returns the aggregate bridge, not one mount point per backend:
 
 ```typescript
-const volumes = await getVolumeMountPoints();
-// May include entries like:
-// /run/user/1000/gvfs/smb-share:server=nas,share=documents
+const gvfsBridges = (
+  await getVolumeMountPoints({ includeSystemVolumes: true })
+).filter(({ fstype }) => fstype === "fuse.gvfsd-fuse");
 ```
+
+The bridge does not provide a separate filesystem identity, label, or capacity
+for each backend. Applications that need to discover individual GIO mounts
+must use a GIO-aware API rather than infer them from mount-table entries.
+
+The exclusion is by fstype, not path, because gvfsd-fuse mounts at
+`$XDG_RUNTIME_DIR/gvfs` and falls back to `$HOME/.gvfs` when
+`$XDG_RUNTIME_DIR` is unavailable (commonly for root). GVfs does not request
+FUSE's `allow_other` option, so only the owner can access the bridge; parent
+directory permissions may reject another user even before FUSE does. The owner
+can walk the backend directories, while another user gets `EACCES` and
+previously saw the bridge reported as `inaccessible`.
 
 ### macOS
 
