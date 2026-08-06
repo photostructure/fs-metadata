@@ -16,6 +16,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `scripts/` - Build and utility scripts
 - `prebuilds/` - Prebuilt native binaries for different platforms
 
+### Before a release
+
+`make preflight` (or `npm run preflight`, which runs `scripts/preflight.ts`):
+updates dependencies, formats, lints, builds native + dist, and runs the tests.
+
 ### Script Preferences
 
 **Always** use TypeScript (`.ts`) scripts executed with `tsx` instead of:

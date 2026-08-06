@@ -77,8 +77,8 @@
     "release:prebuild-artifact": "tsx scripts/release-prebuild-artifacts-cli.ts package",
     "release:assemble-prebuilds": "tsx scripts/release-prebuild-artifacts-cli.ts assemble",
     "release:smoke-package": "tsx scripts/release-package-smoke.ts",
-    "// all": "should be manually run by developers before they run `git commit`",
-    "all": "tsx scripts/all.ts",
+    "// preflight": "should be manually run by developers before they run `git commit`",
+    "preflight": "tsx scripts/preflight.ts",
     "prepare-release": "npm run build:dist"
   },
   "gypfile": true,

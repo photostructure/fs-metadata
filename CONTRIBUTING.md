@@ -26,7 +26,8 @@ npm ci --ignore-scripts
 npm run build:native
 ```
 
-Use `npm run all` for dependency updates and the full local check. It verifies
+Use `npm run preflight` (or `make preflight`) for dependency updates and the
+full local check. It verifies
 the npm version before changing the lockfile and invokes required project build
 steps explicitly; do not enable dependency lifecycle scripts.
 
@@ -87,7 +88,7 @@ mounts but not `/dev/zfs` intentionally skip the external GUID queries.
 
 ## Before submitting your PR
 
-Run `npm run all`, which:
+Run `npm run preflight`, which:
 
 - reformats your code
 - runs the linter
