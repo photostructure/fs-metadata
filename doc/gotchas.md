@@ -76,10 +76,10 @@ non-ancestors are touched solely when no ancestor is on the target's device
 than 57, and an unrelated dead mount is never touched.
 
 **Enumeration gives each health probe a fraction of the budget.** On Linux and
-macOS, `getVolumeMountPoints()` is bounded by `timeoutMs` as a whole, so the
-per-mount-point `readdir()` probe gets a quarter of that. A wedged mount point
-is reported with `status: "timeout"` and enumeration returns everything else,
-instead of the whole call failing on the one bad entry. Windows is exempt —
+macOS, `getVolumeMountPoints()` is bounded by `timeoutMs` as a whole, so its
+health-probe phase gets a quarter of that. A wedged mount reports
+`status: "timeout"` on both platforms. Enumeration returns the other volumes
+instead of failing the whole call on one bad entry. Windows is exempt —
 `timeoutMs` applies per system call there, with no outer deadline to lose a race
 to, so its probe keeps the full budget.
 
@@ -89,21 +89,24 @@ until the kernel returns. This is why resolution avoids issuing the stat rather
 than merely bounding it, and why embedders should size `UV_THREADPOOL_SIZE` (see
 below) for the number of volumes they enumerate.
 
-**Known gaps outside Linux.**
+**How each platform gets there.** The mechanism differs, but no platform lets an
+unreachable volume tax an unrelated lookup:
 
-- **Windows path resolution** builds its candidate list by status-checking every
-  logical drive natively, before path ancestry is considered, so one
-  disconnected network drive can still delay an unrelated lookup on `C:`. Pass a
-  cached `mountPoints` array to bypass enumeration until this is fixed natively.
-- **macOS enumeration** runs its native accessibility probes with the full
-  `timeoutMs` while the outer deadline is already ticking, so a single wedged
-  mount can still make `getVolumeMountPoints()` reject rather than reporting
-  that mount as `timeout`.
+- **Linux** reads the mount table without per-volume I/O.
+- **Windows** enumerates drive roots for path resolution without
+  `GetDriveTypeW`, the status check, or `GetVolumeInformationW`, so a
+  disconnected network drive costs nothing. Those entries carry only
+  `mountPoint`; anything needing `status` or `fstype` enumerates normally and
+  pays for the probe.
+- **macOS** never enumerates for path resolution: `getMountPointForPath()` and
+  `getVolumeMetadataForPath()` resolve through targeted native calls
+  (`fstatfs`). They also ignore `mountPoints`, so caching it changes nothing
+  there.
 
-macOS _path resolution_ is unaffected by both: `getMountPointForPath()` and
-`getVolumeMetadataForPath()` resolve through targeted native calls (`fstatfs`)
-rather than enumerating, so they never touch an unrelated volume — and they
-ignore `mountPoints` for resolution, so caching it changes nothing there.
+For public enumeration, macOS bounds its native accessibility probes with the
+same fraction of `timeoutMs` the JavaScript probe gets and schedules them in a
+rolling four-probe window. One wedged mount is reported as `timeout` without
+preventing later healthy mounts from being checked or rejecting the whole call.
 
 ### Concurrency and `UV_THREADPOOL_SIZE`
 

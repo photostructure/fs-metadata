@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { withTimeout } from "./async";
 import { type canReaddir, statAsync } from "./fs";
 import { optionsWithDefaults } from "./options";
-import { isLinux, isWindows } from "./platform";
+import { isLinux, isMacOS, isWindows } from "./platform";
 import type { MountPoint } from "./types/mount_point";
 import type { NativeBindingsFn } from "./types/native_bindings";
 import type { Options } from "./types/options";
@@ -215,6 +215,38 @@ describe("dead mount isolation", () => {
           impl,
         ),
       ).resolves.toBe(p.ancestor);
+    });
+  });
+
+  // macOS-only: this asserts the budget handed to the *native* enumerator,
+  // which only runs on the native platforms, and Windows deliberately keeps
+  // the full value (no outer deadline there to lose a race to).
+  (isMacOS ? describe : describe.skip)("native enumeration budget", () => {
+    it("gives the macOS native probe phase a fraction of the budget", async () => {
+      // Darwin deadlines its own per-mount accessibility probes from the
+      // timeoutMs it receives. Handing it the whole budget loses to the outer
+      // withTimeout(), which started first: one wedged mount rejects the entire
+      // enumeration instead of being returned as `timeout`.
+      const timeoutMs = 4_000;
+      const received: (number | undefined)[] = [];
+      const fakeNative = (() =>
+        Promise.resolve({
+          getVolumeMountPoints: (opts?: { timeoutMs?: number }) => {
+            received.push(opts?.timeoutMs);
+            return Promise.resolve([{ mountPoint: tmpdir() }]);
+          },
+        })) as unknown as NativeBindingsFn;
+
+      await getVolumeMountPointsImpl(
+        {
+          ...optionsWithDefaults({ timeoutMs, includeSystemVolumes: true }),
+          skipHealthProbes: true,
+        },
+        fakeNative,
+      );
+
+      expect(received).toEqual([healthProbeTimeoutMs(timeoutMs)]);
+      expect(received[0]).toBeLessThan(timeoutMs);
     });
   });
 

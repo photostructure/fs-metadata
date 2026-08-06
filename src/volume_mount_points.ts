@@ -47,13 +47,12 @@ type GetVolumeMountPointImplOptions = Required<GetVolumeMountPointOptions> & {
    * which is exactly the hazard the ancestor-only `stat()` partitioning exists
    * to avoid.
    *
-   * This only reaches the TypeScript probe below. Windows enumerates natively
-   * and status-checks every logical drive before returning, which this flag
-   * cannot suppress, so path resolution there is not fully isolated from an
-   * unreachable drive; passing a cached {@link Options.mountPoints} array skips
-   * enumeration outright. macOS never reaches this code path at all — both
-   * macOS path APIs resolve through targeted native calls rather than
-   * enumeration.
+   * Forwarded to the native enumerator too. Windows honors it by skipping both
+   * the drive status check and `GetVolumeInformationW`, the two calls that
+   * touch the volume, so a disconnected network drive no longer stalls a lookup
+   * on another drive; those entries then carry only `mountPoint`. macOS never
+   * reaches this code path — both macOS path APIs resolve through targeted
+   * native calls rather than enumeration.
    */
   skipHealthProbes?: boolean;
 };
@@ -82,7 +81,18 @@ async function _getVolumeMountPoints(
   const raw = await (isWindows || isMacOS
     ? (async () => {
         debug("[getVolumeMountPoints] using native implementation");
-        const points = await (await nativeFn()).getVolumeMountPoints(o);
+        // macOS runs its own accessibility probe per mount inside this call,
+        // deadlined from the timeoutMs it receives. Handing it the whole budget
+        // loses the same race the TypeScript probe below was losing: the outer
+        // withTimeout() started first, so one wedged mount rejected the entire
+        // enumeration instead of being reported as `timeout`. Give the native
+        // phase the same fraction. Windows enforces its own per-call timeouts
+        // and has no outer deadline, so it keeps the full value.
+        const points = await (
+          await nativeFn()
+        ).getVolumeMountPoints(
+          isMacOS ? { ...o, timeoutMs: healthProbeTimeoutMs(o.timeoutMs) } : o,
+        );
         debug(
           "[getVolumeMountPoints] native returned %d mount points",
           points.length,
@@ -97,8 +107,13 @@ async function _getVolumeMountPoints(
     .map((ea) => compactValues(ea) as MountPoint)
     .filter((ea) => isNotBlank(ea.mountPoint));
 
-  for (const ea of compacted) {
-    assignSystemVolume(ea, o);
+  // The candidate-only route includes system volumes unconditionally and reads
+  // only mountPoint. Avoid manufacturing isSystemVolume on its deliberately
+  // minimal Windows records.
+  if (!o.skipHealthProbes) {
+    for (const ea of compacted) {
+      assignSystemVolume(ea, o);
+    }
   }
 
   const filtered = o.includeSystemVolumes

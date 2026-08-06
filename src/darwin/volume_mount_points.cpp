@@ -8,6 +8,8 @@
 #include "./raii_utils.h"
 #include "./system_volume.h"
 #include <chrono>
+#include <condition_variable>
+#include <cstdint>
 #include <future>
 #include <mutex>
 #include <sys/mount.h>
@@ -26,6 +28,8 @@ namespace {
 // stuck threads without bound.
 struct ProbeState {
   std::mutex mutex;
+  std::condition_variable completed;
+  std::uint64_t completionGeneration = 0;
   std::unordered_map<std::string, std::shared_future<bool>> inflight;
 };
 
@@ -68,7 +72,9 @@ std::shared_future<bool> StartAccessProbe(const std::string &path) {
         // StartAccessProbe() for this path could observe the erased entry
         // before the value is set and spawn a redundant probe.
         promise->set_value(accessible);
+        ++state->completionGeneration;
       }
+      state->completed.notify_all();
     }).detach();
   } catch (...) {
     // Thread construction can throw under resource exhaustion. Remove the
@@ -78,6 +84,33 @@ std::shared_future<bool> StartAccessProbe(const std::string &path) {
     throw;
   }
   return future;
+}
+
+std::uint64_t ProbeCompletionGeneration() {
+  ProbeState *const state = GetProbeState();
+  std::lock_guard<std::mutex> lock(state->mutex);
+  return state->completionGeneration;
+}
+
+void WaitForProbeCompletion(std::uint64_t &observedGeneration) {
+  ProbeState *const state = GetProbeState();
+  std::unique_lock<std::mutex> lock(state->mutex);
+  state->completed.wait(lock, [&]() {
+    return state->completionGeneration != observedGeneration;
+  });
+  observedGeneration = state->completionGeneration;
+}
+
+bool WaitForProbeCompletionUntil(
+    std::uint64_t &observedGeneration,
+    const std::chrono::steady_clock::time_point &deadline) {
+  ProbeState *const state = GetProbeState();
+  std::unique_lock<std::mutex> lock(state->mutex);
+  const bool completed = state->completed.wait_until(lock, deadline, [&]() {
+    return state->completionGeneration != observedGeneration;
+  });
+  observedGeneration = state->completionGeneration;
+  return completed;
 }
 
 } // namespace
@@ -165,8 +198,11 @@ public:
         // DA session RAII unschedules and releases here under the lock
       }
 
-      // Process mount points in batches to limit concurrent threads
-      const size_t maxConcurrentChecks = 4; // Limit concurrent access checks
+      // Keep a rolling window rather than fixed batches. If one probe hangs,
+      // each healthy peer that finishes immediately makes room for another
+      // mount point; a hung member of an early group therefore cannot prevent
+      // later healthy volumes from being checked before the deadline.
+      const size_t maxConcurrentChecks = 4;
 
       // One deadline for the whole probing phase, matching the per-call
       // timeoutMs contract enforced by the TypeScript wrapper — otherwise
@@ -178,78 +214,106 @@ public:
       const auto deadline = std::chrono::steady_clock::now() +
                             std::chrono::milliseconds(timeoutMs_);
 
-      for (size_t i = 0; i < allMountPoints.size(); i += maxConcurrentChecks) {
+      struct PendingProbe {
+        MountPoint *mountPoint;
+        std::shared_future<bool> future;
+      };
+
+      auto recordReadyProbe = [](PendingProbe &probe) {
+        auto &mp = *probe.mountPoint;
+        try {
+          const bool isAccessible = probe.future.get();
+          mp.status = isAccessible ? "healthy" : "inaccessible";
+          if (!isAccessible) {
+            mp.error = "Path is not accessible";
+          }
+          DEBUG_LOG("[GetVolumeMountPointsWorker] Access check %s: %s",
+                    isAccessible ? "succeeded" : "failed",
+                    mp.mountPoint.c_str());
+        } catch (const std::exception &e) {
+          mp.status = "error";
+          mp.error = std::string("Access check failed: ") + e.what();
+          DEBUG_LOG("[GetVolumeMountPointsWorker] Exception: %s", e.what());
+        }
+      };
+
+      auto recordTimedOutProbe = [](MountPoint &mp) {
+        mp.status = "timeout";
+        mp.error = "Access check timed out";
+        DEBUG_LOG("[GetVolumeMountPointsWorker] Access check timed out: %s",
+                  mp.mountPoint.c_str());
+      };
+
+      std::vector<PendingProbe> pending;
+      pending.reserve(maxConcurrentChecks);
+      size_t nextMountPoint = 0;
+      std::uint64_t completionGeneration = ProbeCompletionGeneration();
+
+      auto fillProbeWindow = [&]() {
+        while (pending.size() < maxConcurrentChecks &&
+               nextMountPoint < allMountPoints.size()) {
+          auto &mp = allMountPoints[nextMountPoint++];
+          DEBUG_LOG("[GetVolumeMountPointsWorker] Checking mount point: %s",
+                    mp.mountPoint.c_str());
+          pending.push_back(PendingProbe{&mp, StartAccessProbe(mp.mountPoint)});
+        }
+      };
+
+      auto timeoutUnfinishedProbes = [&]() {
+        for (auto &probe : pending) {
+          recordTimedOutProbe(*probe.mountPoint);
+        }
+        pending.clear();
+        while (nextMountPoint < allMountPoints.size()) {
+          recordTimedOutProbe(allMountPoints[nextMountPoint++]);
+        }
+      };
+
+      fillProbeWindow();
+      while (!pending.empty()) {
         if (IsShuttingDown()) {
           return;
         }
 
-        std::vector<std::shared_future<bool>> futures;
-        std::vector<MountPoint *> batchPtrs;
-
-        // Launch async accessibility checks (no DA operations here)
-        for (size_t j = i;
-             j < allMountPoints.size() && j < i + maxConcurrentChecks; j++) {
-          auto &mp = allMountPoints[j];
-
-          DEBUG_LOG("[GetVolumeMountPointsWorker] Checking mount point: %s",
-                    mp.mountPoint.c_str());
-
-          batchPtrs.push_back(&mp);
-          futures.push_back(StartAccessProbe(mp.mountPoint));
+        bool completedAny = false;
+        for (auto it = pending.begin(); it != pending.end();) {
+          if (it->future.wait_for(std::chrono::milliseconds(0)) ==
+              std::future_status::ready) {
+            recordReadyProbe(*it);
+            it = pending.erase(it);
+            completedAny = true;
+          } else {
+            ++it;
+          }
         }
 
-        // Process results for this batch
-        for (size_t k = 0; k < futures.size(); k++) {
-          auto &mp = *batchPtrs[k];
-          try {
-            // timeoutMs 0 disables the timeout (see Options.timeoutMs).
-            std::future_status status;
-            if (timeoutMs_ == 0) {
-              futures[k].wait();
-              status = std::future_status::ready;
-            } else {
-              status = futures[k].wait_until(deadline);
-            }
-
-            switch (status) {
-            case std::future_status::timeout:
-              mp.status = "disconnected";
-              mp.error = "Access check timed out";
-              DEBUG_LOG(
-                  "[GetVolumeMountPointsWorker] Access check timed out: %s",
-                  mp.mountPoint.c_str());
-              break;
-
-            case std::future_status::ready:
-              try {
-                bool isAccessible = futures[k].get();
-                mp.status = isAccessible ? "healthy" : "inaccessible";
-                if (!isAccessible) {
-                  mp.error = "Path is not accessible";
-                }
-                DEBUG_LOG("[GetVolumeMountPointsWorker] Access check %s: %s",
-                          isAccessible ? "succeeded" : "failed",
-                          mp.mountPoint.c_str());
-              } catch (const std::exception &e) {
-                mp.status = "error";
-                mp.error = std::string("Access check failed: ") + e.what();
-                DEBUG_LOG("[GetVolumeMountPointsWorker] Exception: %s",
-                          e.what());
-              }
-              break;
-
-            default:
-              mp.status = "error";
-              mp.error = "Unexpected future status";
-              DEBUG_LOG("[GetVolumeMountPointsWorker] Unexpected status: %s",
-                        mp.mountPoint.c_str());
-              break;
-            }
-          } catch (const std::exception &e) {
-            mp.status = "error";
-            mp.error = std::string("Mount point check failed: ") + e.what();
-            DEBUG_LOG("[GetVolumeMountPointsWorker] Exception: %s", e.what());
+        if (completedAny) {
+          if (timeoutMs_ != 0 && std::chrono::steady_clock::now() >= deadline) {
+            timeoutUnfinishedProbes();
+            break;
           }
+          fillProbeWindow();
+          continue;
+        }
+
+        // timeoutMs 0 disables the timeout (see Options.timeoutMs).
+        if (timeoutMs_ == 0) {
+          WaitForProbeCompletion(completionGeneration);
+        } else if (!WaitForProbeCompletionUntil(completionGeneration,
+                                                deadline)) {
+          // Poll once after the deadline so a probe that completed at the
+          // boundary keeps its real status, then time out only unfinished work.
+          for (auto it = pending.begin(); it != pending.end();) {
+            if (it->future.wait_for(std::chrono::milliseconds(0)) ==
+                std::future_status::ready) {
+              recordReadyProbe(*it);
+              it = pending.erase(it);
+            } else {
+              ++it;
+            }
+          }
+          timeoutUnfinishedProbes();
+          break;
         }
       }
 

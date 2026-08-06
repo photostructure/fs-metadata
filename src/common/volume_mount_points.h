@@ -10,9 +10,21 @@ namespace FSMeta {
 struct MountPointOptions {
   uint32_t timeoutMs = 5000; // Default 5 second timeout
 
+  // Skip per-volume health/accessibility probing during enumeration.
+  //
+  // Internal path resolution only needs each mount point's path to filter by
+  // path ancestry. Probing there is pure cost: one unreachable volume would
+  // delay every path lookup, and neither the status nor the filesystem name is
+  // read on that route.
+  bool skipHealthProbes = false;
+
   // Add static helper to parse from JS object
   static MountPointOptions FromObject(const Napi::Object &obj) {
     MountPointOptions options;
+    if (obj.Has("skipHealthProbes")) {
+      options.skipHealthProbes =
+          obj.Get("skipHealthProbes").ToBoolean().Value();
+    }
     if (obj.Has("timeoutMs")) {
       // Uint32Value() would wrap negative values into ~50-day timeouts;
       // reject out-of-range values instead. The !(x >= 0) form also catches
@@ -38,11 +50,19 @@ struct MountPoint {
   std::string volumeRole;
   std::string error;
 
+  // Internal candidate enumeration can deliberately omit every field except
+  // mountPoint. Keep this serialization concern separate from the public
+  // optional metadata fields so normal enumeration remains unchanged.
+  bool mountPointOnly = false;
+
   Napi::Object ToObject(Napi::Env env) const {
     auto obj = Napi::Object::New(env);
 
     if (!mountPoint.empty()) {
       obj.Set("mountPoint", mountPoint);
+    }
+    if (mountPointOnly) {
+      return obj;
     }
     if (!fstype.empty()) {
       obj.Set("fstype", fstype);

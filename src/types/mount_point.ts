@@ -25,16 +25,16 @@ export interface MountPoint {
   fstype?: string;
 
   /**
-   * On Windows, returns the health status of the volume.
+   * Lightweight accessibility status observed while enumerating the mount
+   * point. This does not run a filesystem integrity check such as `fsck` or
+   * `diskutil verifyVolume`.
    *
-   * Note that this is only available on Windows, as both Linux and macOS  are
-   * prohibitively expensive, requiring forking `fsck -N` or `diskutil
-   * verifyVolume`.
+   * Linux and macOS derive this from bounded access probes. Windows additionally
+   * maps explicit offline network errors to `disconnected`. The status may be
+   * absent when probing is deliberately skipped, such as for an unprobed remote
+   * mount.
    *
-   * If there are non-critical errors while extracting metadata, those error
-   * messages may be added to this field (say, from blkid).
-   *
-   * @see {@link VolumeHealthStatuses} for values returned by Windows.
+   * @see {@link VolumeHealthStatuses} for the standard values.
    */
   status?: VolumeHealthStatus | string;
 

@@ -40,7 +40,17 @@ export interface NativeBindings {
    * proc mounts table.
    */
   getVolumeMountPoints(
-    options?: Pick<Options, "timeoutMs">,
+    options?: Pick<Options, "timeoutMs"> & {
+      /**
+       * Skip per-volume health/accessibility probing. Windows honors this by
+       * reading only the logical drive strings and omitting `GetDriveTypeW`,
+       * the drive status check, and `GetVolumeInformationW`, so a disconnected
+       * network drive cannot stall enumeration. The returned entries carry
+       * only `mountPoint`. Used by internal path resolution, which reads
+       * nothing else.
+       */
+      skipHealthProbes?: boolean;
+    },
   ): Promise<MountPoint[]>;
 
   /**

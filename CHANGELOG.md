@@ -66,20 +66,23 @@ Security in case of vulnerabilities.
   `autofs` trigger or wedged FUSE mount elsewhere on the system is never
   touched. `fs.promises.stat()` cannot be cancelled, so a blocked call parks a
   libuv thread until the kernel gives up — not issuing it is the only remedy.
-  Complete on Linux. Windows still status-checks every logical drive natively
-  before path ancestry is considered, so pass a cached `mountPoints` array there
-  to bypass enumeration. macOS resolves paths through targeted native calls
-  rather than enumeration and was never affected.
+  Windows gets the same isolation natively: building the candidate list for path
+  resolution now reads only the logical drive strings, skipping `GetDriveTypeW`,
+  the drive status check, and `GetVolumeInformationW`, so a disconnected network
+  drive no longer delays a lookup on another drive. Those entries carry only
+  `mountPoint`. macOS resolves paths through targeted native calls rather than
+  enumeration and was never affected.
 
 - **Enumeration no longer fails outright when a single mount point is wedged.**
   `getVolumeMountPoints()` gave each per-mount `readdir()` probe the same budget
   as the whole call, so the outer deadline always won the race and one
   unresponsive volume rejected the entire request. Probes now get a fraction of
   the budget, making `status: "timeout"` reachable and letting healthy volumes
-  return. Windows is unchanged — `timeoutMs` applies per system call there, with
-  no outer deadline, so its probe keeps the full budget. macOS still runs its
-  native accessibility probes against the whole budget, so that race persists
-  there pending a native fix.
+  return. macOS's native accessibility probes get the same fraction and run in
+  a rolling window, so one blocked probe cannot stop later healthy volumes from
+  being checked; an expired native probe reports `status: "timeout"`.
+  Windows is unchanged — `timeoutMs` applies per system call there, with no
+  outer deadline, so its probe keeps the full budget.
 
 - **`fuse.gvfsd-fuse` mounts are now excluded by default.** GVfs does not mount
   its FUSE bridge with `allow_other`, so FUSE denies access to every user except

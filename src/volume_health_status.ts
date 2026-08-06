@@ -8,7 +8,7 @@ import { isObject } from "./object";
 import { stringEnum, StringEnumKeys } from "./string_enum";
 
 /**
- * Health statuses for volumes (mostly applicable to Windows).
+ * Accessibility statuses returned while enumerating volumes.
  *
  * - `healthy`: Volume is "OK": accessible and functioning normally
  * - `timeout`: Volume could not be accessed before the specified timeout. It

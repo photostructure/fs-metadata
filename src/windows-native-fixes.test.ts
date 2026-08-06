@@ -4,13 +4,20 @@
 // 2. Adaptive callback-pool scheduling for potentially blocking drive probes
 // 3. Promise/future timeout - no detached threads, proper timeout handling
 // 4. VolumeInfo/DiskSpaceInfo - initialized members
+// 5. Mount-point-only candidate enumeration for path resolution
 
+import NodeGypBuild from "node-gyp-build";
+import { join } from "node:path";
+import { _dirname } from "./dirname";
 import {
   getAllVolumeMetadata,
   getVolumeMetadata,
   getVolumeMountPoints,
 } from "./index";
+import { optionsWithDefaults } from "./options";
 import { describePlatformStable, systemDrive } from "./test-utils/platform";
+import type { NativeBindings } from "./types/native_bindings";
+import { getVolumeMountPointsImpl } from "./volume_mount_points";
 
 describePlatformStable("win32")("Windows Native Code Fixes", () => {
   // Helper to get handle count from process report
@@ -21,6 +28,27 @@ describePlatformStable("win32")("Windows Native Code Fixes", () => {
     };
     return report?.header?.handleCount ?? 0;
   };
+
+  describe("Mount-point-only candidate enumeration", () => {
+    it("omits every probe-derived field", async () => {
+      const bindings = NodeGypBuild(join(_dirname(), "..")) as NativeBindings;
+      const result = await getVolumeMountPointsImpl(
+        {
+          ...optionsWithDefaults({
+            timeoutMs: 5_000,
+            includeSystemVolumes: true,
+          }),
+          skipHealthProbes: true,
+        },
+        async () => bindings,
+      );
+
+      expect(result.length).toBeGreaterThan(0);
+      for (const mountPoint of result) {
+        expect(mountPoint).toEqual({ mountPoint: expect.any(String) });
+      }
+    });
+  });
 
   describe("FindHandleGuard RAII Cleanup", () => {
     // This tests that FindFirstFileEx handles are properly closed with FindClose

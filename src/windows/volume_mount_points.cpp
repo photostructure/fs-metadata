@@ -28,12 +28,14 @@ private:
   Napi::Promise::Deferred deferred_;
   std::vector<MountPoint> mountPoints_;
   uint32_t timeoutMs_;
+  bool skipHealthProbes_;
 
 public:
   GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred,
-                             uint32_t timeoutMs = 5000)
+                             uint32_t timeoutMs = 5000,
+                             bool skipHealthProbes = false)
       : SafeAsyncWorker(deferred.Env()), deferred_(deferred),
-        timeoutMs_(timeoutMs) {}
+        timeoutMs_(timeoutMs), skipHealthProbes_(skipHealthProbes) {}
 
   void Execute() override {
     if (IsShuttingDown()) {
@@ -55,13 +57,20 @@ public:
         throw FSException("GetLogicalDriveStrings", GetLastError());
       }
 
-      // First collect all valid drives and their types
+      // Internal path resolution needs only candidate drive roots, so it skips
+      // GetDriveTypeW and its DRIVE_NO_ROOT_DIR filter. A root without a
+      // mounted volume may remain in the list, but later device matching
+      // ignores it when stat() fails.
       std::vector<std::string> paths;
-      std::vector<UINT> driveTypes;
 
       for (LPWSTR drive = drives.buffer.get(); *drive;
            drive += wcslen(drive) + 1) {
         DEBUG_LOG("[GetVolumeMountPoints] processing drive: %ls", drive);
+
+        if (skipHealthProbes_) {
+          paths.push_back(WideToUtf8(drive));
+          continue;
+        }
 
         UINT driveType = GetDriveTypeW(drive);
         if (driveType == DRIVE_NO_ROOT_DIR) {
@@ -73,14 +82,21 @@ public:
                   driveType);
 
         paths.push_back(WideToUtf8(drive));
-        driveTypes.push_back(driveType);
       }
 
-      // Check all drive statuses in parallel
-      if (IsShuttingDown()) {
-        return;
+      // Check all drive statuses in parallel.
+      //
+      // Both this and GetVolumeInformationW() below touch the volume itself, so
+      // a disconnected network drive blocks here until timeoutMs_ elapses. Path
+      // resolution only needs the drive letters, so it asks for neither and
+      // also bypasses GetDriveTypeW() above.
+      std::vector<DriveStatus> statuses;
+      if (!skipHealthProbes_) {
+        if (IsShuttingDown()) {
+          return;
+        }
+        statuses = CheckDriveStatus(paths, timeoutMs_);
       }
-      auto statuses = CheckDriveStatus(paths, timeoutMs_);
 
       // Build mount points from results
       mountPoints_.reserve(paths.size());
@@ -92,9 +108,25 @@ public:
 
         MountPoint mp;
         mp.mountPoint = paths[i];
-        mp.status = DriveStatusToString(statuses[i]);
+
+        if (skipHealthProbes_) {
+          // Path resolution reads only the mount point. status, fstype,
+          // isReadOnly, and isSystemVolume are all left unset rather than
+          // guessed: every one of them requires touching the volume, which is
+          // the cost this mode exists to avoid. Callers that need them must
+          // enumerate normally.
+          //
+          // This costs no network-volume filtering that existed before: a
+          // mapped drive reports the *server's* filesystem (usually NTFS), so
+          // skipNetworkVolumes never matched Windows network drives by fstype
+          // anyway. See Options.skipNetworkVolumes.
+          mp.mountPointOnly = true;
+          mountPoints_.push_back(std::move(mp));
+          continue;
+        }
 
         std::wstring widePath = SecurityUtils::SafeStringToWide(paths[i]);
+        mp.status = DriveStatusToString(statuses[i]);
 
         if (statuses[i] == DriveStatus::Healthy) {
           DWORD fsFlags = 0;
@@ -149,7 +181,8 @@ Napi::Promise GetVolumeMountPoints(const Napi::CallbackInfo &info) {
     options = MountPointOptions::FromObject(info[0].As<Napi::Object>());
   }
 
-  auto *worker = new GetVolumeMountPointsWorker(deferred, options.timeoutMs);
+  auto *worker = new GetVolumeMountPointsWorker(deferred, options.timeoutMs,
+                                                options.skipHealthProbes);
   worker->Queue();
   return deferred.Promise();
 }
