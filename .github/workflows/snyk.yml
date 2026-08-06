@@ -41,7 +41,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/node@9adf32b1121593767fc3c057af55b55db032dc04 # master
+        uses: snyk/actions/node@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
           args: --severity-threshold=high
 
       - name: Run Snyk Code test
-        uses: snyk/actions/node@9adf32b1121593767fc3c057af55b55db032dc04 # master
+        uses: snyk/actions/node@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
