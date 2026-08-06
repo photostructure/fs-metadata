@@ -34,6 +34,10 @@ export interface MountPoint {
    * absent when probing is deliberately skipped, such as for an unprobed remote
    * mount.
    *
+   * Not every value is a {@link VolumeHealthStatus}: on Linux, a non-critical
+   * metadata error may land here instead, such as `"Blkid warning: …"` when
+   * libblkid cannot read a volume's UUID or label.
+   *
    * @see {@link VolumeHealthStatuses} for the standard values.
    */
   status?: VolumeHealthStatus | string;
