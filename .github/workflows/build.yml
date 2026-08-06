@@ -100,10 +100,17 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
+      - name: Record the prebuild identity and checksum
+        run: |
+          npm run release:prebuild-artifact -- \
+            --project-root . \
+            --artifact-root prebuild-artifact \
+            --target darwin-x64
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: prebuilds-macos-15-intel
-          path: prebuilds/
+          name: prebuild-darwin-x64
+          path: prebuild-artifact/
+          if-no-files-found: error
       - run: git diff --exit-code
 
   prebuild-mac-arm64:
@@ -119,10 +126,17 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
+      - name: Record the prebuild identity and checksum
+        run: |
+          npm run release:prebuild-artifact -- \
+            --project-root . \
+            --artifact-root prebuild-artifact \
+            --target darwin-arm64
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: prebuilds-macos-14
-          path: prebuilds/
+          name: prebuild-darwin-arm64
+          path: prebuild-artifact/
+          if-no-files-found: error
       - run: git diff --exit-code
 
   prebuild-win-x64:
@@ -138,10 +152,18 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
+      - name: Record the prebuild identity and checksum
+        shell: bash
+        run: |
+          npm run release:prebuild-artifact -- \
+            --project-root . \
+            --artifact-root prebuild-artifact \
+            --target win32-x64
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: prebuilds-windows-latest
-          path: prebuilds/
+          name: prebuild-win32-x64
+          path: prebuild-artifact/
+          if-no-files-found: error
       - run: git diff --exit-code
 
   prebuild-win-arm64:
@@ -157,10 +179,18 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
+      - name: Record the prebuild identity and checksum
+        shell: bash
+        run: |
+          npm run release:prebuild-artifact -- \
+            --project-root . \
+            --artifact-root prebuild-artifact \
+            --target win32-arm64
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: prebuilds-windows-11-arm
-          path: prebuilds/
+          name: prebuild-win32-arm64
+          path: prebuild-artifact/
+          if-no-files-found: error
       - run: git diff --exit-code
 
   prebuild-linux-glibc:
@@ -178,14 +208,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
       - name: Build in Debian 11 for glibc 2.31 compatibility
         env:
           TARGET_ARCH: ${{ matrix.arch }}
         run: npm run build:linux-glibc
+      - name: Record the prebuild identity and checksum
+        env:
+          PREBUILD_TARGET: linux-${{ matrix.arch }}-glibc
+        run: |
+          npm run release:prebuild-artifact -- \
+            --project-root . \
+            --artifact-root prebuild-artifact \
+            --target "$PREBUILD_TARGET"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: prebuilds-linux-${{ matrix.arch }}-glibc
-          path: prebuilds/
+          name: prebuild-linux-${{ matrix.arch }}-glibc
+          path: prebuild-artifact/
+          if-no-files-found: error
       - run: git diff --exit-code
 
   prebuild-linux-musl:
@@ -205,20 +249,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build in Alpine Linux
+      - name: Build and inventory in Alpine Linux
         env:
           DOCKER_PLATFORM: ${{ matrix.platform }}
+          PREBUILD_TARGET: linux-${{ matrix.arch }}-musl
         run: |
           docker run --rm \
+            -e PREBUILD_TARGET="$PREBUILD_TARGET" \
             -v "$PWD:/tmp/project" \
             --entrypoint /bin/sh \
             --platform "$DOCKER_PLATFORM" \
             node:22-alpine3.21 \
-            -c "apk add build-base git python3 py3-setuptools util-linux-dev linux-headers --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run build:native"
+            -c 'apk add build-base git python3 py3-setuptools util-linux-dev linux-headers --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run build:native && npm run release:prebuild-artifact -- --project-root . --artifact-root prebuild-artifact --target "$PREBUILD_TARGET"'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: prebuilds-linux-${{ matrix.arch }}-musl
-          path: prebuilds/
+          name: prebuild-linux-${{ matrix.arch }}-musl
+          path: prebuild-artifact/
+          if-no-files-found: error
       - run: git diff --exit-code
 
   test-mac-win:
@@ -240,8 +287,8 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: prebuilds-*
-          path: prebuilds/
+          pattern: prebuild-*
+          path: .
           merge-multiple: true
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -273,8 +320,8 @@ jobs:
           package-manager-cache: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: prebuilds-linux-*-glibc
-          path: prebuilds/
+          pattern: prebuild-linux-*-glibc
+          path: .
           merge-multiple: true
       - run: npm ci --ignore-scripts
       - run: npm run tests
@@ -302,8 +349,8 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: prebuilds-linux-*-musl
-          path: prebuilds/
+          pattern: prebuild-linux-*-musl
+          path: .
           merge-multiple: true
       - name: Run tests in Alpine Linux
         env:
@@ -316,6 +363,132 @@ jobs:
             --platform "$DOCKER_PLATFORM" \
             "node:${NODE_VERSION}-alpine" \
             -c "apk add util-linux-dev bash valgrind --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run tests"
+      - run: git diff --exit-code
+
+  # The pack and verify-package jobs below rehearse publish.yaml's release path
+  # on every push, driving the same scripts/release-package-cli.ts subcommands.
+  # Without them, that procedure would first execute at tag time -- and a
+  # workflow file is frozen at its tag, so a defect there costs a version.
+  pack:
+    name: Pack the release tarball
+    needs:
+      - prebuild-mac-x64
+      - prebuild-mac-arm64
+      - prebuild-win-x64
+      - prebuild-win-arm64
+      - prebuild-linux-glibc
+      - prebuild-linux-musl
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - name: Verify the release npm version
+        run: test "$(npm --version)" = "11.17.0"
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: prebuild-*
+          path: release-input/
+          merge-multiple: true
+      - name: Verify and assemble all eight prebuilds
+        run: |
+          npm run release:assemble-prebuilds -- \
+            --project-root . \
+            --source-root release-input \
+            --destination-root prebuilds
+      - name: Build JavaScript and declarations
+        run: npm run build:dist
+      - name: Verify package exports
+        run: npm run check:exports
+      - name: Pack and inventory the package
+        run: |
+          npm run release:pack-package -- \
+            --project-root . \
+            --artifact-dir package-artifact
+      - run: git diff --exit-code
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: npm-package
+          path: package-artifact/
+          if-no-files-found: error
+          retention-days: 1
+
+  verify-package:
+    name: Verify packed package on ${{ matrix.os }}
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - name: Verify the package-test npm version
+        run: test "$(npm --version)" = "11.17.0"
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-package
+          path: package-artifact/
+      - name: Install the packed package with the dependency age gate
+        # The checksummed tarball is the subject under test.
+        run: | # zizmor: ignore[adhoc-packages]
+          npm run release:install-package -- \
+            --project-root . \
+            --artifact-dir package-artifact \
+            --install-root package-install
+      - name: Install a different Node.js major
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          package-manager-cache: false
+      - name: Load the packed package
+        run: |
+          npm run release:load-package -- \
+            --project-root . \
+            --install-root package-install
+      - run: git diff --exit-code
+
+  verify-package-alpine:
+    name: Verify packed package on Alpine
+    needs: pack
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-package
+          path: package-artifact/
+      - name: Install the packed package with the dependency age gate
+        run: |
+          docker run --rm \
+            -v "$PWD:/tmp/project" \
+            --entrypoint /bin/sh \
+            node:24.19.0-alpine \
+            -c 'test "$(npm --version)" = "11.17.0" && apk add util-linux-dev --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run release:install-package -- --project-root . --artifact-dir package-artifact --install-root package-install'
+      - name: Load the packed package on a different Node.js major
+        run: |
+          docker run --rm \
+            -v "$PWD:/tmp/project" \
+            --entrypoint /bin/sh \
+            node:26-alpine \
+            -c 'apk add util-linux-dev --update-cache && cd /tmp/project && npm run release:load-package -- --project-root . --install-root package-install'
       - run: git diff --exit-code
 
   memory-tests:
@@ -400,6 +573,8 @@ jobs:
       - test-mac-win
       - test-ubuntu
       - test-alpine
+      - verify-package
+      - verify-package-alpine
       - memory-tests
       - thread-sanitizer
     outputs:

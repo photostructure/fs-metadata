@@ -44,7 +44,10 @@ exist before the maintainer approves the package for public access.
 ## What the workflows enforce
 
 - `build.yml` runs the full pre-tag test gate and verifies that every test job
-  leaves tracked source unchanged.
+  leaves tracked source unchanged. It also records each prebuild's manifest,
+  packs a tarball, and installs and loads it on Linux, macOS, Windows, and
+  Alpine, so `publish.yaml` never runs that procedure for the first time at a
+  tag — a workflow file is frozen at its tag, so a defect there costs a version.
 - The release job changes only `package.json` and `package-lock.json`, signs the
   commit and tag, and pushes them atomically.
 - `publish.yaml` accepts only a signed `vMAJOR.MINOR.PATCH` annotated tag whose

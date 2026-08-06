@@ -17,6 +17,13 @@ coverage/
 prebuilds/
 *.tsbuildinfo
 
+# Release staging: scripts/release-package-cli.ts and the prebuild artifact CLI
+package-artifact/
+package-install/
+prebuild-artifact/
+prebuild-manifests/
+release-input/
+
 # node-pre-gyp generated files
 build/
 compiled/

@@ -76,7 +76,9 @@
     "update:actions": "pinact run -u || echo \"problem with pinact\"",
     "release:prebuild-artifact": "tsx scripts/release-prebuild-artifacts-cli.ts package",
     "release:assemble-prebuilds": "tsx scripts/release-prebuild-artifacts-cli.ts assemble",
-    "release:smoke-package": "tsx scripts/release-package-smoke.ts",
+    "release:pack-package": "tsx scripts/release-package-cli.ts pack",
+    "release:install-package": "tsx scripts/release-package-cli.ts install",
+    "release:load-package": "tsx scripts/release-package-cli.ts load",
     "// preflight": "should be manually run by developers before they run `git commit`",
     "preflight": "tsx scripts/preflight.ts",
     "prepare-release": "npm run build:dist"

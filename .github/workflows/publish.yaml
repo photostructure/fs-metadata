@@ -267,50 +267,11 @@ jobs:
         run: npm run check:exports
       - name: Pack and inventory the package
         run: |
-          mkdir package-artifact
-          npm pack --json --ignore-scripts \
-            --pack-destination package-artifact > package-artifact/PACK.json
-          mapfile -t TARBALLS < <(
-            find package-artifact -maxdepth 1 -type f -name '*.tgz'
-          )
-          if [[ "${#TARBALLS[@]}" -ne 1 ]]; then
-            echo "::error::Expected exactly one package tarball, found ${#TARBALLS[@]}"
-            exit 1
-          fi
-
-          PACK_FILENAME="$(node -e '
-            const { readFileSync } = require("node:fs")
-            const entries = JSON.parse(readFileSync("package-artifact/PACK.json", "utf8"))
-            if (entries.length !== 1) throw new Error("Expected one pack record, found " + entries.length)
-            const entry = entries[0]
-            if (entry.name !== process.env.EXPECTED_PACKAGE_NAME ||
-                entry.version !== process.env.EXPECTED_VERSION) {
-              throw new Error("Unexpected pack identity: " + entry.name + "@" + entry.version)
-            }
-            process.stdout.write(entry.filename)
-          ')"
-          TARBALL="package-artifact/$PACK_FILENAME"
-          if [[ "${TARBALLS[0]}" != "$TARBALL" ]]; then
-            echo "::error::Pack record does not identify the only tarball"
-            exit 1
-          fi
-
-          MANIFEST_PATH="$RUNNER_TEMP/packed-package.json"
-          tar -xOf "$TARBALL" package/package.json > "$MANIFEST_PATH"
-          MANIFEST_PATH="$MANIFEST_PATH" node -e '
-            const { readFileSync } = require("node:fs")
-            const pkg = JSON.parse(readFileSync(process.env.MANIFEST_PATH, "utf8"))
-            if (pkg.name !== process.env.EXPECTED_PACKAGE_NAME ||
-                pkg.version !== process.env.EXPECTED_VERSION) {
-              throw new Error("Unexpected packed manifest: " + pkg.name + "@" + pkg.version)
-            }
-          '
-
-          tar -tzf "$TARBALL" | LC_ALL=C sort > package-artifact/CONTENTS.txt
-          (
-            cd package-artifact
-            sha256sum -- *.tgz > SHA256SUMS
-          )
+          npm run release:pack-package -- \
+            --project-root . \
+            --artifact-dir package-artifact \
+            --expected-name "$EXPECTED_PACKAGE_NAME" \
+            --expected-version "$EXPECTED_VERSION"
       - run: git diff --exit-code
       - name: Upload the exact package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -320,7 +281,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  smoke-mac-win:
+  verify-package-mac-win:
     name: Test packed package on Node.js ${{ matrix.node-version }} / ${{ matrix.os }}
     needs: pack
     strategy:
@@ -351,26 +312,10 @@ jobs:
       - name: Install the packed package with the dependency age gate
         # The exact checksummed release tarball is the subject under test.
         run: | # zizmor: ignore[adhoc-packages]
-          (
-            cd package-artifact
-            if command -v sha256sum >/dev/null 2>&1; then
-              sha256sum --check SHA256SUMS
-            else
-              shasum -a 256 --check SHA256SUMS
-            fi
-          )
-          TARBALL="$(find "$PWD/package-artifact" -maxdepth 1 -type f -name '*.tgz')"
-          SMOKE_ROOT="$PWD/package-smoke"
-          mkdir "$SMOKE_ROOT"
-          (
-            cd "$SMOKE_ROOT"
-            npm init --yes
-            npm install "$TARBALL" \
-              --ignore-scripts \
-              --min-release-age=14 \
-              --no-audit \
-              --no-fund
-          )
+          npm run release:install-package -- \
+            --project-root . \
+            --artifact-dir package-artifact \
+            --install-root package-install
       - name: Install the target Node.js runtime
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -378,10 +323,12 @@ jobs:
           package-manager-cache: false
       - name: Load the packed package
         run: |
-          npm run release:smoke-package -- "$PWD/package-smoke"
+          npm run release:load-package -- \
+            --project-root . \
+            --install-root package-install
       - run: git diff --exit-code
 
-  smoke-ubuntu:
+  verify-package-ubuntu:
     name: Test packed package on Node.js ${{ matrix.node-version }} / ${{ matrix.os }} ${{ matrix.arch }}
     needs: pack
     strategy:
@@ -410,22 +357,10 @@ jobs:
       - name: Install the packed package with the dependency age gate
         # The exact checksummed release tarball is the subject under test.
         run: | # zizmor: ignore[adhoc-packages]
-          (
-            cd package-artifact
-            sha256sum --check SHA256SUMS
-          )
-          TARBALL="$(find "$PWD/package-artifact" -maxdepth 1 -type f -name '*.tgz')"
-          SMOKE_ROOT="$PWD/package-smoke"
-          mkdir "$SMOKE_ROOT"
-          (
-            cd "$SMOKE_ROOT"
-            npm init --yes
-            npm install "$TARBALL" \
-              --ignore-scripts \
-              --min-release-age=14 \
-              --no-audit \
-              --no-fund
-          )
+          npm run release:install-package -- \
+            --project-root . \
+            --artifact-dir package-artifact \
+            --install-root package-install
       - name: Install the target Node.js runtime
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -433,10 +368,12 @@ jobs:
           package-manager-cache: false
       - name: Load the packed package
         run: |
-          npm run release:smoke-package -- "$PWD/package-smoke"
+          npm run release:load-package -- \
+            --project-root . \
+            --install-root package-install
       - run: git diff --exit-code
 
-  smoke-alpine:
+  verify-package-alpine:
     name: Test packed package on Node.js ${{ matrix.node-version }} / Alpine ${{ matrix.arch }}
     needs: pack
     strategy:
@@ -469,7 +406,7 @@ jobs:
             --entrypoint /bin/sh \
             --platform "$DOCKER_PLATFORM" \
             node:24.19.0-alpine \
-            -c 'test "$(npm --version)" = "11.17.0" && apk add util-linux-dev --update-cache && cd /tmp/project && npm ci --ignore-scripts && cd package-artifact && sha256sum --check SHA256SUMS && TARBALL="$(find "$PWD" -maxdepth 1 -type f -name "*.tgz")" && SMOKE_ROOT=/tmp/project/package-smoke && mkdir "$SMOKE_ROOT" && cd "$SMOKE_ROOT" && npm init --yes && npm install "$TARBALL" --ignore-scripts --min-release-age=14 --no-audit --no-fund'
+            -c 'test "$(npm --version)" = "11.17.0" && apk add util-linux-dev --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run release:install-package -- --project-root . --artifact-dir package-artifact --install-root package-install'
       - name: Load the packed package on the target Node.js runtime
         env:
           DOCKER_PLATFORM: ${{ matrix.platform }}
@@ -480,7 +417,7 @@ jobs:
             --entrypoint /bin/sh \
             --platform "$DOCKER_PLATFORM" \
             "node:${NODE_VERSION}-alpine" \
-            -c 'apk add util-linux-dev --update-cache && cd /tmp/project && npm run release:smoke-package -- /tmp/project/package-smoke'
+            -c 'apk add util-linux-dev --update-cache && cd /tmp/project && npm run release:load-package -- --project-root . --install-root package-install'
       - run: git diff --exit-code
 
   stage:
@@ -488,9 +425,9 @@ jobs:
     needs:
       - validate
       - pack
-      - smoke-mac-win
-      - smoke-ubuntu
-      - smoke-alpine
+      - verify-package-mac-win
+      - verify-package-ubuntu
+      - verify-package-alpine
     runs-on: ubuntu-24.04
     env:
       EXPECTED_PACKAGE_NAME: ${{ needs.validate.outputs.package_name }}
@@ -520,7 +457,7 @@ jobs:
         run: |
           (
             cd package-artifact
-            sha256sum --check SHA256SUMS
+            sha256sum -c SHA256SUMS
           )
           mapfile -t TARBALLS < <(
             find package-artifact -maxdepth 1 -type f -name '*.tgz'

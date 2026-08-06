@@ -94,7 +94,7 @@ export function prebuildifyArgs(
   ];
 }
 
-async function sha256(path: string): Promise<string> {
+export async function sha256File(path: string): Promise<string> {
   return createHash("sha256")
     .update(await readFile(path))
     .digest("hex");
@@ -167,7 +167,7 @@ export async function packagePrebuild({
     libc: target.libc,
     abi: "napi-v9",
     file: expectedFile,
-    sha256: await sha256(source),
+    sha256: await sha256File(source),
   };
   const destination = join(artifactRoot, expectedFile);
   const manifestPath = join(
@@ -208,7 +208,7 @@ export async function verifyAndAssemblePrebuilds({
   for (const target of prebuildTargets) {
     const file = expectedPrebuildPath(packageName, target);
     const manifestPath = join(manifestRoot, `${targetId(target)}.json`);
-    const checksum = await sha256(join(sourceRoot, file));
+    const checksum = await sha256File(join(sourceRoot, file));
     const expected: PrebuildManifest = {
       schemaVersion: 1,
       packageName,
