@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, join, resolve } from "node:path";
-import { argv, execPath, platform } from "node:process";
+import { argv, env, execPath, platform } from "node:process";
 
 import {
   assertPackedManifest,
@@ -21,10 +21,6 @@ import {
  * it here rather than in workflow shell also keeps it off the platform's
  * coreutils: the matrix spans GNU, BusyBox, macOS, and Git for Windows.
  */
-
-// npm is a shell script everywhere but Windows, where it is a .cmd that
-// execFile cannot launch under its bare name.
-const npmCommand = platform === "win32" ? "npm.cmd" : "npm";
 
 function option(name: string): string {
   const index = argv.indexOf(`--${name}`);
@@ -68,8 +64,29 @@ async function identity(projectRoot: string): Promise<PackageIdentity> {
   return { name: pkg.name, version: pkg.version };
 }
 
+/**
+ * How to launch npm: `[command, ...prefixArgs]`.
+ *
+ * On Windows npm is `npm.cmd`, which Node refuses to spawn without a shell
+ * (EINVAL, since the CVE-2024-27980 fix) -- and `shell: true` would hand
+ * cmd.exe the tarball path unquoted. `npm_execpath` is npm's JavaScript entry
+ * point, which node runs directly. Both workflows invoke this script through
+ * `npm run`, so it is always set there.
+ */
+function npmArgv(): string[] {
+  const execpath = env["npm_execpath"];
+  if (execpath?.endsWith(".js") === true) return [execPath, execpath];
+  if (platform === "win32") {
+    throw new Error(
+      "npm_execpath is unset, and node cannot spawn npm.cmd directly. Run this script through `npm run`.",
+    );
+  }
+  return ["npm"]; // a shebang script execFile can launch
+}
+
 function npm(args: readonly string[], cwd: string): string {
-  return execFileSync(npmCommand, args, {
+  const [command, ...prefixArgs] = npmArgv() as [string, ...string[]];
+  return execFileSync(command, [...prefixArgs, ...args], {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
