@@ -740,7 +740,8 @@ public:
 
 1. **Network Volume Timeouts**:
    - Use timeouts for all volume operations
-   - Mark as "disconnected" on timeout
+   - Mark as "timeout" on timeout — reserve "disconnected" for an explicit
+     offline-network error, as Windows does
    - Continue processing other volumes
 
 2. **Permission Errors**:
