@@ -1,6 +1,15 @@
 // src/index.ts
 
 import NodeGypBuild from "node-gyp-build";
+import type {
+  AvailableSpaceChange,
+  AvailableSpaceChangeListener,
+  AvailableSpaceState,
+  AvailableSpaceStatus,
+  AvailableSpaceWatcher,
+  WatchAvailableSpaceOptions,
+} from "./available_space_watcher";
+import { watchAvailableSpaceImpl } from "./available_space_watcher";
 import { debug, debugLogContext, isDebugEnabled } from "./debuglog";
 import { defer } from "./defer";
 import { _dirname } from "./dirname";
@@ -24,6 +33,11 @@ import {
   SystemFsTypesDefault,
   SystemPathPatternsDefault,
 } from "./options";
+import {
+  type PollingSubscription,
+  type PollingWatcherOptions,
+  PollIntervalMsDefault,
+} from "./polling_watcher";
 import type { StringEnum, StringEnumKeys, StringEnumType } from "./string_enum";
 import type { SystemVolumeConfig } from "./system_volume";
 import type { HiddenMetadata } from "./types/hidden_metadata";
@@ -40,13 +54,27 @@ import {
 } from "./volume_metadata";
 import type { GetVolumeMountPointOptions } from "./volume_mount_points";
 import { getVolumeMountPointsImpl } from "./volume_mount_points";
+import type {
+  VolumeMountChange,
+  VolumeMountChangeListener,
+  VolumeMountWatcher,
+  WatchVolumeMountPointsOptions,
+} from "./volume_mount_watcher";
+import { watchVolumeMountPointsImpl } from "./volume_mount_watcher";
 
 export type {
+  AvailableSpaceChange,
+  AvailableSpaceChangeListener,
+  AvailableSpaceState,
+  AvailableSpaceStatus,
+  AvailableSpaceWatcher,
   GetVolumeMountPointOptions,
   HiddenMetadata,
   HideMethod,
   MountPoint,
   Options,
+  PollingSubscription,
+  PollingWatcherOptions,
   ResolvedOptions,
   SetHiddenResult,
   StringEnum,
@@ -55,6 +83,11 @@ export type {
   SystemVolumeConfig,
   VolumeHealthStatus,
   VolumeMetadata,
+  VolumeMountChange,
+  VolumeMountChangeListener,
+  VolumeMountWatcher,
+  WatchAvailableSpaceOptions,
+  WatchVolumeMountPointsOptions,
 };
 
 const nativeFn = defer<Promise<NativeBindings>>(async () => {
@@ -96,6 +129,59 @@ export function getVolumeMountPoints(
   opts?: Partial<GetVolumeMountPointOptions>,
 ): Promise<MountPoint[]> {
   return getVolumeMountPointsImpl(optionsWithDefaults(opts), nativeFn);
+}
+
+/**
+ * Watch the process-visible mount-point set for additions and removals.
+ *
+ * This is a polling, eventually consistent state observer rather than a
+ * lossless mount-operation log. The caller controls the delay between polls
+ * with `pollIntervalMs`; it defaults to {@link PollIntervalMsDefault} (one
+ * minute). A new poll starts only after the prior poll has fully settled.
+ * `timeoutMs` bounds each caller-visible snapshot, but cannot cancel its
+ * underlying native or filesystem work; after a timeout, another poll is not
+ * scheduled until that raw work settles. On Linux, newly observed local paths
+ * receive a directory probe with one quarter of that snapshot budget.
+ *
+ * Snapshots do not fetch capacity or accessibility status. On Linux, each
+ * newly observed local path (including the initial set) gets one directory
+ * probe to preserve the public directory-only mount-point behavior; remote
+ * paths are never probed, and raw timed-out probes must settle before another
+ * poll starts. On Windows, observation follows the current logical-drive-root
+ * enumeration and does not include directory-mounted volume paths. Because
+ * that shallow Windows enumeration does not query filesystem types, passing a
+ * custom `systemFsTypes` filter throws. Windows snapshots contain only
+ * `mountPoint` and the TypeScript-derived `isSystemVolume`; fields that require
+ * touching the drive, including `fstype` and `isReadOnly`, are omitted.
+ *
+ * Existing mount points are returned by `watcher.ready`; they are not emitted
+ * as additions. A transient later polling error is available as `lastError`
+ * and through an `error` listener when one is registered, while the last good
+ * snapshot is retained.
+ */
+export function watchVolumeMountPoints(
+  opts: WatchVolumeMountPointsOptions = {},
+  listener?: VolumeMountChangeListener,
+): VolumeMountWatcher {
+  return watchVolumeMountPointsImpl(opts, nativeFn, listener);
+}
+
+/**
+ * Watch whether the filesystem containing `pathname` has at least a requested
+ * number of bytes available to the current caller.
+ *
+ * The initial predicate state is returned by `watcher.ready`. The listener is
+ * called only when the state crosses below the minimum or recovers above the
+ * minimum plus `hysteresisBytes`. Polling errors and timeouts never manufacture
+ * a low-space transition, and a timed-out filesystem request must settle before
+ * another poll is scheduled.
+ */
+export function watchAvailableSpace(
+  pathname: string,
+  opts: WatchAvailableSpaceOptions,
+  listener?: AvailableSpaceChangeListener,
+): AvailableSpaceWatcher {
+  return watchAvailableSpaceImpl(pathname, opts, listener);
 }
 
 /**
@@ -288,6 +374,7 @@ export {
   NetworkFsTypesDefault,
   OptionsDefault,
   optionsWithDefaults,
+  PollIntervalMsDefault,
   SkipNetworkVolumesDefault,
   SystemFsTypesDefault,
   SystemPathPatternsDefault,

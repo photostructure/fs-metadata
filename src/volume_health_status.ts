@@ -3,7 +3,7 @@
 import { TimeoutError } from "./async";
 import { debug } from "./debuglog";
 import { toError } from "./error";
-import { canReaddir } from "./fs";
+import { canReaddir, canReaddirObservation } from "./fs";
 import { isObject } from "./object";
 import { stringEnum, StringEnumKeys } from "./string_enum";
 
@@ -100,4 +100,22 @@ export async function directoryStatus(
       : result;
   }
   return { status: VolumeHealthStatuses.unknown };
+}
+
+/**
+ * A directory status whose `settled` promise tracks the raw filesystem probe.
+ * The visible status can report a timeout before that uncancellable work ends.
+ */
+export function directoryStatusObservation(
+  dir: string,
+  timeoutMs: number,
+): {
+  value: ReturnType<typeof directoryStatus>;
+  settled: Promise<unknown>;
+} {
+  const probe = canReaddirObservation(dir, timeoutMs);
+  return {
+    value: directoryStatus(dir, timeoutMs, () => probe.value),
+    settled: probe.settled,
+  };
 }

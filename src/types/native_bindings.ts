@@ -46,8 +46,9 @@ export interface NativeBindings {
        * reading only the logical drive strings and omitting `GetDriveTypeW`,
        * the drive status check, and `GetVolumeInformationW`, so a disconnected
        * network drive cannot stall enumeration. The returned entries carry
-       * only `mountPoint`. Used by internal path resolution, which reads
-       * nothing else.
+       * only `mountPoint`. macOS still classifies the `MNT_NOWAIT` mount table
+       * but skips every per-path `faccessat` accessibility probe. Used by
+       * internal path resolution and volume mount subscriptions.
        */
       skipHealthProbes?: boolean;
     },

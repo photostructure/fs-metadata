@@ -51,6 +51,25 @@ const metadata = await getVolumeMetadata("\\\\nas\\share", {
 - Linux: NFS mounts without `soft` option will retry forever
 - macOS: AFP/SMB shares may hang during network interruptions
 
+The same limitation applies to `watchAvailableSpace()`. Its `timeoutMs` bounds
+when the watcher reports a polling error, but Node's `statfs()` request cannot
+be cancelled. The watcher does not issue another probe until that underlying
+request settles, preventing one dead share from consuming another libuv worker
+on every interval. `close()` and `unref()` stop future timers but cannot cancel
+an already-running filesystem request; that request may keep the process alive
+until the operating system returns.
+
+`watchVolumeMountPoints()` keeps recurring topology snapshots shallow on macOS
+and Windows. On Linux it issues one directory probe for each newly observed
+local mount path (including the initial set) so its results continue to omit
+file bind-mount targets like `getVolumeMountPoints()`. It never probes paths
+whose filesystem type is configured as remote. Its `timeoutMs` bounds each
+caller-visible snapshot; each Linux directory probe gets one quarter of that
+budget so it can report before the outer snapshot deadline. A timeout is
+reported through `lastError` and an attached `error` listener, but cannot cancel
+the underlying native or filesystem work. The watcher does not start another
+poll until that raw work settles; `close()` cannot cancel it.
+
 `timeoutMs` bounds the caller-visible promise of each single-volume operation —
 `getVolumeMetadata()`, `getVolumeMetadataForPath()`, and `getMountPointForPath()`
 — including initial `realpath()`/`stat()` calls and later native metadata

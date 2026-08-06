@@ -10,17 +10,10 @@
 #include "system_volume.h"
 #include "windows_arch.h"
 #include <iostream>
-#include <memory>
 #include <sstream>
 #include <vector>
 
 namespace FSMeta {
-
-struct DriveStringsBuffer {
-  std::unique_ptr<WCHAR[]> buffer;
-  explicit DriveStringsBuffer(DWORD size)
-      : buffer(std::make_unique<WCHAR[]>(size)) {}
-};
 
 class GetVolumeMountPointsWorker : public SafeAsyncWorker {
 
@@ -51,10 +44,21 @@ public:
         throw FSException("GetLogicalDriveStrings", GetLastError());
       }
 
-      DriveStringsBuffer drives(size);
-      DEBUG_LOG("[GetVolumeMountPoints] getting logical drive strings");
-      if (!GetLogicalDriveStringsW(size, drives.buffer.get())) {
-        throw FSException("GetLogicalDriveStrings", GetLastError());
+      std::vector<WCHAR> drives;
+      while (true) {
+        drives.resize(size);
+        DEBUG_LOG("[GetVolumeMountPoints] getting logical drive strings");
+        const DWORD copied = GetLogicalDriveStringsW(size, drives.data());
+        if (!copied) {
+          throw FSException("GetLogicalDriveStrings", GetLastError());
+        }
+        // The drive set can grow after the sizing call. In that case Windows
+        // returns the newly required capacity, including the final null. Never
+        // parse the possibly unterminated partial buffer; resize and retry.
+        if (copied < size) {
+          break;
+        }
+        size = copied;
       }
 
       // Internal path resolution needs only candidate drive roots, so it skips
@@ -63,8 +67,7 @@ public:
       // ignores it when stat() fails.
       std::vector<std::string> paths;
 
-      for (LPWSTR drive = drives.buffer.get(); *drive;
-           drive += wcslen(drive) + 1) {
+      for (LPWSTR drive = drives.data(); *drive; drive += wcslen(drive) + 1) {
         DEBUG_LOG("[GetVolumeMountPoints] processing drive: %ls", drive);
 
         if (skipHealthProbes_) {

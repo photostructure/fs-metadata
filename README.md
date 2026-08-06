@@ -30,7 +30,8 @@ console.log(metadata);
 
 ## Features
 
-- **Volume management**: List mount points, get volume metadata, space usage
+- **Volume management**: List mount points, subscribe to mount changes, get
+  volume metadata, and watch available-space thresholds
 - **Hidden files**: Get/set hidden attributes, recursive checks, cross-platform support
 - **Performance**: Non-blocking async operations with timeout protection
 - **TypeScript**: Type definitions with ESM and CommonJS support

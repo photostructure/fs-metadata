@@ -67,11 +67,21 @@ export async function canReaddir(
   dir: string,
   timeoutMs: number,
 ): Promise<true> {
-  return withTimeout({
+  return canReaddirObservation(dir, timeoutMs).value;
+}
+
+/** A directory probe and the underlying filesystem work it time-bounds. */
+export function canReaddirObservation(
+  dir: string,
+  timeoutMs: number,
+): { value: Promise<true>; settled: Promise<true> } {
+  const settled = _canReaddir(dir);
+  const value = withTimeout({
     desc: "canReaddir()",
-    promise: _canReaddir(dir),
+    promise: settled,
     timeoutMs,
   });
+  return { value, settled };
 }
 
 async function _canReaddir(dir: string): Promise<true> {

@@ -14,6 +14,29 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## [Unreleased]
+
+### Added
+
+- **Cross-platform volume subscriptions.** `watchVolumeMountPoints()` observes
+  additions and removals using non-overlapping shallow snapshots at a
+  caller-configurable `pollIntervalMs` (one minute by default). Initial state is
+  exposed through `ready`; recurring failures retain the last good snapshot.
+  `watchAvailableSpace()` separately reports crossings of a caller-selected
+  available-space threshold, with optional hysteresis and no overlapping
+  filesystem requests after a caller-visible timeout.
+  Linux retains the public directory-only mount contract with one tracked probe
+  per newly observed local path; remote paths are not touched. Windows observes
+  logical drive roots and rejects custom `systemFsTypes`, which shallow drive
+  enumeration cannot evaluate.
+
+### Fixed
+
+- **Shallow mount enumeration is now reliable for long-lived consumers.**
+  macOS now honors `skipHealthProbes` instead of starting `faccessat` probes for
+  every path, and Windows retries `GetLogicalDriveStringsW` if the drive set
+  grows between sizing and filling the result buffer.
+
 ## [2.4.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.4.0) (2026-08-05)
 
 ### Changed

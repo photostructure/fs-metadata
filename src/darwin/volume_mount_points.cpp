@@ -120,12 +120,14 @@ private:
   Napi::Promise::Deferred deferred_;
   std::vector<MountPoint> mountPoints_;
   uint32_t timeoutMs_;
+  bool skipHealthProbes_;
 
 public:
   GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred,
-                             uint32_t timeoutMs = 5000)
+                             uint32_t timeoutMs = 5000,
+                             bool skipHealthProbes = false)
       : SafeAsyncWorker(deferred.Env()), deferred_(deferred),
-        timeoutMs_(timeoutMs) {}
+        timeoutMs_(timeoutMs), skipHealthProbes_(skipHealthProbes) {}
 
   void Execute() override {
     DEBUG_LOG("[GetVolumeMountPointsWorker] Executing");
@@ -196,6 +198,14 @@ public:
           allMountPoints.push_back(std::move(mp));
         }
         // DA session RAII unschedules and releases here under the lock
+      }
+
+      // Topology and path-resolution callers need only the classified mount
+      // table. Do not touch every mounted path: faccessat() can remain blocked
+      // on a dead network filesystem after the caller-visible timeout.
+      if (skipHealthProbes_) {
+        mountPoints_ = std::move(allMountPoints);
+        return;
       }
 
       // Keep a rolling window rather than fixed batches. If one probe hangs,
@@ -354,7 +364,8 @@ Napi::Promise GetVolumeMountPoints(const Napi::CallbackInfo &info) {
     options = MountPointOptions::FromObject(info[0].As<Napi::Object>());
   }
 
-  auto *worker = new GetVolumeMountPointsWorker(deferred, options.timeoutMs);
+  auto *worker = new GetVolumeMountPointsWorker(deferred, options.timeoutMs,
+                                                options.skipHealthProbes);
   worker->Queue();
   return deferred.Promise();
 }

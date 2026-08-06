@@ -61,6 +61,62 @@ const totalStorage = healthyVolumes.reduce((sum, v) => sum + v.size, 0);
 const totalUsed = healthyVolumes.reduce((sum, v) => sum + v.used, 0);
 ```
 
+### Watch Mounted Volumes
+
+```typescript
+import { watchVolumeMountPoints } from "@photostructure/fs-metadata";
+
+const watcher = watchVolumeMountPoints(
+  { pollIntervalMs: 60_000 },
+  ({ added, removed }) => {
+    for (const volume of added) console.log("mounted:", volume.mountPoint);
+    for (const volume of removed) console.log("unmounted:", volume.mountPoint);
+  },
+);
+
+console.log("initial mounts:", await watcher.ready);
+watcher.on("error", (error) => console.warn("mount poll failed:", error));
+
+// Later, when observation is no longer needed:
+watcher.close();
+```
+
+The watcher observes state at the requested interval. A complete mount and
+unmount between two polls may not be seen. Polls do not query volume capacity
+or report accessibility health. On Linux, each newly observed local path gets
+one directory probe so file bind-mount targets remain omitted; remote paths are
+never probed. On Windows, the watcher sees logical drive roots, not
+directory-mounted volume paths, and rejects a custom `systemFsTypes` filter
+because shallow drive enumeration does not fetch filesystem types. Windows
+snapshot and change records contain only `mountPoint` and the TypeScript-derived
+`isSystemVolume`; fields that require touching the drive, including `fstype` and
+`isReadOnly`, are omitted.
+
+### Watch an Available-Space Threshold
+
+```typescript
+import { watchAvailableSpace } from "@photostructure/fs-metadata";
+
+const watcher = watchAvailableSpace(
+  "/var/lib/photos",
+  {
+    minimumAvailableBytes: 20 * 1024 ** 3,
+    hysteresisBytes: 2 * 1024 ** 3,
+    pollIntervalMs: 60_000,
+  },
+  ({ current }) => {
+    console.log(current.state, current.availableBytes);
+  },
+);
+
+console.log("initial space state:", await watcher.ready);
+watcher.close();
+```
+
+Hysteresis means that after dropping below 20 GiB, the watcher reports recovery
+only after available space reaches 22 GiB. Errors and timeouts are not treated
+as zero available bytes.
+
 ## Hidden Files
 
 ### Check if File is Hidden
