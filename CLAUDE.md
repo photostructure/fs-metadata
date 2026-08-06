@@ -247,21 +247,22 @@ console.log("RESULT:" + outcome); // Signal result
 
 ## Release Process
 
-Requires repository secrets:
+Releases use npm Trusted Publishing and staged approval. GitHub Actions must
+have access to these organization-level signing secrets:
 
-- `NPM_TOKEN`: npm authentication
-- `GPG_PRIVATE_KEY`: ASCII-armored GPG key
-- `GPG_PASSPHRASE`: GPG passphrase
+- `SSH_SIGNING_KEY`: SSH private signing key
+- `GIT_USER_NAME`: release commit author name
+- `GIT_USER_EMAIL`: release commit author email
 
-Automated via GitHub Actions workflow dispatch or manual:
+Do not create or move a release tag manually. Do not run `npm publish` from a
+workstation. To release:
 
-```bash
-npm run prepare-release
-git config commit.gpgsign true
-npm version patch|minor|major
-npm publish
-git push origin main --follow-tags
-```
+1. Run the **Build & Prepare Release** workflow on `main`.
+2. Choose `patch`, `minor`, or `major`.
+3. Wait for `publish.yaml` to validate, build, test, and stage the exact tag.
+4. Inspect the staged package on npm and approve it with 2FA.
+
+See `doc/RELEASING.md` for the complete procedure and failure recovery.
 
 ## General guidance
 

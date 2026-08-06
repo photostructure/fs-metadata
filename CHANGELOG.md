@@ -18,6 +18,12 @@ Security in case of vulnerabilities.
 
 ### Changed
 
+- **The npm package now uses an explicit file allowlist.** Published tarballs
+  contain the runtime JavaScript and declarations, supported native prebuilds,
+  native rebuild sources, install script, and top-level package documentation.
+  Tests, coverage output, generated API documentation, and internal plans are no
+  longer published.
+
 - **`maxConcurrency` now tracks `UV_THREADPOOL_SIZE`, not core count.** It
   defaults to the libuv pool size plus a small fixed headroom (7 unless the pool
   was raised), capped by `availableParallelism()`. All filesystem work runs on

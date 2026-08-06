@@ -19,6 +19,13 @@ on:
   schedule:
     - cron: "45 4 * * 5"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
@@ -29,15 +36,10 @@ jobs:
     # Consider using larger runners or machines with greater resources for possible analysis time improvements.
     runs-on: "ubuntu-latest"
     permissions:
-      # required for all workflows
-      security-events: write
-
-      # required to fetch internal or private CodeQL packs
-      packages: read
-
-      # only required for workflows in private repositories
-      actions: read
-      contents: read
+      security-events: write # Upload CodeQL results.
+      packages: read # Fetch CodeQL query packs.
+      actions: read # Read workflow metadata for analysis.
+      contents: read # Analyze the repository contents.
 
     strategy:
       fail-fast: false
@@ -53,12 +55,15 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         if: matrix.build-mode == 'manual'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+          package-manager-cache: false
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
@@ -82,10 +87,13 @@ jobs:
       - if: matrix.build-mode == 'manual'
         shell: bash
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npx node-gyp rebuild
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           category: "/language:${{matrix.language}}"
+
+      - name: Verify the analyzed source stayed unchanged
+        run: git diff --exit-code

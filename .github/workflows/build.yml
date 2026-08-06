@@ -1,4 +1,4 @@
-name: Build & Release
+name: Build & Prepare Release
 
 on:
   push:
@@ -8,52 +8,55 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "fs-metadata release: bump version (current = use package.json)"
-        required: false
+        description: Version bump
+        required: true
+        default: patch
         type: choice
-        default: "current"
         options:
-          - current
           - patch
           - minor
           - major
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.event.inputs.version) || format('Build - {0}', github.event.head_commit.message || github.event.pull_request.title) }}
+
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', inputs.version) || format('Build - {0}', github.ref_name) }}
+
+permissions:
+  contents: read
+
 jobs:
   lint:
+    name: Lint on ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # macos-14 is here so clang-tidy actually analyzes src/darwin/*. Because
-        # scripts/clang-tidy.ts excludes the non-host platform's sources, a
-        # Linux+Windows-only matrix meant the darwin tree -- the most RAII-dense
-        # code in the project (CoreFoundation/IOKit/DiskArbitration) -- was
-        # linted on no CI leg at all.
+        # macos-14 ensures clang-tidy analyzes src/darwin/*. The script excludes
+        # source directories for platforms other than its current host.
         os: [ubuntu-24.04, windows-latest, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      # Linux-specific dependencies
-      - if: runner.os == 'Linux'
+      - name: Install Linux analysis tools
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-tidy bear build-essential libblkid-dev uuid-dev
 
-      # macOS: clang-tidy + bear are not preinstalled. Use Homebrew LLVM's
-      # clang-tidy; scripts/clang-tidy.ts points it at the Xcode SDK sysroot.
-      - if: runner.os == 'macOS'
+      - name: Install macOS analysis tools
+        if: runner.os == 'macOS'
         run: brew install llvm bear
 
-      # Windows clang-tidy installation
-      - if: runner.os == 'Windows'
+      - name: Install Windows analysis tools
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          # Check if clang-tidy is available in common locations
           $found = $false
           $paths = @(
             "C:\Program Files\LLVM\bin\clang-tidy.exe",
             "C:\Program Files (x86)\LLVM\bin\clang-tidy.exe"
           )
-
           foreach ($path in $paths) {
             if (Test-Path $path) {
               Write-Host "Found clang-tidy at: $path"
@@ -61,99 +64,107 @@ jobs:
               break
             }
           }
-
           if (-not $found) {
-            Write-Host "Installing LLVM/clang-tidy..."
-            # Install via Chocolatey (available on GitHub runners)
             choco install llvm -y
-            # Refresh PATH
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
           }
-
-          # Verify installation
           clang-tidy --version
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+          package-manager-cache: false
 
-      - run: npm ci --ignore-scripts
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Run linters
+        run: npm run lint
+      - name: Build JavaScript and declarations
+        run: npm run build:dist
+      - name: Verify package exports
+        run: npm run check:exports
+      - name: Verify the tested source stayed unchanged
+        run: git diff --exit-code
 
-      # Run linting - the scripts handle platform differences
-      - run: npm run lint
-
-      # Verify package.json exports + type declarations resolve correctly.
-      # check:exports (attw --pack .) needs the built dist, so build it first.
-      - run: npm run build:dist
-      - run: npm run check:exports
-
-  # This goes away in Fall 2027: https://github.blog/changelog/2025-09-19-github-actions-macos-13-runner-image-is-closing-down/#notice-of-macos-x86_64-intel-architecture-deprecation
   prebuild-mac-x64:
-    runs-on: macos-15-intel # Intel x64 runner
+    name: Build macOS x64 prebuild
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      # We need to ignore scripts so the `install` script in package.json does
-      # not run node-gyp-build
+          package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuilds-macos-15-intel
           path: prebuilds/
+      - run: git diff --exit-code
 
-  # macos-13 goes away November 2025: https://github.blog/changelog/2025-09-19-github-actions-macos-13-runner-image-is-closing-down
   prebuild-mac-arm64:
-    runs-on: macos-14 # Apple Silicon ARM64 runner (default for macos-14)
+    name: Build macOS ARM64 prebuild
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      # We need to ignore scripts so the `install` script in package.json does
-      # not run node-gyp-build
+          package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuilds-macos-14
           path: prebuilds/
+      - run: git diff --exit-code
 
   prebuild-win-x64:
+    name: Build Windows x64 prebuild
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      # We need to ignore scripts so the `install` script in package.json does
-      # not run node-gyp-build
+          package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuilds-windows-latest
           path: prebuilds/
+      - run: git diff --exit-code
 
   prebuild-win-arm64:
+    name: Build Windows ARM64 prebuild
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      # We need to ignore scripts so the `install` script in package.json does
-      # not run node-gyp-build
+          package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuilds-windows-11-arm
           path: prebuilds/
+      - run: git diff --exit-code
 
   prebuild-linux-glibc:
+    name: Build glibc Linux ${{ matrix.arch }} prebuild
     strategy:
       fail-fast: false
       matrix:
@@ -165,16 +176,20 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Build in Debian 11 Bullseye container for GLIBC 2.31 compatibility
-      # This ensures compatibility with Ubuntu 20.04+ and modern Node.js Docker images
-      # Note: npm ci is run inside the container by the build:linux-glibc script
-      - run: TARGET_ARCH=${{ matrix.arch }} npm run build:linux-glibc
+        with:
+          persist-credentials: false
+      - name: Build in Debian 11 for glibc 2.31 compatibility
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: npm run build:linux-glibc
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuilds-linux-${{ matrix.arch }}-glibc
           path: prebuilds/
+      - run: git diff --exit-code
 
   prebuild-linux-musl:
+    name: Build musl Linux ${{ matrix.arch }} prebuild
     strategy:
       fail-fast: false
       matrix:
@@ -188,18 +203,26 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: |
-          docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform ${{ matrix.platform }} node:22-alpine3.21 -c "\
-          apk add build-base git python3 py3-setuptools util-linux-dev linux-headers --update-cache && \
-          cd /tmp/project && \
-          npm ci --ignore-scripts && \
-          npm run build:native"
+        with:
+          persist-credentials: false
+      - name: Build in Alpine Linux
+        env:
+          DOCKER_PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker run --rm \
+            -v "$PWD:/tmp/project" \
+            --entrypoint /bin/sh \
+            --platform "$DOCKER_PLATFORM" \
+            node:22-alpine3.21 \
+            -c "apk add build-base git python3 py3-setuptools util-linux-dev linux-headers --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run build:native"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuilds-linux-${{ matrix.arch }}-musl
           path: prebuilds/
+      - run: git diff --exit-code
 
   test-mac-win:
+    name: Test Node.js ${{ matrix.node-version }} on ${{ matrix.os }}
     needs:
       - prebuild-mac-x64
       - prebuild-mac-arm64
@@ -213,19 +236,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          path: ./prebuilds
+          pattern: prebuilds-*
+          path: prebuilds/
           merge-multiple: true
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
-
-      - run: npm ci
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
       - run: npm run tests
+      - run: git diff --exit-code
 
   test-ubuntu:
-    needs: [prebuild-linux-glibc]
+    name: Test Node.js ${{ matrix.node-version }} on ${{ matrix.os }} ${{ matrix.arch }}
+    needs: prebuild-linux-glibc
     strategy:
       fail-fast: false
       matrix:
@@ -235,20 +263,26 @@ jobs:
     runs-on: ${{ matrix.arch == 'arm64' && format('{0}-arm', matrix.os) || matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: sudo apt-get update
       - run: sudo apt-get install -y libblkid-dev uuid-dev
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          path: ./prebuilds
+          pattern: prebuilds-linux-*-glibc
+          path: prebuilds/
           merge-multiple: true
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run tests
+      - run: git diff --exit-code
 
   test-alpine:
-    needs: [prebuild-linux-musl]
+    name: Test Node.js ${{ matrix.node-version }} on Alpine ${{ matrix.arch }}
+    needs: prebuild-linux-musl
     strategy:
       fail-fast: false
       matrix:
@@ -264,73 +298,215 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          path: ./prebuilds
+          pattern: prebuilds-linux-*-musl
+          path: prebuilds/
           merge-multiple: true
-      - run: |
-          docker run --rm -v $(pwd):/tmp/project --entrypoint /bin/sh --platform ${{ matrix.platform }} node:${{ matrix.node-version }}-alpine -c "\
-          apk add util-linux-dev bash valgrind --update-cache && \
-          cd /tmp/project && \
-          npm ci && \
-          npm run tests"
+      - name: Run tests in Alpine Linux
+        env:
+          DOCKER_PLATFORM: ${{ matrix.platform }}
+          NODE_VERSION: ${{ matrix.node-version }}
+        run: |
+          docker run --rm \
+            -v "$PWD:/tmp/project" \
+            --entrypoint /bin/sh \
+            --platform "$DOCKER_PLATFORM" \
+            "node:${NODE_VERSION}-alpine" \
+            -c "apk add util-linux-dev bash valgrind --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run tests"
+      - run: git diff --exit-code
 
-  publish:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-24.04
-    needs: [test-mac-win, test-ubuntu, test-alpine, lint]
-    permissions:
-      id-token: write # Required for OIDC trusted publishing to npm
-      contents: write # Required for release-it to create tags/commits
-      packages: write
+  memory-tests:
+    name: Memory tests on Node.js ${{ matrix.node-version }} / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+        node-version: [22, 24, 26]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Fetch full history for proper git operations
-          fetch-depth: 0
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: ./prebuilds
-          merge-multiple: true
-
-      # setup-node with registry-url is required for OIDC trusted publishing
+          persist-credentials: false
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libblkid-dev uuid-dev build-essential valgrind clang
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: lts/*
-          registry-url: "https://registry.npmjs.org"
+          node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm run check:memory
+        env:
+          CI: "true"
+      - name: Upload memory test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: memory-test-results-${{ matrix.os }}-node${{ matrix.node-version }}
+          path: |
+            *.log
+            valgrind-*.log
+            asan-output.log
+            core.*
+            test-results/
+          retention-days: 7
+      - if: always()
+        run: git diff --exit-code
 
-      - uses: photostructure/git-ssh-signing-action@abd2a642ab7d704f66193472b47c72375d85a0c1 # v2.0.1
+  thread-sanitizer:
+    name: ThreadSanitizer on Linux ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libblkid-dev uuid-dev build-essential clang
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm run check:tsan
+        env:
+          CI: "true"
+      - name: Upload ThreadSanitizer output
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tsan-results-${{ matrix.arch }}
+          path: tsan-output.log
+          retention-days: 7
+      - if: always()
+        run: git diff --exit-code
+
+  release:
+    name: Create signed release commit and tag
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    needs:
+      - lint
+      - test-mac-win
+      - test-ubuntu
+      - test-alpine
+      - memory-tests
+      - thread-sanitizer
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    concurrency:
+      group: ${{ github.repository }}-release
+      cancel-in-progress: false
+      queue: single
+    permissions:
+      contents: write # Push the release commit and signed tag.
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          # This isolated job must push. It installs no dependencies and has no
+          # npm publishing authority.
+          persist-credentials: true
+
+      - name: Verify the release source
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo "::error::Releases must be dispatched from $DEFAULT_BRANCH, not $GITHUB_REF"
+            exit 1
+          fi
+          git fetch --no-tags origin "$DEFAULT_BRANCH"
+          if [[ "$(git rev-parse "origin/$DEFAULT_BRANCH")" != "$GITHUB_SHA" ]]; then
+            echo "::error::$DEFAULT_BRANCH moved after this release run started; run it again"
+            exit 1
+          fi
+
+      - name: Install the release Node.js toolchain
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+
+      - name: Verify the release npm version
+        run: test "$(npm --version)" = "11.17.0"
+
+      - name: Set up SSH signing
+        uses: photostructure/git-ssh-signing-action@abd2a642ab7d704f66193472b47c72375d85a0c1 # v2.0.1
         with:
           ssh-signing-key: ${{ secrets.SSH_SIGNING_KEY }}
           git-user-name: ${{ secrets.GIT_USER_NAME }}
           git-user-email: ${{ secrets.GIT_USER_EMAIL }}
 
-      - run: ls -laR ./prebuilds
-
-      # Upgrade npm to support OIDC trusted publishing (requires npm >= 11.5.1)
-      - run: npm install -g npm@latest
-
-      - run: npm ci
-
-      - run: npm run prepare-release
-
-      - name: Bump version (if requested)
-        if: ${{ github.event.inputs.version != 'current' }}
-        run: |
-          npm version ${{ github.event.inputs.version }} -m "release: %s" --sign-git-tag
-
-      - name: Get version
+      - name: Bump the package version
         id: version
-        run: echo "version=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Push changes
-        run: git push origin main --follow-tags
-
-      - name: Create GitHub release
-        run: gh release create ${{ steps.version.outputs.version }} --generate-notes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUMP: ${{ inputs.version }}
+        run: |
+          case "$BUMP" in
+            patch|minor|major) ;;
+            *)
+              echo "::error::Unsupported version bump: $BUMP"
+              exit 1
+              ;;
+          esac
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+          npm version "$BUMP" --no-git-tag-version --ignore-scripts
+
+          if ! git diff --quiet -- . \
+            ':(exclude)package.json' \
+            ':(exclude)package-lock.json'; then
+            echo "::error::The version bump changed unexpected files"
+            git diff --name-only
+            exit 1
+          fi
+
+          VERSION="$(node -p "require('./package.json').version")"
+          node -e '
+            const pkg = require("./package.json")
+            const lock = require("./package-lock.json")
+            if (lock.version !== pkg.version || lock.packages[""].version !== pkg.version) {
+              throw new Error("package.json and package-lock.json versions do not match")
+            }
+          '
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create the signed release commit and annotated tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git add package.json package-lock.json
+          git commit -S -m "chore(release): $VERSION"
+          git tag -s -m "Release $VERSION" "$TAG"
+
+      - name: Push the commit and tag atomically
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: git push --atomic origin "HEAD:refs/heads/$DEFAULT_BRANCH" "refs/tags/$TAG"
+
+  dispatch:
+    name: Start tag-bound publishing
+    runs-on: ubuntu-24.04
+    needs: release
+    permissions:
+      actions: write # Start the tag-bound publishing workflow.
+    steps:
+      - name: Start the publishing workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: gh workflow run publish.yaml --repo "$GITHUB_REPOSITORY" --ref "$TAG"

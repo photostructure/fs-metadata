@@ -8,18 +8,27 @@ Please make sure to update tests and documentation as appropriate.
 
 ## Development Setup
 
-This repository uses `ignore-scripts=true` in `.npmrc` as a security measure against [supply chain attacks](https://www.nodejs-security.com/blog/npm-ignore-scripts-best-practices-as-security-mitigation-for-malicious-packages). Since this is a native module, you need to explicitly enable scripts for the initial build:
+This repository uses `ignore-scripts=true` in `.npmrc` as a security measure
+against [supply chain attacks](https://www.nodejs-security.com/blog/npm-ignore-scripts-best-practices-as-security-mitigation-for-malicious-packages).
+Use npm 11.10 or later for every command that may resolve or update
+`package-lock.json`; the repository pins npm 11.17.0 for release work. Older npm
+versions are supported only for `npm ci` against the committed lockfile.
 
 ```bash
 # Clone the repository
 git clone https://github.com/photostructure/fs-metadata.git
 cd fs-metadata
 
-# Install with scripts enabled (required for native module build)
-npm install --ignore-scripts=false
+# Install the exact locked dependencies without lifecycle scripts
+npm ci --ignore-scripts
 
-# Subsequent installs of new dependencies will have scripts disabled by default
+# Build the native module explicitly
+npm run build:native
 ```
+
+Use `npm run all` for dependency updates and the full local check. It verifies
+the npm version before changing the lockfile and invokes required project build
+steps explicitly; do not enable dependency lifecycle scripts.
 
 ## Building from Source
 

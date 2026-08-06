@@ -19,6 +19,17 @@
     },
     "./package.json": "./package.json"
   },
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE.txt",
+    "README.md",
+    "binding.gyp",
+    "dist/",
+    "prebuilds/",
+    "scripts/install.cjs",
+    "src/**/*.cpp",
+    "src/**/*.h"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/photostructure/fs-metadata.git"
@@ -63,8 +74,11 @@
     "update:deps": "ncu -u",
     "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@latest",
     "update:actions": "pinact run -u || echo \"problem with pinact\"",
+    "release:prebuild-artifact": "tsx scripts/release-prebuild-artifacts-cli.ts package",
+    "release:assemble-prebuilds": "tsx scripts/release-prebuild-artifacts-cli.ts assemble",
+    "release:smoke-package": "tsx scripts/release-package-smoke.ts",
     "// all": "should be manually run by developers before they run `git commit`",
-    "all": "npx --yes tsx scripts/all.ts",
+    "all": "tsx scripts/all.ts",
     "prepare-release": "npm run build:dist"
   },
   "gypfile": true,
@@ -119,7 +133,7 @@
     "prettier": "3.9.6",
     "prettier-plugin-organize-imports": "4.3.0",
     "terser": "5.49.0",
-    "ts-jest": "^29.4.11",
+    "ts-jest": "29.4.12",
     "tsup": "^8.5.1",
     "tsx": "4.23.1",
     "typedoc": "0.28.20",

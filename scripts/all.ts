@@ -6,6 +6,15 @@ import { exit } from "node:process";
 const isLinux = platform() === "linux";
 const isMacOS = platform() === "darwin";
 
+const npmVersion = execSync("npm --version", { encoding: "utf8" }).trim();
+const [npmMajor, npmMinor] = npmVersion.split(".").map(Number);
+if (npmMajor < 11 || (npmMajor === 11 && npmMinor < 10)) {
+  console.error(
+    `npm 11.10 or later is required to update dependencies (found ${npmVersion})`,
+  );
+  exit(1);
+}
+
 function run({
   cmd,
   desc,
@@ -24,11 +33,14 @@ function run({
   }
 }
 
-run({ cmd: "npm install", desc: "Installing dependencies" });
+run({
+  cmd: "npm install --ignore-scripts",
+  desc: "Installing dependencies",
+});
 run({ cmd: "npm run update", desc: "Updating dependencies" });
 rmSync("package-lock.json", { force: true });
 run({
-  cmd: "npm install --ignore-scripts=false",
+  cmd: "npm install --ignore-scripts",
   desc: "Updating dependencies",
 });
 run({ cmd: "npm run clean", desc: "Start fresh" });
