@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import {
   expectedPrebuildPath,
   packagePrebuild,
+  prebuildifyArgs,
   prebuildTargets,
   targetId,
   verifyAndAssemblePrebuilds,
@@ -78,6 +79,27 @@ describe("release prebuild artifacts", () => {
       "prebuilds/linux-x64/@photostructure+fs-metadata.musl.node",
       "prebuilds/linux-arm64/@photostructure+fs-metadata.musl.node",
     ]);
+  });
+
+  test("tags libc in the build flags exactly where the expected filename does", () => {
+    for (const target of prebuildTargets) {
+      const args = prebuildifyArgs(target);
+      const file = expectedPrebuildPath("@photostructure/fs-metadata", target);
+      expect([targetId(target), args.includes("--tag-libc")]).toEqual([
+        targetId(target),
+        /\.(?:glibc|musl)\.node$/.test(file),
+      ]);
+      expect(args).toEqual(
+        expect.arrayContaining([
+          "--napi",
+          "--strip",
+          "--arch",
+          target.architecture,
+          "--platform",
+          target.platform,
+        ]),
+      );
+    }
   });
 
   test("packages, verifies, and assembles exactly eight checksummed prebuilds", async () => {

@@ -71,6 +71,29 @@ export function expectedPrebuildPath(
   return `prebuilds/${target.platform}-${target.architecture}/${binaryName}${libcSuffix}.node`;
 }
 
+/**
+ * Arguments for `prebuildify` that produce {@link expectedPrebuildPath} for the
+ * host platform.
+ *
+ * `--tag-libc` is Linux-only on purpose: it is what separates the glibc and
+ * musl builds that share `prebuilds/linux-<arch>/`. prebuildify honors the flag
+ * on every platform, so passing it unconditionally emits a nonsensical
+ * `...glibc.node` on macOS and Windows.
+ */
+export function prebuildifyArgs(
+  target: Pick<PrebuildTargetIdentity, "platform" | "architecture">,
+): string[] {
+  return [
+    "--napi",
+    ...(target.platform === "linux" ? ["--tag-libc"] : []),
+    "--strip",
+    "--arch",
+    target.architecture,
+    "--platform",
+    target.platform,
+  ];
+}
+
 async function sha256(path: string): Promise<string> {
   return createHash("sha256")
     .update(await readFile(path))

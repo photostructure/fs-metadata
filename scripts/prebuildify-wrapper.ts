@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import { arch, platform } from "node:os";
+import { prebuildifyArgs } from "../src/release-prebuild-artifacts";
 
 /**
  * Wrapper for prebuildify to ensure architecture is explicitly passed This
@@ -45,16 +46,13 @@ if (currentPlatform === "win32") {
   }
 }
 
-// Build the prebuildify command with explicit architecture
-const args = [
-  "--napi",
-  "--tag-libc",
-  "--strip",
-  "--arch",
-  currentArch,
-  "--platform",
-  currentPlatform,
-];
+// Build the prebuildify command with explicit architecture. The flags live
+// next to expectedPrebuildPath() so the filename the release tooling demands
+// and the filename prebuildify emits stay defined in one place.
+const args = prebuildifyArgs({
+  platform: currentPlatform,
+  architecture: currentArch,
+});
 
 // Add any additional arguments passed to this script
 if (process.argv.length > 2) {

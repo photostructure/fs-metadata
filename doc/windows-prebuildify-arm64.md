@@ -27,8 +27,10 @@ Windows ARM64 support for native Node.js modules is a rapidly evolving area. Thi
 For scoped npm packages like `@photostructure/fs-metadata`:
 
 - Package scope uses `+` instead of `/` in filenames
-- Example: `@photostructure+fs-metadata.glibc.node`
+- Example: `@photostructure+fs-metadata.node`
 - This is standard prebuildify behavior
+- Only Linux builds add a libc tag (`...glibc.node` / `...musl.node`); see
+  `scripts/prebuildify-wrapper.ts`
 
 ## Windows ARM64 Specific Considerations
 
