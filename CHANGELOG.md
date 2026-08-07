@@ -37,7 +37,7 @@ Security in case of vulnerabilities.
   every path, and Windows retries `GetLogicalDriveStringsW` if the drive set
   grows between sizing and filling the result buffer.
 
-## [2.4.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.4.0) (2026-08-05)
+## 2.4.0 (not released)
 
 ### Changed
 
