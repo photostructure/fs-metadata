@@ -16,6 +16,7 @@ import { isLinux, isMacOS, isWindows } from "./platform";
 import { pickRandom, randomLetter, randomLetters, shuffle } from "./random";
 import { assertMetadata } from "./test-utils/assert";
 import { systemDrive } from "./test-utils/platform";
+import { getTestTimeout } from "./test-utils/test-timeout-config";
 import type { NativeBindingsFn } from "./types/native_bindings";
 import { getVolumeMetadataImpl } from "./volume_metadata";
 
@@ -226,10 +227,21 @@ describe("Timeout Handling", () => {
     // withTimeout in getVolumeMetadataImpl can end this. We assert nativeReached
     // so the test cannot silently pass via the earlier directoryStatus()/
     // canReaddir() timeout (which fires under the old Windows bypass too) —
-    // it must actually reach the native call. A generous, real (non-1)
-    // timeoutMs avoids withTimeout's test-mode immediate-throw and keeps
-    // readdir(rootPath) well within the deadline, so the native call is what
-    // the outer deadline bounds.
+    // it must actually reach the native call. A real (non-1) timeoutMs avoids
+    // withTimeout's test-mode immediate-throw.
+    //
+    // That same deadline also covers the directoryStatus() probe that runs
+    // first, so the budget has to comfortably exceed opendir(rootPath) plus any
+    // scheduling stall: when it doesn't, the probe times out and nativeReached
+    // stays false, which is how a flat 150ms failed on macos-15-intel. That
+    // runner completes this suite in ~104s against ~12s here, so 150ms there
+    // bought roughly 17ms of dev-box-equivalent work. Scaling by the platform
+    // multiplier restores ~200ms of equivalent budget on every runner, for work
+    // that costs well under a millisecond. The cap keeps an emulated runner (20x
+    // multiplier) from sitting on the hung native call for 10s, since a passing
+    // run always spends the deadline in full.
+    const timeoutMs = Math.min(3_000, getTestTimeout(500));
+
     let nativeReached = false;
     const hangingNativeFn = (() => ({
       getVolumeMetadata: () => {
@@ -237,13 +249,20 @@ describe("Timeout Handling", () => {
         return new Promise<never>(() => {});
       },
     })) as unknown as NativeBindingsFn;
+    const startedAt = Date.now();
     await expect(
       getVolumeMetadataImpl(
-        { ...optionsWithDefaults({ timeoutMs: 150 }), mountPoint: rootPath },
+        { ...optionsWithDefaults({ timeoutMs }), mountPoint: rootPath },
         hangingNativeFn,
       ),
     ).rejects.toThrow(/timeout/i);
-    expect(nativeReached).toBe(true);
+    // toMatchObject so a CI failure reports the budget and how much of it was
+    // spent, which is what distinguishes a slow probe from a real regression.
+    expect({
+      nativeReached,
+      timeoutMs,
+      elapsedMs: Date.now() - startedAt,
+    }).toMatchObject({ nativeReached: true });
   });
 });
 
