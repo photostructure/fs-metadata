@@ -46,7 +46,12 @@ jobs:
 
       - name: Install macOS analysis tools
         if: runner.os == 'macOS'
-        run: brew install llvm bear
+        run: |
+          # The runner image pre-taps aws/tap (for aws-sam-cli), which Homebrew
+          # now flags as untrusted on every invocation. We only install from
+          # homebrew/core, so drop the tap instead of granting it trust.
+          brew untap aws/tap || true
+          brew install llvm bear
 
       - name: Install Windows analysis tools
         if: runner.os == 'Windows'
