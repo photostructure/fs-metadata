@@ -124,19 +124,11 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run build:native
-      - name: Record the prebuild identity and checksum
-        env:
-          PREBUILD_TARGET: ${{ matrix.target }}
-        run: |
-          npm run release:prebuild-artifact -- \
-            --project-root . \
-            --artifact-root prebuild-artifact \
-            --target "$PREBUILD_TARGET"
-      - name: Upload the prebuild and manifest
+      - name: Upload the prebuild
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuild-${{ matrix.target }}
-          path: prebuild-artifact/
+          path: prebuilds/
           if-no-files-found: error
           retention-days: 1
       - run: git diff --exit-code
@@ -168,19 +160,11 @@ jobs:
         env:
           TARGET_ARCH: ${{ matrix.arch }}
         run: npm run build:linux-glibc
-      - name: Record the prebuild identity and checksum
-        env:
-          PREBUILD_TARGET: linux-${{ matrix.arch }}-glibc
-        run: |
-          npm run release:prebuild-artifact -- \
-            --project-root . \
-            --artifact-root prebuild-artifact \
-            --target "$PREBUILD_TARGET"
-      - name: Upload the prebuild and manifest
+      - name: Upload the prebuild
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuild-linux-${{ matrix.arch }}-glibc
-          path: prebuild-artifact/
+          path: prebuilds/
           if-no-files-found: error
           retention-days: 1
       - run: git diff --exit-code
@@ -204,23 +188,21 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build and inventory in Alpine Linux
+      - name: Build in Alpine Linux
         env:
           DOCKER_PLATFORM: ${{ matrix.platform }}
-          PREBUILD_TARGET: linux-${{ matrix.arch }}-musl
         run: |
           docker run --rm \
-            -e PREBUILD_TARGET="$PREBUILD_TARGET" \
             -v "$PWD:/tmp/project" \
             --entrypoint /bin/sh \
             --platform "$DOCKER_PLATFORM" \
             node:22-alpine3.21 \
-            -c 'apk add build-base git python3 py3-setuptools util-linux-dev linux-headers --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run build:native && npm run release:prebuild-artifact -- --project-root . --artifact-root prebuild-artifact --target "$PREBUILD_TARGET"'
-      - name: Upload the prebuild and manifest
+            -c 'apk add build-base git python3 py3-setuptools util-linux-dev linux-headers --update-cache && cd /tmp/project && npm ci --ignore-scripts && npm run build:native'
+      - name: Upload the prebuild
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: prebuild-linux-${{ matrix.arch }}-musl
-          path: prebuild-artifact/
+          path: prebuilds/
           if-no-files-found: error
           retention-days: 1
       - run: git diff --exit-code
@@ -253,18 +235,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: prebuild-*
-          path: release-input/
+          path: prebuilds/
           merge-multiple: true
-      - name: Verify and assemble all eight prebuilds
-        run: |
-          npm run release:assemble-prebuilds -- \
-            --project-root . \
-            --source-root release-input \
-            --destination-root prebuilds
       - name: Build JavaScript and declarations
         run: npm run build:dist
       - name: Verify package exports
         run: npm run check:exports
+      - name: Verify the exact prebuild set
+        run: npm run release:verify-prebuilds -- --project-root .
       - name: Pack and inventory the package
         run: |
           npm run release:pack-package -- \
@@ -310,7 +288,7 @@ jobs:
           name: npm-package-${{ github.ref_name }}
           path: package-artifact/
       - name: Install the packed package with the dependency age gate
-        # The exact checksummed release tarball is the subject under test.
+        # The exact downloaded release tarball is the subject under test.
         run: | # zizmor: ignore[adhoc-packages]
           npm run release:install-package -- \
             --project-root . \
@@ -355,7 +333,7 @@ jobs:
           name: npm-package-${{ github.ref_name }}
           path: package-artifact/
       - name: Install the packed package with the dependency age gate
-        # The exact checksummed release tarball is the subject under test.
+        # The exact downloaded release tarball is the subject under test.
         run: | # zizmor: ignore[adhoc-packages]
           npm run release:install-package -- \
             --project-root . \
@@ -455,20 +433,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          (
-            cd package-artifact
-            sha256sum -c SHA256SUMS
-          )
-          mapfile -t TARBALLS < <(
-            find package-artifact -maxdepth 1 -type f -name '*.tgz'
-          )
-          if [[ "${#TARBALLS[@]}" -ne 1 ]]; then
-            echo "::error::Expected exactly one package tarball, found ${#TARBALLS[@]}"
-            exit 1
-          fi
-
           PACK_FILENAME="$(node -e '
-            const { readFileSync } = require("node:fs")
+            const { readFileSync, readdirSync } = require("node:fs")
+            const tarballs = readdirSync("package-artifact")
+              .filter((file) => file.endsWith(".tgz"))
+            if (tarballs.length !== 1) {
+              throw new Error("Expected exactly one package tarball, found " + tarballs.length)
+            }
             const entries = JSON.parse(readFileSync("package-artifact/PACK.json", "utf8"))
             if (entries.length !== 1) throw new Error("Expected one pack record, found " + entries.length)
             const entry = entries[0]
@@ -476,13 +447,12 @@ jobs:
                 entry.version !== process.env.EXPECTED_VERSION) {
               throw new Error("Unexpected pack identity: " + entry.name + "@" + entry.version)
             }
+            if (entry.filename !== tarballs[0]) {
+              throw new Error("Pack record does not identify the only tarball")
+            }
             process.stdout.write(entry.filename)
           ')"
           TARBALL="package-artifact/$PACK_FILENAME"
-          if [[ "${TARBALLS[0]}" != "$TARBALL" ]]; then
-            echo "::error::Pack record does not identify the only tarball"
-            exit 1
-          fi
 
           MANIFEST_PATH="$RUNNER_TEMP/packed-package.json"
           tar -xOf "$TARBALL" package/package.json > "$MANIFEST_PATH"

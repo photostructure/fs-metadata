@@ -6,10 +6,9 @@ import { argv, env, execPath, platform } from "node:process";
 
 import {
   assertPackedManifest,
+  assertPackedPrebuilds,
   findTarball,
   packedFilename,
-  verifyChecksums,
-  writeChecksums,
   type PackageIdentity,
 } from "../src/release-package";
 
@@ -128,21 +127,18 @@ async function pack(projectRoot: string): Promise<void> {
     .split("\n")
     .filter((line) => line.length > 0)
     .sort();
+  assertPackedPrebuilds(contents, expected.name);
   await writeFile(
     join(artifactDir, "CONTENTS.txt"),
     contents.map((line) => `${line}\n`).join(""),
   );
 
-  await writeChecksums(artifactDir, [filename]);
   console.log(`Packed ${expected.name}@${expected.version} as ${filename}`);
 }
 
 async function install(): Promise<void> {
   const artifactDir = resolve(option("artifact-dir"));
   const installRoot = resolve(option("install-root"));
-
-  const entries = await verifyChecksums(artifactDir);
-  console.log(`Verified ${entries.length} checksummed release file(s)`);
 
   const tarball = await findTarball(artifactDir);
   await mkdir(installRoot, { recursive: true });

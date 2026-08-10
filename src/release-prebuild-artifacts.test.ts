@@ -1,53 +1,26 @@
-import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
   expectedPrebuildPath,
-  packagePrebuild,
   prebuildifyArgs,
   prebuildTargets,
-  targetId,
-  verifyAndAssemblePrebuilds,
+  verifyPrebuilds,
 } from "./release-prebuild-artifacts";
 
 describe("release prebuild artifacts", () => {
+  const packageName = "@photostructure/fs-metadata";
   let tempRoot: string;
 
-  async function populateAggregate(
-    aggregateRoot: string,
-    packageName: string,
-  ): Promise<void> {
-    const sourceRoot = join(tempRoot, "source");
-
+  async function populatePrebuilds(projectRoot: string): Promise<void> {
     for (const target of prebuildTargets) {
-      const projectRoot = join(sourceRoot, targetId(target));
-      const artifactRoot = join(tempRoot, "artifact", targetId(target));
-      const relativeFile = expectedPrebuildPath(packageName, target);
-      const binary = Buffer.from(`binary:${targetId(target)}`);
-      await mkdir(dirname(join(projectRoot, relativeFile)), {
-        recursive: true,
-      });
-      await writeFile(join(projectRoot, relativeFile), binary);
-
-      await packagePrebuild({ projectRoot, artifactRoot, packageName, target });
-
-      const manifestPath = join(
-        aggregateRoot,
-        "prebuild-manifests",
-        `${targetId(target)}.json`,
-      );
-      const aggregateBinary = join(aggregateRoot, relativeFile);
-      await mkdir(dirname(manifestPath), { recursive: true });
-      await mkdir(dirname(aggregateBinary), { recursive: true });
+      const file = join(projectRoot, expectedPrebuildPath(packageName, target));
+      await mkdir(dirname(file), { recursive: true });
       await writeFile(
-        manifestPath,
-        await readFile(
-          join(artifactRoot, "prebuild-manifests", `${targetId(target)}.json`),
-        ),
+        file,
+        `binary:${target.platform}-${target.architecture}-${target.libc}`,
       );
-      await writeFile(aggregateBinary, binary);
     }
   }
 
@@ -67,7 +40,7 @@ describe("release prebuild artifacts", () => {
   test("uses the prebuildify package filenames for every release target", () => {
     expect(
       prebuildTargets.map((target) =>
-        expectedPrebuildPath("@photostructure/fs-metadata", target),
+        expectedPrebuildPath(packageName, target),
       ),
     ).toEqual([
       "prebuilds/darwin-x64/@photostructure+fs-metadata.node",
@@ -84,9 +57,12 @@ describe("release prebuild artifacts", () => {
   test("tags libc in the build flags exactly where the expected filename does", () => {
     for (const target of prebuildTargets) {
       const args = prebuildifyArgs(target);
-      const file = expectedPrebuildPath("@photostructure/fs-metadata", target);
-      expect([targetId(target), args.includes("--tag-libc")]).toEqual([
-        targetId(target),
+      const file = expectedPrebuildPath(packageName, target);
+      expect([
+        `${target.platform}-${target.architecture}-${target.libc ?? "none"}`,
+        args.includes("--tag-libc"),
+      ]).toEqual([
+        `${target.platform}-${target.architecture}-${target.libc ?? "none"}`,
         /\.(?:glibc|musl)\.node$/.test(file),
       ]);
       expect(args).toEqual(
@@ -102,68 +78,47 @@ describe("release prebuild artifacts", () => {
     }
   });
 
-  test("packages, verifies, and assembles exactly eight checksummed prebuilds", async () => {
-    const aggregateRoot = join(tempRoot, "aggregate");
-    const destinationRoot = join(tempRoot, "assembled");
-    const packageName = "@photostructure/fs-metadata";
-
-    await populateAggregate(aggregateRoot, packageName);
-
-    const manifests = await verifyAndAssemblePrebuilds({
-      sourceRoot: aggregateRoot,
-      destinationRoot,
-      packageName,
-    });
-
-    expect(manifests).toHaveLength(8);
-    for (const manifest of manifests) {
-      const assembled = await readFile(
-        join(destinationRoot, manifest.file.replace(/^prebuilds\//, "")),
-      );
-      expect(createHash("sha256").update(assembled).digest("hex")).toBe(
-        manifest.sha256,
-      );
-    }
-  });
-
-  test("rejects an unexpected manifest", async () => {
-    const aggregateRoot = join(tempRoot, "aggregate");
-    const packageName = "@photostructure/fs-metadata";
-    await populateAggregate(aggregateRoot, packageName);
-    await writeFile(
-      join(aggregateRoot, "prebuild-manifests", "unexpected.json"),
-      "{}\n",
-    );
-
-    await expect(
-      verifyAndAssemblePrebuilds({
-        sourceRoot: aggregateRoot,
-        destinationRoot: join(tempRoot, "assembled"),
-        packageName,
-      }),
-    ).rejects.toThrow("Manifest set mismatch");
-  });
-
-  test("rejects an unexpected native binary", async () => {
+  test("accepts exactly the eight expected prebuilds", async () => {
     const projectRoot = join(tempRoot, "project");
-    const expected = expectedPrebuildPath(
-      "@photostructure/fs-metadata",
-      prebuildTargets[0],
-    );
-    await mkdir(dirname(join(projectRoot, expected)), { recursive: true });
-    await writeFile(join(projectRoot, expected), "expected");
-    await writeFile(
-      join(projectRoot, "prebuilds/darwin-x64/unexpected.node"),
-      "bad",
-    );
+    await populatePrebuilds(projectRoot);
 
     await expect(
-      packagePrebuild({
-        projectRoot,
-        artifactRoot: join(tempRoot, "artifact"),
-        packageName: "@photostructure/fs-metadata",
-        target: prebuildTargets[0],
-      }),
-    ).rejects.toThrow("Expected only");
+      verifyPrebuilds({ projectRoot, packageName }),
+    ).resolves.toEqual(
+      prebuildTargets
+        .map((target) => expectedPrebuildPath(packageName, target))
+        .sort(),
+    );
+  });
+
+  test("names a missing target in the error", async () => {
+    const projectRoot = join(tempRoot, "project");
+    await populatePrebuilds(projectRoot);
+    const missing = expectedPrebuildPath(packageName, prebuildTargets[0]);
+    await rm(join(projectRoot, missing));
+
+    await expect(verifyPrebuilds({ projectRoot, packageName })).rejects.toThrow(
+      `Missing: ${missing}`,
+    );
+  });
+
+  test("rejects an unexpected file", async () => {
+    const projectRoot = join(tempRoot, "project");
+    await populatePrebuilds(projectRoot);
+    const unexpected = "prebuilds/darwin-x64/unexpected.txt";
+    await writeFile(join(projectRoot, unexpected), "unexpected");
+
+    await expect(verifyPrebuilds({ projectRoot, packageName })).rejects.toThrow(
+      `Unexpected: ${unexpected}`,
+    );
+  });
+
+  test("rejects an absent prebuild directory", async () => {
+    const projectRoot = join(tempRoot, "project");
+    await mkdir(projectRoot);
+
+    await expect(verifyPrebuilds({ projectRoot, packageName })).rejects.toThrow(
+      /Prebuild directory .*prebuilds does not exist/,
+    );
   });
 });

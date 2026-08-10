@@ -2,12 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { argv } from "node:process";
 
-import {
-  packagePrebuild,
-  prebuildTargets,
-  targetId,
-  verifyAndAssemblePrebuilds,
-} from "../src/release-prebuild-artifacts";
+import { verifyPrebuilds } from "../src/release-prebuild-artifacts";
 
 function option(name: string): string {
   const index = argv.indexOf(`--${name}`);
@@ -30,38 +25,16 @@ async function packageName(projectRoot: string): Promise<string> {
 
 async function main(): Promise<void> {
   const command = argv[2];
+  if (command !== "verify") {
+    throw new Error(`Unsupported command: ${String(command)}`);
+  }
+
   const projectRoot = resolve(option("project-root"));
-  const name = await packageName(projectRoot);
-
-  if (command === "package") {
-    const id = option("target");
-    const target = prebuildTargets.find(
-      (candidate) => targetId(candidate) === id,
-    );
-    if (target == null) {
-      throw new Error(`Unsupported prebuild target: ${id}`);
-    }
-    const manifest = await packagePrebuild({
-      projectRoot,
-      artifactRoot: resolve(option("artifact-root")),
-      packageName: name,
-      target,
-    });
-    console.log(JSON.stringify(manifest));
-    return;
-  }
-
-  if (command === "assemble") {
-    const manifests = await verifyAndAssemblePrebuilds({
-      sourceRoot: resolve(option("source-root")),
-      destinationRoot: resolve(option("destination-root")),
-      packageName: name,
-    });
-    console.log(JSON.stringify(manifests, null, 2));
-    return;
-  }
-
-  throw new Error(`Unsupported command: ${String(command)}`);
+  const files = await verifyPrebuilds({
+    projectRoot,
+    packageName: await packageName(projectRoot),
+  });
+  console.log(`Verified exactly ${files.length} release prebuilds`);
 }
 
 void main().catch((error: unknown) => {

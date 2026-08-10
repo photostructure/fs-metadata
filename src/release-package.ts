@@ -1,85 +1,14 @@
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import { sha256File } from "./release-prebuild-artifacts";
-
-/**
- * The checksum file that travels with the packed tarball between the pack job
- * and every job that consumes it.
- */
-export const checksumFileName = "SHA256SUMS";
-
-export interface ChecksumEntry {
-  file: string;
-  sha256: string;
-}
+import {
+  assertExactFileSet,
+  expectedPrebuildPaths,
+} from "./release-prebuild-artifacts";
 
 export interface PackageIdentity {
   name: string;
   version: string;
-}
-
-/**
- * Renders the `sha256sum` output format: `<hash><two spaces><name>`.
- *
- * We write and verify this file ourselves rather than shelling out, because the
- * available checksum tool differs on every platform the release matrix touches:
- * Alpine's BusyBox `sha256sum` accepts only `-c` (not `--check`), macOS ships no
- * `sha256sum` at all, and Windows has whatever Git for Windows bundles.
- */
-export function formatChecksums(entries: readonly ChecksumEntry[]): string {
-  return entries.map((entry) => `${entry.sha256}  ${entry.file}\n`).join("");
-}
-
-/** Accepts both the text (`  `) and binary (` *`) separators. */
-export function parseChecksums(text: string): ChecksumEntry[] {
-  return text
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => {
-      const match = /^([0-9a-f]{64}) [ *](.+)$/.exec(line);
-      const sha256 = match?.[1];
-      const file = match?.[2];
-      if (sha256 == null || file == null) {
-        throw new Error(`Malformed ${checksumFileName} line: ${line}`);
-      }
-      return { sha256, file };
-    });
-}
-
-export async function writeChecksums(
-  directory: string,
-  files: readonly string[],
-): Promise<ChecksumEntry[]> {
-  const entries: ChecksumEntry[] = [];
-  for (const file of files) {
-    entries.push({ file, sha256: await sha256File(join(directory, file)) });
-  }
-  await writeFile(join(directory, checksumFileName), formatChecksums(entries));
-  return entries;
-}
-
-/**
- * Rehashes every file listed in `SHA256SUMS`, throwing on the first mismatch.
- */
-export async function verifyChecksums(
-  directory: string,
-): Promise<ChecksumEntry[]> {
-  const entries = parseChecksums(
-    await readFile(join(directory, checksumFileName), "utf8"),
-  );
-  if (entries.length === 0) {
-    throw new Error(`${checksumFileName} lists no files`);
-  }
-  for (const entry of entries) {
-    const actual = await sha256File(join(directory, entry.file));
-    if (actual !== entry.sha256) {
-      throw new Error(
-        `${entry.file} is ${actual}, but ${checksumFileName} expects ${entry.sha256}`,
-      );
-    }
-  }
-  return entries;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -132,6 +61,18 @@ export function assertPackedManifest(
   expected: PackageIdentity,
 ): void {
   assertIdentity(manifest, expected, "The packed manifest");
+}
+
+/** Verifies that every expected native binary appears once in the tar listing. */
+export function assertPackedPrebuilds(
+  contents: readonly string[],
+  packageName: string,
+): void {
+  const actualFiles = contents.filter((file) => file.endsWith(".node"));
+  const expectedFiles = expectedPrebuildPaths(packageName).map(
+    (file) => `package/${file}`,
+  );
+  assertExactFileSet(actualFiles, expectedFiles, "Packed prebuild set");
 }
 
 /** Locates the one tarball in a package artifact directory. */

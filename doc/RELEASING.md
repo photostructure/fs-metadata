@@ -30,7 +30,7 @@ Verify these conditions:
 6. Wait for **Stage npm Release**. It rebuilds all eight prebuilds from the tag,
    packs one tarball, and tests that tarball on every supported platform.
 7. Download the one-day `npm-package-vMAJOR.MINOR.PATCH` artifact. Inspect
-   `CONTENTS.txt` and `PACK.json`, verify `SHA256SUMS`, and confirm the embedded
+   `CONTENTS.txt` and `PACK.json`, and confirm the embedded
    `package/package.json` name and version match the tag.
 8. Open **Staged Packages** from the npm user menu. Verify the package name,
    version, files, repository, source commit, workflow, and provenance.
@@ -44,16 +44,25 @@ exist before the maintainer approves the package for public access.
 ## What the workflows enforce
 
 - `build.yml` runs the full pre-tag test gate and verifies that every test job
-  leaves tracked source unchanged. It also records each prebuild's manifest,
-  packs a tarball, and installs and loads it on Linux, macOS, Windows, and
-  Alpine, so `publish.yaml` never runs that procedure for the first time at a
-  tag — a workflow file is frozen at its tag, so a defect there costs a version.
+  leaves tracked source unchanged. It also packs a tarball and installs and
+  loads it on Linux, macOS, Windows, and Alpine, so `publish.yaml` never runs
+  that procedure for the first time at a tag — a workflow file is frozen at its
+  tag, so a defect there costs a version.
 - The release job changes only `package.json` and `package-lock.json`, signs the
   commit and tag, and pushes them atomically.
 - `publish.yaml` accepts only a signed `vMAJOR.MINOR.PATCH` annotated tag whose
   package version and target commit match the workflow ref.
-- All eight native binaries are rebuilt from that tag and recorded with their
-  platform, architecture, ABI, filename, and SHA-256 checksum.
+- All eight native binaries are rebuilt from that tag. Immediately before
+  packaging, the workflow requires `prebuilds/` to contain exactly the expected
+  paths — no missing or extra files. Platform and architecture are encoded in
+  each `prebuilds/<platform>-<arch>/` path, with Linux libc in the filename.
+- After packing, the tarball inventory must contain every expected native binary
+  exactly once. This separately catches a `package.json` `files` allowlist
+  regression.
+- Artifact transport integrity comes from the pinned
+  `actions/download-artifact` v8 action. GitHub records a SHA-256 digest when an
+  artifact is uploaded; every download recalculates it and fails on a mismatch.
+  The package carries no same-channel checksum as a substitute for that control.
 - The staging job has no checkout, cache, project dependency installation,
   repository secret, third-party Action, or artifact executable. It alone has
   `id-token: write`.

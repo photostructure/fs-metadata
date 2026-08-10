@@ -4,17 +4,20 @@ import { join } from "node:path";
 
 import {
   assertPackedManifest,
-  checksumFileName,
+  assertPackedPrebuilds,
   findTarball,
-  formatChecksums,
   packedFilename,
-  parseChecksums,
-  verifyChecksums,
-  writeChecksums,
 } from "./release-package";
+import {
+  expectedPrebuildPath,
+  prebuildTargets,
+} from "./release-prebuild-artifacts";
 
 describe("release package", () => {
   const identity = { name: "@photostructure/fs-metadata", version: "9.9.9" };
+  const packedPrebuilds = prebuildTargets.map(
+    (target) => `package/${expectedPrebuildPath(identity.name, target)}`,
+  );
   let tempRoot: string;
 
   beforeEach(async () => {
@@ -27,58 +30,6 @@ describe("release package", () => {
       force: true,
       maxRetries: process.platform === "win32" ? 3 : 1,
       retryDelay: process.platform === "win32" ? 100 : 0,
-    });
-  });
-
-  describe("checksums", () => {
-    test("writes the sha256sum text format", async () => {
-      await writeFile(join(tempRoot, "a.tgz"), "hello");
-      const entries = await writeChecksums(tempRoot, ["a.tgz"]);
-
-      expect(entries).toEqual([
-        {
-          file: "a.tgz",
-          sha256:
-            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-        },
-      ]);
-      expect(formatChecksums(entries)).toBe(
-        `${entries[0]!.sha256}  a.tgz\n`, // two spaces, as GNU coreutils writes
-      );
-    });
-
-    test("round-trips what it writes", async () => {
-      await writeFile(join(tempRoot, "a.tgz"), "hello");
-      const written = await writeChecksums(tempRoot, ["a.tgz"]);
-      expect(await verifyChecksums(tempRoot)).toEqual(written);
-    });
-
-    test("accepts the binary-mode separator", () => {
-      const hash = "0".repeat(64);
-      expect(parseChecksums(`${hash} *a.tgz\n`)).toEqual([
-        { file: "a.tgz", sha256: hash },
-      ]);
-    });
-
-    test("rejects a malformed line", () => {
-      expect(() => parseChecksums("not-a-checksum\n")).toThrow(
-        /Malformed SHA256SUMS line/,
-      );
-    });
-
-    test("rejects an empty checksum file", async () => {
-      await writeFile(join(tempRoot, checksumFileName), "\n");
-      await expect(verifyChecksums(tempRoot)).rejects.toThrow(/lists no files/);
-    });
-
-    test("rejects altered content", async () => {
-      await writeFile(join(tempRoot, "a.tgz"), "hello");
-      await writeChecksums(tempRoot, ["a.tgz"]);
-      await writeFile(join(tempRoot, "a.tgz"), "tampered");
-
-      await expect(verifyChecksums(tempRoot)).rejects.toThrow(
-        /a\.tgz is [0-9a-f]{64}, but SHA256SUMS expects/,
-      );
     });
   });
 
@@ -114,10 +65,42 @@ describe("release package", () => {
     });
   });
 
+  describe("packed prebuilds", () => {
+    test("accepts every expected binary exactly once", () => {
+      expect(() =>
+        assertPackedPrebuilds(
+          ["package/package.json", ...packedPrebuilds],
+          identity.name,
+        ),
+      ).not.toThrow();
+    });
+
+    test("rejects a missing expected binary", () => {
+      expect(() =>
+        assertPackedPrebuilds(packedPrebuilds.slice(1), identity.name),
+      ).toThrow(`Missing: ${packedPrebuilds[0]}`);
+    });
+
+    test("rejects a duplicate expected binary", () => {
+      expect(() =>
+        assertPackedPrebuilds(
+          [...packedPrebuilds, packedPrebuilds[0]!],
+          identity.name,
+        ),
+      ).toThrow(`Unexpected: ${packedPrebuilds[0]}`);
+    });
+
+    test("rejects an unexpected native binary", () => {
+      const unexpected = "package/prebuilds/linux-x64/unexpected.node";
+      expect(() =>
+        assertPackedPrebuilds([...packedPrebuilds, unexpected], identity.name),
+      ).toThrow(`Unexpected: ${unexpected}`);
+    });
+  });
+
   describe("findTarball", () => {
     test("returns the only tarball", async () => {
       await writeFile(join(tempRoot, "a.tgz"), "");
-      await writeFile(join(tempRoot, checksumFileName), "");
       expect(await findTarball(tempRoot)).toBe(join(tempRoot, "a.tgz"));
     });
 
