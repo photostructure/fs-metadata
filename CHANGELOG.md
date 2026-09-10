@@ -14,6 +14,19 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## Unreleased
+
+### Fixed
+
+- **Stalled macOS volume queries no longer block `process.exit()`.** Metadata,
+  mount enumeration, path resolution, and directory probes now run on bounded
+  detached threads instead of libuv's joined worker pool. This also applies
+  when `timeoutMs: 0` disables the deadline. DiskArbitration lock waits observe
+  cancellation and deadlines, excess queued requests reject with `EBUSY`, and
+  Worker teardown does not wait for native calls that never return. Other Node
+  filesystem calls, including `watchAvailableSpace()` polling, still need
+  application-level subprocess supervision when mounts can hang.
+
 ## [2.5.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.5.0) (2026-08-06)
 
 ### Added

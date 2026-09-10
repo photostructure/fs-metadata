@@ -1,6 +1,9 @@
 // src/types/node-gyp-build.d.ts
 
 declare module "node-gyp-build" {
-  function NodeGypBuild(dir: string): unknown;
+  const NodeGypBuild: {
+    (dir: string): unknown;
+    path(dir: string): string;
+  };
   export default NodeGypBuild;
 }

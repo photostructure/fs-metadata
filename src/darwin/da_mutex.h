@@ -12,12 +12,24 @@
 
 #pragma once
 
+#include "./native_job.h"
 #include <mutex>
 
 namespace FSMeta {
 
-// Defined in volume_metadata.cpp. Serializes all DiskArbitration + IOKit
-// operations across both getVolumeMetadata and getVolumeMountPoints workers.
-extern std::mutex g_diskArbitrationMutex;
+// Never destroyed while detached OS calls might still hold it. No libuv
+// thread ever waits here. Short timed waits let cancelled/expired requests
+// leave the queue even if another call never releases DiskArbitration.
+inline std::unique_lock<std::timed_mutex>
+LockDiskArbitration(const NativeJob &job) {
+  static auto *const mutex = new std::timed_mutex();
+  std::unique_lock<std::timed_mutex> lock(*mutex, std::defer_lock);
+  while (!job.IsCancelled()) {
+    if (lock.try_lock_for(std::chrono::milliseconds(10)))
+      return lock;
+  }
+  throw std::runtime_error(
+      "DiskArbitration busy: operation timed out or cancelled");
+}
 
 } // namespace FSMeta

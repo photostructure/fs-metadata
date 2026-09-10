@@ -66,7 +66,10 @@ export interface NativeBindings {
    * Returns the f_mntonname for the given directory path without fetching
    * full volume metadata (no DiskArbitration, no IOKit, no space calculation).
    */
-  getMountPoint?(path: string): Promise<string>;
+  getMountPoint?(
+    path: string,
+    options?: Pick<Options, "timeoutMs">,
+  ): Promise<string>;
 }
 
 export type GetVolumeMetadataOptions = {

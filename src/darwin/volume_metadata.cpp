@@ -4,7 +4,6 @@
 #include "../common/debug_log.h"
 #include "../common/fd_guard.h"
 #include "../common/path_security.h"
-#include "../common/shutdown.h"
 #include "../common/volume_utils.h"
 #include "./da_mutex.h"
 #include "./fs_meta.h"
@@ -24,9 +23,6 @@
 #include <unistd.h>
 
 namespace FSMeta {
-
-// Global mutex for DiskArbitration operations (declared in da_mutex.h)
-std::mutex g_diskArbitrationMutex;
 
 // Helper function to convert CFString to std::string
 static std::string CFStringToString(CFStringRef cfString) {
@@ -67,17 +63,15 @@ static std::string CFStringToString(CFStringRef cfString) {
   return result;
 }
 
-class GetVolumeMetadataWorker : public MetadataWorkerBase {
+class GetVolumeMetadataWorker : public NativeJob {
 public:
-  GetVolumeMetadataWorker(const std::string &mountPoint,
-                          const VolumeMetadataOptions &options,
-                          const Napi::Promise::Deferred &deferred)
-      : MetadataWorkerBase(mountPoint, deferred), options_(options) {}
+  explicit GetVolumeMetadataWorker(const VolumeMetadataOptions &options)
+      : NativeJob(options.timeoutMs), mountPoint(options.mountPoint) {}
 
   void Execute() override {
     DEBUG_LOG("[GetVolumeMetadataWorker] Executing for mount point: %s",
               mountPoint.c_str());
-    if (IsShuttingDown()) {
+    if (IsCancelled()) {
       // Avoid kicking off blocking IOKit/DA calls during env teardown.
       SetError("fs-metadata: shutdown in progress");
       return;
@@ -86,10 +80,11 @@ public:
       // Validate and canonicalize mount point using realpath()
       // This follows Apple's Secure Coding Guide recommendations
       std::string error;
+      int errorCode = 0;
       std::string validated_mount_point =
-          ValidatePathForRead(mountPoint, error);
+          ValidatePathForRead(mountPoint, error, &errorCode);
       if (validated_mount_point.empty()) {
-        SetError(error);
+        SetError(error, errorCode, "realpath", mountPoint);
         return;
       }
 
@@ -101,7 +96,7 @@ public:
       std::string original_mount_point = mountPoint;
       mountPoint = validated_mount_point;
 
-      if (!GetBasicVolumeInfo()) {
+      if (!GetBasicVolumeInfo(original_mount_point)) {
         mountPoint = original_mount_point; // Restore for error reporting
         return;
       }
@@ -116,10 +111,13 @@ public:
   }
 
 private:
-  VolumeMetadataOptions options_;
+  std::string mountPoint;
+  VolumeMetadata metadata;
   uint32_t f_flags_ = 0;
 
-  bool GetBasicVolumeInfo() {
+  Napi::Value ToValue(Napi::Env env) override { return metadata.ToObject(env); }
+
+  bool GetBasicVolumeInfo(const std::string &requestedMountPoint) {
     DEBUG_LOG("[GetVolumeMetadataWorker] Getting basic volume info for: %s",
               mountPoint.c_str());
 
@@ -132,7 +130,8 @@ private:
       int error = errno;
       DEBUG_LOG("[GetVolumeMetadataWorker] open failed: %s (%d)",
                 strerror(error), error);
-      SetError(CreatePathErrorMessage("open", mountPoint, error));
+      SetError(CreatePathErrorMessage("open", requestedMountPoint, error),
+               error, "open", requestedMountPoint);
       return false;
     }
 
@@ -148,7 +147,8 @@ private:
       int error = errno;
       DEBUG_LOG("[GetVolumeMetadataWorker] fstatvfs failed: %s (%d)",
                 strerror(error), error);
-      SetError(CreatePathErrorMessage("fstatvfs", mountPoint, error));
+      SetError(CreatePathErrorMessage("fstatvfs", requestedMountPoint, error),
+               error, "fstatvfs", requestedMountPoint);
       return false;
     }
 
@@ -156,7 +156,8 @@ private:
       int error = errno;
       DEBUG_LOG("[GetVolumeMetadataWorker] fstatfs failed: %s (%d)",
                 strerror(error), error);
-      SetError(CreatePathErrorMessage("fstatfs", mountPoint, error));
+      SetError(CreatePathErrorMessage("fstatfs", requestedMountPoint, error),
+               error, "fstatfs", requestedMountPoint);
       return false;
     }
 
@@ -213,9 +214,9 @@ private:
     DEBUG_LOG("[GetVolumeMetadataWorker] Getting Disk Arbitration info for: %s",
               mountPoint.c_str());
 
-    if (IsShuttingDown()) {
-      // IOServiceGetMatchingService is uncancellable; if we're already in
-      // teardown, surface a partial result rather than block FreeEnvironment.
+    if (IsCancelled()) {
+      // Avoid starting another uncancellable OS call after the request has
+      // timed out or its environment has begun teardown.
       metadata.status = "partial";
       metadata.error = "shutdown in progress";
       return;
@@ -237,7 +238,9 @@ private:
     //
     // The mutex serializes DA operations across worker threads for extra
     // safety.
-    std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
+    auto lock = LockDiskArbitration(*this);
+    if (IsCancelled())
+      return;
 
     // Create session with RAII wrapper that handles unscheduling before release
     DASessionRAII session(DASessionCreate(kCFAllocatorDefault));
@@ -380,11 +383,8 @@ Napi::Value GetVolumeMetadata(const Napi::CallbackInfo &info) {
   }
   auto options = VolumeMetadataOptions::FromObject(info[0].As<Napi::Object>());
 
-  auto deferred = Napi::Promise::Deferred::New(env);
-  auto *worker =
-      new GetVolumeMetadataWorker(options.mountPoint, options, deferred);
-  worker->Queue();
-  return deferred.Promise();
+  return QueueNativeJob(env,
+                        std::make_shared<GetVolumeMetadataWorker>(options));
 }
 
 } // namespace FSMeta

@@ -80,6 +80,31 @@ The operating-system request may still remain blocked in a background worker
 because Node's filesystem promises and several platform APIs do not provide
 portable cancellation.
 
+### macOS Volume Queries and Process Exit
+
+On macOS, metadata, mount enumeration, and path resolution run on detached
+native threads. Their path and directory checks also avoid libuv. Node's
+`process.exit()` joins libuv's worker pool, so a JavaScript timeout alone would
+not prevent a hung native call from blocking exit.
+
+The addon permits at most four executing jobs and 256 queued jobs across its
+Worker environments. Further queued requests reject with `code: "EBUSY"`.
+DiskArbitration lock acquisition observes each job's deadline and cancellation;
+an OS call that already holds the lock cannot be interrupted. Access probes
+reuse in-flight work per mount path, with at most 64 distinct probes. A stalled
+call can consume this bounded capacity until the OS returns.
+
+`timeoutMs: 0` still disables the deadline. A pending query keeps the event loop
+alive for normal operation, but does not prevent explicit `process.exit()` or
+Worker termination. Finite deadlines release the request's event-loop timer
+even if native work remains blocked.
+
+This protection covers the macOS volume-query APIs. `watchAvailableSpace()`,
+hidden-attribute operations, and other application calls to Node's filesystem
+APIs can still occupy libuv workers. Applications that must exit reliably with
+dead mounts should run such work in a child process whose parent enforces an
+exit deadline and can send `SIGKILL`.
+
 ### One Dead Mount Point Must Not Tax Everything Else
 
 A mount point that cannot answer — a dead `autofs` trigger, an unplugged
@@ -122,17 +147,19 @@ unreachable volume tax an unrelated lookup:
   (`fstatfs`). They also ignore `mountPoints`, so caching it changes nothing
   there.
 
-For public enumeration, macOS bounds its native accessibility probes with the
-same fraction of `timeoutMs` the JavaScript probe gets and schedules them in a
-rolling four-probe window. One wedged mount is reported as `timeout` without
-preventing later healthy mounts from being checked or rejecting the whole call.
+For public enumeration, macOS gives its native access and directory probes a
+quarter of `timeoutMs` and schedules them in a rolling four-probe window. One
+wedged mount is reported as `timeout` without preventing later healthy mounts
+from being checked or rejecting the whole call. No JavaScript directory probe
+runs afterward.
 
 ### Concurrency and `UV_THREADPOOL_SIZE`
 
-Every filesystem call here — `stat()`, `readdir()`, and the native metadata
-workers — runs on libuv's thread pool, **not** on one thread per core. That pool
-holds `UV_THREADPOOL_SIZE` threads (**4** by default, regardless of core count)
-and is shared with the rest of your process.
+Node's filesystem calls — including `stat()` and `readdir()` — and the
+Linux/Windows native metadata workers use libuv's thread pool. That pool holds
+`UV_THREADPOOL_SIZE` threads (**4** by default, regardless of core count) and is
+shared with the rest of your process. macOS volume queries use the separate
+bounded executor described above; raising `UV_THREADPOOL_SIZE` does not expand it.
 
 `maxConcurrency` therefore defaults to the pool size plus a small fixed
 headroom (7), not to `availableParallelism()`. Core count is the wrong unit: on

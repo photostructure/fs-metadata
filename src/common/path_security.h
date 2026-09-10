@@ -34,7 +34,10 @@ namespace FSMeta {
  */
 inline std::string ValidateAndCanonicalizePath(const std::string &path,
                                                std::string &error,
-                                               bool allow_nonexistent = false) {
+                                               bool allow_nonexistent = false,
+                                               int *error_code = nullptr) {
+  if (error_code)
+    *error_code = 0;
   DEBUG_LOG("[ValidateAndCanonicalizePath] Validating path: %s "
             "(allow_nonexistent: %d)",
             path.c_str(), allow_nonexistent);
@@ -91,6 +94,8 @@ inline std::string ValidateAndCanonicalizePath(const std::string &path,
     // Validate parent directory exists and is accessible
     if (realpath(parent_dir.c_str(), resolved_path) == nullptr) {
       int parent_error = errno;
+      if (error_code)
+        *error_code = parent_error;
       error =
           CreatePathErrorMessage("realpath (parent)", parent_dir, parent_error);
       DEBUG_LOG("[ValidateAndCanonicalizePath] Parent validation failed: %s",
@@ -119,6 +124,8 @@ inline std::string ValidateAndCanonicalizePath(const std::string &path,
   // realpath() failed for a different reason, or path doesn't exist and we
   // don't allow it
   error = CreatePathErrorMessage("realpath", path, realpath_error);
+  if (error_code)
+    *error_code = realpath_error;
   DEBUG_LOG("[ValidateAndCanonicalizePath] Failed: %s", error.c_str());
   return "";
 }
@@ -132,8 +139,9 @@ inline std::string ValidateAndCanonicalizePath(const std::string &path,
  * @return The canonicalized path, or empty string if validation fails
  */
 inline std::string ValidatePathForRead(const std::string &path,
-                                       std::string &error) {
-  return ValidateAndCanonicalizePath(path, error, false);
+                                       std::string &error,
+                                       int *error_code = nullptr) {
+  return ValidateAndCanonicalizePath(path, error, false, error_code);
 }
 
 /**

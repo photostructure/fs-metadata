@@ -136,7 +136,7 @@ public:
 
 ```cpp
 // Thread-safe session creation
-std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
+auto lock = LockDiskArbitration(*this); // Inside a NativeJob
 CFReleaser<DASessionRef> session(DASessionCreate(kCFAllocatorDefault));
 if (!session.get()) {
   throw std::runtime_error("Failed to create DiskArbitration session");
@@ -250,11 +250,9 @@ if (!disk.get()) {
 **Critical**: All DiskArbitration operations must be serialized:
 
 ```cpp
-// Global mutex for all DA operations
-std::mutex g_diskArbitrationMutex;
-
-// Always lock before any DA operation
-std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
+// Shared timed mutex; acquisition checks job cancellation and deadline.
+// Always lock before any DA operation on a detached native thread.
+auto lock = LockDiskArbitration(*this); // Inside a NativeJob
 ```
 
 ## File System APIs
@@ -663,46 +661,32 @@ CFStringRef name = (CFStringRef)CFDictionaryGetValue(desc.get(), key);
 
 ### DiskArbitration Serialization
 
-All DiskArbitration operations must be serialized:
-
-```cpp
-// In header file
-extern std::mutex g_diskArbitrationMutex;
-
-// In implementation
-std::mutex g_diskArbitrationMutex;
-
-// Usage
-{
-  std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
-  // All DA operations here
-}
-```
+All DiskArbitration operations use `LockDiskArbitration(*this)` from
+`src/darwin/da_mutex.h` inside a `NativeJob`. Its process-lifetime timed mutex
+is shared by metadata and mount enumeration. Acquisition checks cancellation
+and the job deadline every 10 ms, so a wedged holder does not leave expired
+jobs waiting forever. No libuv worker acquires this mutex.
 
 ### Async Operations
 
-For concurrent file system checks:
+`src/darwin/native_job.cpp` runs volume queries on at most four detached
+threads, with up to 256 queued jobs. Each request owns an event-loop timer that
+reads published C++ results and settles the promise. Detached threads hold no
+JavaScript handles and never call N-API or libuv. An asynchronous environment
+cleanup hook closes the timer without joining native work. The addon image is
+pinned with `RTLD_NODELETE` so late completion remains safe after the last
+Worker environment unloads it.
 
-```cpp
-// Limit concurrent operations
-const size_t maxConcurrentChecks = 4;
+The native deadline includes time spent waiting in the queue and acquiring
+DiskArbitration. Zero disables the deadline, while Worker teardown still
+cancels queued jobs and interruptible waits. An executing OS call itself cannot
+be cancelled. These jobs do not prevent `process.exit()`, which joins libuv's
+worker pool but does not join detached threads.
 
-// Process in batches
-for (size_t i = 0; i < count; i += maxConcurrentChecks) {
-  std::vector<std::future<Result>> futures;
-
-  // Launch batch
-  for (size_t j = i; j < count && j < i + maxConcurrentChecks; j++) {
-    futures.push_back(std::async(std::launch::async, checkFunction));
-  }
-
-  // Collect results with timeout
-  for (auto& future : futures) {
-    auto status = future.wait_for(std::chrono::milliseconds(timeout));
-    // Handle timeout, ready, or error states
-  }
-}
-```
+Mount accessibility and directory checks use a rolling window of four detached
+probes, reusing in-flight probes by path, with a global limit of 64 distinct
+probes. Their shared futures come from promises. Do not replace them with
+`std::async`: destroying its future can wait for the stalled call to finish.
 
 ## Error Handling Patterns
 

@@ -1,5 +1,6 @@
 // src/error.ts
 
+import { types } from "node:util";
 import { isNumber } from "./number";
 import { compactValues, map, omit } from "./object";
 import { isBlank, isNotBlank } from "./string";
@@ -75,5 +76,14 @@ export class WrappedError extends Error {
 }
 
 export function toError(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(String(cause));
+  if (cause instanceof Error) return cause;
+  // Native addons can reject with an Error from another VM context. Preserve
+  // errno properties when recreating it in the caller's JavaScript realm.
+  if (types.isNativeError(cause)) {
+    return Object.assign(new Error(cause.message, { cause }), cause, {
+      name: cause.name,
+      stack: cause.stack,
+    });
+  }
+  return new Error(String(cause));
 }

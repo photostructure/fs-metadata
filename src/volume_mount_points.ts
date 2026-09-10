@@ -81,18 +81,9 @@ async function _getVolumeMountPoints(
   const raw = await (isWindows || isMacOS
     ? (async () => {
         debug("[getVolumeMountPoints] using native implementation");
-        // macOS runs its own accessibility probe per mount inside this call,
-        // deadlined from the timeoutMs it receives. Handing it the whole budget
-        // loses the same race the TypeScript probe below was losing: the outer
-        // withTimeout() started first, so one wedged mount rejected the entire
-        // enumeration instead of being reported as `timeout`. Give the native
-        // phase the same fraction. Windows enforces its own per-call timeouts
-        // and has no outer deadline, so it keeps the full value.
-        const points = await (
-          await nativeFn()
-        ).getVolumeMountPoints(
-          isMacOS ? { ...o, timeoutMs: healthProbeTimeoutMs(o.timeoutMs) } : o,
-        );
+        // macOS owns both its whole-operation deadline and the shorter
+        // directory-probe budget. No JS filesystem probes follow it.
+        const points = await (await nativeFn()).getVolumeMountPoints(o);
         debug(
           "[getVolumeMountPoints] native returned %d mount points",
           points.length,
@@ -150,6 +141,7 @@ async function _getVolumeMountPoints(
       (ea) =>
         // skipHealthProbes: callers that read neither status nor the
         // non-directory filter must not pay for — or block on — the probe.
+        !isMacOS &&
         !o.skipHealthProbes &&
         // trust but verify
         (isBlank(ea.status) || ea.status === "healthy") &&

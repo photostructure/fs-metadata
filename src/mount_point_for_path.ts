@@ -1,9 +1,9 @@
 // src/mount_point_for_path.ts
 
 import { realpath } from "node:fs/promises";
-import { dirname } from "node:path";
 import { validateTimeoutMs, withTimeout } from "./async";
 import { debug } from "./debuglog";
+import { toError } from "./error";
 import { statAsync } from "./fs";
 import { isMacOS } from "./platform";
 import { isBlank, isNotBlank } from "./string";
@@ -39,30 +39,25 @@ async function _getMountPointForPath(
   nativeFn: NativeBindingsFn,
   resolvePath: typeof realpath,
 ): Promise<string> {
-  // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
-  // realpath(), but fstatfs() follows them — handled below on macOS.
+  if (isMacOS) {
+    const native = await nativeFn();
+    if (!native.getMountPoint) {
+      throw new Error("getMountPoint native function unavailable");
+    }
+    // Native resolves symlinks and the containing directory off libuv too.
+    // Doing realpath/stat here would reintroduce the process.exit hazard.
+    const mountPoint = await native
+      .getMountPoint(pathname, opts)
+      .catch((error: unknown) => {
+        throw toError(error);
+      });
+    if (isNotBlank(mountPoint)) return mountPoint;
+    throw new Error("getMountPoint returned an empty mount point");
+  }
+  // Resolve symlinks before matching Linux/Windows device IDs and ancestors.
   const resolved = await resolvePath(pathname);
 
   const resolvedStat = await statAsync(resolved);
-  const dir = resolvedStat.isDirectory() ? resolved : dirname(resolved);
-
-  if (isMacOS) {
-    // Use the lightweight native getMountPoint which only does fstatfs —
-    // no DiskArbitration, IOKit, or space calculations.
-    const native = await nativeFn();
-    if (native.getMountPoint) {
-      debug("[getMountPointForPath] using native getMountPoint for %s", dir);
-      // No withTimeout() here: getMountPointForPathImpl() already wraps this
-      // whole function in one deadline that also covers realpath()/stat().
-      const mountPoint = await native.getMountPoint(dir);
-      if (isNotBlank(mountPoint)) {
-        debug("[getMountPointForPath] resolved to %s", mountPoint);
-        return mountPoint;
-      }
-    }
-    // Fallback: should not happen on macOS, but defensive
-    throw new Error("getMountPoint native function unavailable");
-  }
 
   // Linux/Windows: device ID filtering + longest ancestor path matching
   debug("[getMountPointForPath] using device matching for %s", resolved);

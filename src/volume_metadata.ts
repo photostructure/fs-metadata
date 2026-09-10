@@ -2,10 +2,14 @@
 
 import type { Stats } from "node:fs";
 import { realpath } from "node:fs/promises";
-import { dirname } from "node:path";
-import { mapConcurrent, validateTimeoutMs, withTimeout } from "./async";
+import {
+  TimeoutError,
+  mapConcurrent,
+  validateTimeoutMs,
+  withTimeout,
+} from "./async";
 import { debug } from "./debuglog";
-import { WrappedError } from "./error";
+import { WrappedError, toError } from "./error";
 import { canReaddir, statAsync } from "./fs";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk";
 import { getLinuxMtabMetadata } from "./linux/mount_points";
@@ -118,7 +122,11 @@ async function _getVolumeMetadata(
     }) as VolumeMetadata;
   }
 
-  const pathStatus = await directoryStatus(o.mountPoint, o.timeoutMs);
+  // The macOS native directory open performs this validation off libuv.
+  // A redundant JS opendir would leave a joined worker behind on timeout.
+  const pathStatus = isMacOS
+    ? { status: VolumeHealthStatuses.healthy, isDirectory: true }
+    : await directoryStatus(o.mountPoint, o.timeoutMs);
   const isNonDirectoryLinuxMount =
     isLinux && pathStatus.isDirectory === false && mtabInfo != null;
   if (
@@ -149,9 +157,18 @@ async function _getVolumeMetadata(
   }
 
   debug("[getVolumeMetadata] requesting native metadata");
+  if (isMacOS && deadlineMs != null) {
+    const remaining = deadlineMs - Date.now();
+    if (remaining <= 0) throw new TimeoutError("getVolumeMetadata(): timeout");
+    o.timeoutMs = remaining;
+  }
   const metadata = (await (
     await nativeFn()
-  ).getVolumeMetadata(o)) as VolumeMetadata;
+  )
+    .getVolumeMetadata(o)
+    .catch((error: unknown) => {
+      throw toError(error);
+    })) as VolumeMetadata;
   debug("[getVolumeMetadata] native metadata: %o", metadata);
 
   // Some OS implementations leave it up to us to extract remote info:
@@ -284,35 +301,27 @@ async function _getVolumeMetadataForPath(
   resolvePath: typeof realpath,
   operationDeadlineMs: number | undefined,
 ): Promise<VolumeMetadata> {
-  // realpath() resolves POSIX symlinks. APFS firmlinks are NOT resolved by
-  // realpath(), but fstatfs() follows them — handled below.
-  const resolved = await resolvePath(pathname);
-
-  // macOS probes the containing directory. Linux/Windows use the original
-  // path below so an exact Linux file bind mount remains distinguishable.
-  const resolvedStat = await statAsync(resolved);
-  const dir = resolvedStat.isDirectory() ? resolved : dirname(resolved);
-
   if (isMacOS) {
-    // On macOS, native fstatfs() sets mountName = f_mntonname, which is the
-    // canonical mount point even through APFS firmlinks. Probe the dir to get
-    // it, then re-query with the canonical mount point so the result has
-    // mountPoint set correctly.
-    const probe = await getVolumeMetadataImpl(
-      { ...opts, mountPoint: dir },
-      nativeFn,
-      operationDeadlineMs,
-    );
-    const canonicalMountPoint = isNotBlank(probe.mountName)
-      ? probe.mountName
-      : dir;
-    if (canonicalMountPoint === dir) return probe;
+    const native = await nativeFn();
+    if (!native.getMountPoint)
+      throw new Error("getMountPoint native function unavailable");
+    const mountPoint = await native
+      .getMountPoint(pathname, opts)
+      .catch((error: unknown) => {
+        throw toError(error);
+      });
     return getVolumeMetadataImpl(
-      { ...opts, mountPoint: canonicalMountPoint },
+      { ...opts, mountPoint },
       nativeFn,
       operationDeadlineMs,
     );
   }
+  // Resolve symlinks before matching Linux/Windows device IDs and ancestors.
+  const resolved = await resolvePath(pathname);
+
+  // Keep the original path so an exact Linux file bind mount remains
+  // distinguishable from its containing directory.
+  const resolvedStat = await statAsync(resolved);
 
   // Linux/Windows: stat().dev is reliable (no firmlinks). Find the mount point
   // by comparing device IDs, using path prefix as a tiebreaker for bind mounts

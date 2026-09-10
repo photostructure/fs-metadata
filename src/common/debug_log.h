@@ -13,13 +13,30 @@ namespace Debug {
 // Written from the JS thread (setDebugLogging/setDebugPrefix) and read from
 // async worker threads, so the flag is atomic and the prefix is
 // mutex-guarded.
+// std::atomic<bool> has a trivial destructor and needs no teardown handling.
 inline std::atomic<bool> enableDebugLogging{false};
-inline std::mutex debugPrefixMutex;
-inline std::string debugPrefix;
+
+struct PrefixState {
+  std::mutex mutex;
+  std::string prefix;
+};
+
+inline PrefixState &GetPrefixState() {
+#if defined(__APPLE__)
+  // Detached jobs can log after environment/static teardown. Allocate lazily
+  // so allocation failures do not throw during addon static initialization.
+  static auto *const state = new PrefixState();
+  return *state;
+#else
+  static PrefixState state;
+  return state;
+#endif
+}
 
 inline void SetDebugPrefix(const std::string &prefix) {
-  std::lock_guard<std::mutex> lock(debugPrefixMutex);
-  debugPrefix = prefix;
+  auto &state = GetPrefixState();
+  std::lock_guard<std::mutex> lock(state.mutex);
+  state.prefix = prefix;
 }
 
 // Tell GCC/Clang that DebugLog is printf-style. This does two things:
@@ -73,8 +90,9 @@ inline void DebugLog(const char *format, ...) {
 
   std::string prefix;
   {
-    std::lock_guard<std::mutex> lock(debugPrefixMutex);
-    prefix = debugPrefix;
+    auto &state = GetPrefixState();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    prefix = state.prefix;
   }
 
   fprintf(stderr, "%s %s %s\n", timestamp, prefix.c_str(), message);

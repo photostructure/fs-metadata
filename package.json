@@ -28,7 +28,8 @@
     "prebuilds/",
     "scripts/install.cjs",
     "src/**/*.cpp",
-    "src/**/*.h"
+    "src/**/*.h",
+    "!src/test-utils/**"
   ],
   "repository": {
     "type": "git",

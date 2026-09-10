@@ -2,7 +2,6 @@
 #include "../common/volume_mount_points.h"
 #include "../common/debug_log.h"
 #include "../common/error_utils.h"
-#include "../common/shutdown.h"
 #include "./da_mutex.h"
 #include "./fs_meta.h"
 #include "./raii_utils.h"
@@ -10,6 +9,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <dirent.h>
 #include <future>
 #include <mutex>
 #include <sys/mount.h>
@@ -54,6 +54,9 @@ std::shared_future<bool> StartAccessProbe(const std::string &path) {
   if (it != state->inflight.end()) {
     return it->second;
   }
+  if (state->inflight.size() >= 64) {
+    throw std::runtime_error("fs-metadata: access probe queue busy");
+  }
   auto promise = std::make_shared<std::promise<bool>>();
   std::shared_future<bool> future = promise->get_future().share();
   state->inflight.emplace(path, future);
@@ -65,6 +68,15 @@ std::shared_future<bool> StartAccessProbe(const std::string &path) {
       //   This prevents TOCTOU attacks and privilege escalation issues
       bool accessible =
           faccessat(AT_FDCWD, path.c_str(), R_OK, AT_EACCESS) == 0;
+      if (accessible) {
+        // Include the directory check here, on the detached probe, instead
+        // of repeating opendir/closedir on Node's libuv pool afterward.
+        std::unique_ptr<DIR, decltype(&closedir)> directory(
+            opendir(path.c_str()), closedir);
+        accessible = bool(directory);
+        if (directory)
+          accessible = closedir(directory.release()) == 0;
+      }
       {
         std::lock_guard<std::mutex> lock(state->mutex);
         state->inflight.erase(path);
@@ -92,15 +104,6 @@ std::uint64_t ProbeCompletionGeneration() {
   return state->completionGeneration;
 }
 
-void WaitForProbeCompletion(std::uint64_t &observedGeneration) {
-  ProbeState *const state = GetProbeState();
-  std::unique_lock<std::mutex> lock(state->mutex);
-  state->completed.wait(lock, [&]() {
-    return state->completionGeneration != observedGeneration;
-  });
-  observedGeneration = state->completionGeneration;
-}
-
 bool WaitForProbeCompletionUntil(
     std::uint64_t &observedGeneration,
     const std::chrono::steady_clock::time_point &deadline) {
@@ -115,23 +118,21 @@ bool WaitForProbeCompletionUntil(
 
 } // namespace
 
-class GetVolumeMountPointsWorker : public SafeAsyncWorker {
+class GetVolumeMountPointsWorker : public NativeJob {
 private:
-  Napi::Promise::Deferred deferred_;
   std::vector<MountPoint> mountPoints_;
   uint32_t timeoutMs_;
   bool skipHealthProbes_;
 
 public:
-  GetVolumeMountPointsWorker(const Napi::Promise::Deferred &deferred,
-                             uint32_t timeoutMs = 5000,
+  GetVolumeMountPointsWorker(uint32_t timeoutMs = 5000,
                              bool skipHealthProbes = false)
-      : SafeAsyncWorker(deferred.Env()), deferred_(deferred),
-        timeoutMs_(timeoutMs), skipHealthProbes_(skipHealthProbes) {}
+      : NativeJob(timeoutMs), timeoutMs_(timeoutMs),
+        skipHealthProbes_(skipHealthProbes) {}
 
   void Execute() override {
     DEBUG_LOG("[GetVolumeMountPointsWorker] Executing");
-    if (IsShuttingDown()) {
+    if (IsCancelled()) {
       SetError("fs-metadata: shutdown in progress");
       return;
     }
@@ -163,9 +164,9 @@ public:
       // DiskArbitration + IOKit operations with getVolumeMetadata workers.
       std::vector<MountPoint> allMountPoints;
       {
-        std::lock_guard<std::mutex> lock(g_diskArbitrationMutex);
+        auto lock = LockDiskArbitration(*this);
 
-        if (IsShuttingDown()) {
+        if (IsCancelled()) {
           return;
         }
 
@@ -178,7 +179,7 @@ public:
         }
 
         for (int j = 0; j < count; j++) {
-          if (IsShuttingDown()) {
+          if (IsCancelled()) {
             return;
           }
 
@@ -214,15 +215,13 @@ public:
       // later healthy volumes from being checked before the deadline.
       const size_t maxConcurrentChecks = 4;
 
-      // One deadline for the whole probing phase, matching the per-call
-      // timeoutMs contract enforced by the TypeScript wrapper — otherwise
-      // each hung probe would burn its own timeoutMs and N dead mounts would
-      // pin this worker for N * timeoutMs. wait_until() with an expired
-      // deadline still polls, so probes that already completed report their
-      // real status even after the budget is spent. (Unused when
-      // timeoutMs_ == 0, which disables the timeout.)
-      const auto deadline = std::chrono::steady_clock::now() +
-                            std::chrono::milliseconds(timeoutMs_);
+      // Reserve a quarter of the operation budget for the entire probing
+      // phase, so a stalled probe can report its status before the overall
+      // NativeJob deadline. Zero disables both deadlines. Poll completed
+      // probes at the boundary so they retain their real status.
+      const auto deadline =
+          std::chrono::steady_clock::now() +
+          std::chrono::milliseconds(std::max(1u, timeoutMs_ / 4));
 
       struct PendingProbe {
         MountPoint *mountPoint;
@@ -281,7 +280,7 @@ public:
 
       fillProbeWindow();
       while (!pending.empty()) {
-        if (IsShuttingDown()) {
+        if (IsCancelled()) {
           return;
         }
 
@@ -308,9 +307,16 @@ public:
 
         // timeoutMs 0 disables the timeout (see Options.timeoutMs).
         if (timeoutMs_ == 0) {
-          WaitForProbeCompletion(completionGeneration);
-        } else if (!WaitForProbeCompletionUntil(completionGeneration,
-                                                deadline)) {
+          // Check cancellation periodically even when the user disables the
+          // deadline, so Worker teardown does not strand an executor slot.
+          WaitForProbeCompletionUntil(completionGeneration,
+                                      std::chrono::steady_clock::now() +
+                                          std::chrono::milliseconds(10));
+        } else if (!WaitForProbeCompletionUntil(
+                       completionGeneration,
+                       std::min(deadline, std::chrono::steady_clock::now() +
+                                              std::chrono::milliseconds(10))) &&
+                   std::chrono::steady_clock::now() >= deadline) {
           // Poll once after the deadline so a probe that completed at the
           // boundary keeps its real status, then time out only unfinished work.
           for (auto it = pending.begin(); it != pending.end();) {
@@ -335,21 +341,14 @@ public:
     }
   }
 
-  void OnOK() override {
-    DEBUG_LOG("[GetVolumeMountPointsWorker] OnOK");
-    auto env = Env();
+  Napi::Value ToValue(Napi::Env env) override {
     auto result = Napi::Array::New(env, mountPoints_.size());
 
     for (size_t i = 0; i < mountPoints_.size(); i++) {
       result[i] = mountPoints_[i].ToObject(env);
     }
 
-    SafeResolve(deferred_, result);
-  }
-
-  void OnError(const Napi::Error &error) override {
-    Napi::HandleScope scope(Env());
-    SafeReject(deferred_, error.Value());
+    return result;
   }
 };
 
@@ -357,17 +356,13 @@ Napi::Promise GetVolumeMountPoints(const Napi::CallbackInfo &info) {
   auto env = info.Env();
   DEBUG_LOG("[GetVolumeMountPoints] called");
 
-  auto deferred = Napi::Promise::Deferred::New(env);
-
   MountPointOptions options;
   if (info.Length() > 0 && info[0].IsObject()) {
     options = MountPointOptions::FromObject(info[0].As<Napi::Object>());
   }
 
-  auto *worker = new GetVolumeMountPointsWorker(deferred, options.timeoutMs,
-                                                options.skipHealthProbes);
-  worker->Queue();
-  return deferred.Promise();
+  return QueueNativeJob(env, std::make_shared<GetVolumeMountPointsWorker>(
+                                 options.timeoutMs, options.skipHealthProbes));
 }
 
 } // namespace FSMeta

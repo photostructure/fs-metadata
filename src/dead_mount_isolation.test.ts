@@ -222,11 +222,8 @@ describe("dead mount isolation", () => {
   // which only runs on the native platforms, and Windows deliberately keeps
   // the full value (no outer deadline there to lose a race to).
   (isMacOS ? describe : describe.skip)("native enumeration budget", () => {
-    it("gives the macOS native probe phase a fraction of the budget", async () => {
-      // Darwin deadlines its own per-mount accessibility probes from the
-      // timeoutMs it receives. Handing it the whole budget loses to the outer
-      // withTimeout(), which started first: one wedged mount rejects the entire
-      // enumeration instead of being returned as `timeout`.
+    it("passes the whole macOS native deadline, including DA queue time", async () => {
+      // Native now owns the operation deadline AND its shorter probe phase.
       const timeoutMs = 4_000;
       const received: (number | undefined)[] = [];
       const fakeNative = (() =>
@@ -245,8 +242,7 @@ describe("dead mount isolation", () => {
         fakeNative,
       );
 
-      expect(received).toEqual([healthProbeTimeoutMs(timeoutMs)]);
-      expect(received[0]).toBeLessThan(timeoutMs);
+      expect(received).toEqual([timeoutMs]);
     });
   });
 

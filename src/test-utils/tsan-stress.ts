@@ -17,7 +17,7 @@
  *   1. Concurrent AsyncWorker calls  -> libuv threadpool runs Execute() on many
  *      threads at once and exercises Linux's BlkidCache::mutex_.
  *   2. Debug globals mutated WHILE workers run -> exercises
- *      FSMeta::Debug::enableDebugLogging and the debugPrefixMutex. A missing
+ *      FSMeta::Debug::enableDebugLogging and the prefix-state mutex. A missing
  *      lock or a non-atomic flag here is precisely what TSan is for.
  *   3. worker_threads -> several napi_envs in ONE process, each loading the
  *      addon. This is the only way to exercise the per-env instance data and

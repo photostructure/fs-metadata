@@ -1,4 +1,29 @@
-import { WrappedError } from "./error";
+import { runInNewContext } from "node:vm";
+import { WrappedError, toError } from "./error";
+
+describe("toError", () => {
+  it("preserves foreign native errors and their errno properties", () => {
+    const foreign: Error = runInNewContext(
+      'Object.assign(new Error("missing path"), { code: "ENOENT", errno: 2, path: "/missing" })',
+    );
+    expect(foreign).not.toBeInstanceOf(Error);
+    const error = toError(foreign);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: "missing path",
+      code: "ENOENT",
+      errno: 2,
+      path: "/missing",
+      stack: foreign.stack,
+    });
+    expect(error.cause).toBe(foreign);
+  });
+
+  it("retains the identity of errors from the same realm", () => {
+    const error = new Error("original");
+    expect(toError(error)).toBe(error);
+  });
+});
 
 describe("WrappedError", () => {
   it("should set the correct message when cause is an Error", () => {

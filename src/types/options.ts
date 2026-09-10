@@ -41,6 +41,9 @@ export interface Options {
    * Timeout in milliseconds for filesystem operations.
    *
    * Disable timeouts by setting this to 0.
+   * On macOS, volume queries use detached native threads even with a zero
+   * timeout, so a stalled query does not prevent explicit `process.exit()`.
+   * A pending query still keeps the event loop alive during normal operation.
    *
    * This bounds each single-volume operation — `getVolumeMetadata()`,
    * `getVolumeMetadataForPath()`, `getMountPointForPath()` — and mount point
@@ -71,6 +74,8 @@ export interface Options {
    * shared, FIFO-queued thread pool rather than one thread per core, so this
    * limit tracks that pool: it bounds how deeply this library can queue ahead
    * of unrelated IO in the host application.
+   * macOS volume queries instead use a separate executor with at most four
+   * executing native jobs; this option does not expand that executor.
    *
    * Raise it for marginally faster enumeration at the cost of host-application
    * latency, or raise `UV_THREADPOOL_SIZE` (before any IO happens) to lift
