@@ -1,5 +1,7 @@
 // Test-only dylib: stop one real native call until the parent releases fd 4.
 // fd 3 reports readiness. Never linked into the published addon.
+#ifdef __APPLE__
+
 #include <DiskArbitration/DiskArbitration.h>
 #include <atomic>
 #include <cerrno>
@@ -77,3 +79,5 @@ __attribute__((used, section("__DATA,__interpose"))) const struct {
      reinterpret_cast<const void *>(opendir)},
 };
 } // namespace
+
+#endif // __APPLE__
