@@ -80,8 +80,33 @@ docker run -d \
   node:22-bullseye \
   sleep 3600
 
+# Remove the container even when dependency installation or compilation fails.
+trap 'docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true' EXIT
+
 # Copy project files into container
 docker cp . "$CONTAINER_NAME:/tmp/project"
+
+# Bullseye LTS ended on 2026-08-31. Keep the glibc 2.31 toolchain using
+# snapshots from the end of LTS, before packages disappeared from live mirrors.
+# Only these frozen sources ignore expiry; Debian signature checks remain on.
+docker exec -i "$CONTAINER_NAME" sh -eu <<'EOF'
+rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
+cat > /etc/apt/sources.list.d/bullseye.sources <<'SOURCES'
+Types: deb
+URIs: https://snapshot.debian.org/archive/debian/20260901T000000Z/
+Suites: bullseye bullseye-updates
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+Check-Valid-Until: no
+
+Types: deb
+URIs: https://snapshot.debian.org/archive/debian-security/20260901T000000Z/
+Suites: bullseye-security
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+Check-Valid-Until: no
+SOURCES
+EOF
 
 # Run build inside container
 # Debian 11 has Python 3.9 and GCC 10.2 which support our requirements
@@ -108,8 +133,5 @@ fi
 if [ -d build ]; then
   chown -R "$(id -u):$(id -g)" build
 fi
-
-# Clean up container
-docker rm -f "$CONTAINER_NAME" >/dev/null
 
 echo "Portable build complete!"
