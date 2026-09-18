@@ -14,7 +14,7 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## Unreleased
+## [2.6.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.0) (2026-09-17)
 
 ### Added
 
