@@ -52,6 +52,10 @@ Security in case of vulnerabilities.
 
 ### Fixed
 
+- **Global npm installs no longer fail in the install script.** Run the installed
+  `node-gyp-build` directly with Node instead of invoking `npx`, whose bootstrap
+  fails when it inherits `npm_config_global=true`. This also removes the shell
+  invocation that emitted Node's DEP0190 deprecation warning.
 - **Stalled macOS volume queries no longer block `process.exit()`.** Metadata,
   mount enumeration, path resolution, and directory probes now run on bounded
   detached threads instead of libuv's joined worker pool. This also applies

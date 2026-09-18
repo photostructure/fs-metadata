@@ -2,11 +2,21 @@
 
 /**
  * Custom install script that handles Windows architecture defines
- * when node-gyp-build needs to compile from source
+ * when node-gyp-build needs to compile from source.
+ *
+ * node-gyp-build is resolved through require.resolve and run with this
+ * process's own interpreter, rather than spawned as `npx node-gyp-build`.
+ *
+ * An outer `npm install -g` exports npm_config_global=true, and a nested npx
+ * inherits it. npx then treats its own bootstrap directory as a global
+ * install, never writes $npm_config_cache/_npx/<hash>/package.json, and fails
+ * reading the file it did not write -- exit 254 on POSIX, 127 on Windows.
+ * Resolving the binary here re-enters neither npm nor the shell, so nothing in
+ * npm's lifecycle environment can redirect it.
  */
 
-const { spawn } = require("child_process");
-const { platform, arch } = require("os");
+const { spawnSync } = require("node:child_process");
+const { platform, arch } = require("node:os");
 
 // If in CI and on Windows, set architecture defines
 if (process.env.CI && platform() === "win32") {
@@ -22,21 +32,20 @@ if (process.env.CI && platform() === "win32") {
   console.log(`Windows CI detected: arch=${currentArch}, CL=${process.env.CL}`);
 }
 
-// Run node-gyp-build
-const child = spawn("npx", ["node-gyp-build"], {
-  stdio: "inherit",
-  shell: true,
-  env: process.env,
-});
+// No env: option, so the child inherits process.env -- including the CL
+// defines set above.
+const result = spawnSync(
+  process.execPath,
+  [require.resolve("node-gyp-build/bin.js")],
+  { stdio: "inherit" },
+);
 
-child.on("error", (error) => {
-  console.error("Failed to run node-gyp-build:", error);
+if (result.error) {
+  console.error("Failed to run node-gyp-build:", result.error);
   process.exit(1);
-});
+}
 
-child.on("exit", (code) => {
-  if (code !== 0) {
-    console.error(`node-gyp-build exited with code ${code}`);
-    process.exit(code || 1);
-  }
-});
+if (result.status !== 0) {
+  console.error(`node-gyp-build exited with code ${result.status}`);
+  process.exit(result.status ?? 1);
+}
