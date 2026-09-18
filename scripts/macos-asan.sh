@@ -91,7 +91,10 @@ fi
 
 # Run the test and capture output
 set +e
-TEST_OUTPUT=$(TEST_ESM=0 "$NODE_BIN" node_modules/jest/bin/jest.js --no-coverage --runInBand 2>&1)
+# node-gyp-build's install probe launches /bin/sh and /usr/bin/env, which
+# strip DYLD_INSERT_LIBRARIES under SIP. Run that lifecycle test against the
+# uninstrumented rebuild below; loading the ASan addon there cannot work.
+TEST_OUTPUT=$(TEST_ESM=0 "$NODE_BIN" node_modules/jest/bin/jest.js --no-coverage --runInBand --testPathIgnorePatterns='src/install-script\.test\.ts$' 2>&1)
 TEST_EXIT_CODE=$?
 set -e
 
@@ -132,6 +135,10 @@ unset CFLAGS CXXFLAGS LDFLAGS FS_METADATA_SANITIZE
 unset MallocScribble MallocGuardEdges
 npm run clean:native
 npm run node-gyp-rebuild
+
+# Keep install coverage mandatory, with a native binary the shell can load.
+echo -e "${YELLOW}Running install lifecycle tests without sanitizers...${NC}"
+TEST_ESM=0 "$NODE_BIN" node_modules/jest/bin/jest.js --no-coverage --runInBand --runTestsByPath src/install-script.test.ts
 
 # Run memory leak check using leaks tool.
 echo -e "${YELLOW}Running macOS leaks tool...${NC}"

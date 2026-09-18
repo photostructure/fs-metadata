@@ -127,6 +127,12 @@ The sanitizer scripts set it for you.
 UBSan's `vptr` check is inert here: it needs RTTI, and Node's `common.gypi` builds addons with
 `-fno-rtti`; clang silently omits `vptr` from the `undefined` group in that case.
 
+On macOS, the install-lifecycle regression test runs after the uninstrumented
+rebuild, before `leaks`. `node-gyp-build` probes the addon through `/bin/sh` and
+`/usr/bin/env`; SIP strips `DYLD_INSERT_LIBRARIES` from that process chain, so
+the probe cannot load an ASan-linked addon. The test remains a required check,
+and the rest of the Jest suite runs under ASan/UBSan.
+
 ### ThreadSanitizer specifics
 
 TSan runs a dedicated stress harness (`src/test-utils/tsan-stress.ts`), **not** the Jest suite:

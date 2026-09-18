@@ -41,6 +41,12 @@ describePlatform("linux", "darwin")("install lifecycle", () => {
       },
     });
 
+    if (result.status !== 0) {
+      throw new Error(
+        `Install failed (${result.status}): ${result.error ?? ""}\n${result.stdout}\n${result.stderr}`,
+      );
+    }
+
     expect({
       error: result.error,
       status: result.status,
