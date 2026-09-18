@@ -204,9 +204,9 @@ pack dry run returned 52 files. A before/after file-set assertion confirmed
 that the interposer was the only removal and every production source and
 artifact remained included. No native code or test behavior changed.
 
-| Scope | Model | Finding | Severity | Accept/Veto | Evidence | Verdict |
-| --- | --- | --- | --- | --- | --- | --- |
-| npm package contents | Claude (user-supplied review) | R817-A: test interposer source shipped | Medium | Accept, fixed | Pack dry run changed from 53 to 52 files; exact file-set comparison found only the interposer removed. | LAND |
+| Scope                | Model                         | Finding                                | Severity | Accept/Veto   | Evidence                                                                                               | Verdict |
+| -------------------- | ----------------------------- | -------------------------------------- | -------- | ------------- | ------------------------------------------------------------------------------------------------------ | ------- |
+| npm package contents | Claude (user-supplied review) | R817-A: test interposer source shipped | Medium   | Accept, fixed | Pack dry run changed from 53 to 52 files; exact file-set comparison found only the interposer removed. | LAND    |
 
 ### Local sanitizer setup
 

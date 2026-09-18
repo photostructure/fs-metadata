@@ -35,11 +35,11 @@ now measured on all three platforms.
 
 ## Description
 
-The push signal is an *invalidation hint*, not an event log. On no platform does
+The push signal is an _invalidation hint_, not an event log. On no platform does
 the notification identify which mount changed in terms this library can consume
 directly, and on every platform some class of change is missed. So the contract
 stays exactly what it is today — snapshot, diff, emit `added`/`removed` — and the
-only thing that changes is *when* a snapshot is taken. That keeps this additive:
+only thing that changes is _when_ a snapshot is taken. That keeps this additive:
 no public type changes, and a caller who sets `pollIntervalMs` keeps the same
 guarantee they have now, just with faster detection in the common case.
 
@@ -107,11 +107,11 @@ this Linux box (kernel 7.0.0-28-generic), `m1` (macOS 26.6.1, arm64), `swift`
 Two candidates were registered simultaneously in one process and compared
 against identical triggers. The result decides the design:
 
-| Trigger | `CM_Register_Notification` | `DBT_DEVTYP_VOLUME` broadcast |
-| --- | --- | --- |
-| ISO mount / dismount | fires (`\\?\SCSI#CdRom&Ven_Msft&Prod_Virtual_DVD-ROM…`) | fires, `units=D` |
-| `subst X: …` / `subst /d` | **silent** | fires, `units=X`, `flags=DBTF_NET` |
-| `net use Z: \\host\share` / `/delete` | **silent** | fires, `units=Z`, `flags=DBTF_NET` |
+| Trigger                               | `CM_Register_Notification`                              | `DBT_DEVTYP_VOLUME` broadcast      |
+| ------------------------------------- | ------------------------------------------------------- | ---------------------------------- |
+| ISO mount / dismount                  | fires (`\\?\SCSI#CdRom&Ven_Msft&Prod_Virtual_DVD-ROM…`) | fires, `units=D`                   |
+| `subst X: …` / `subst /d`             | **silent**                                              | fires, `units=X`, `flags=DBTF_NET` |
+| `net use Z: \\host\share` / `/delete` | **silent**                                              | fires, `units=Z`, `flags=DBTF_NET` |
 
 - Windows enumeration is `GetLogicalDriveStringsW`, which **includes** `subst`
   and `net use` letters. `CM_Register_Notification` therefore covers a strict
@@ -121,7 +121,7 @@ against identical triggers. The result decides the design:
   `WS_EX_TOOLWINDOW | WS_POPUP`, zero-sized, and never call `ShowWindow` — it
   stays off the taskbar and out of Alt-Tab.
 - No `RegisterDeviceNotification` call is needed. Volume broadcasts go to every
-  top-level window; registration is only for *device interface* events, and
+  top-level window; registration is only for _device interface_ events, and
   registering for one just produced duplicate `DBT_DEVTYP_DEVICEINTERFACE`
   events alongside the volume ones.
 - `dbcv_unitmask` gives the exact drive letters that changed, and `DBTF_NET`
@@ -149,7 +149,7 @@ against identical triggers. The result decides the design:
 ### Integration
 
 - `PollingWatcher` already has the right seam: `observe()` → `reconcile()`. Push
-  only changes *when* `poll()` runs. Do not add a second code path that emits
+  only changes _when_ `poll()` runs. Do not add a second code path that emits
   changes.
 - The per-`napi_env` `ModuleInstanceData` in `src/common/shutdown.h` is where a
   watcher registry belongs. Worker threads each get their own env and their own
