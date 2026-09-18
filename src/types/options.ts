@@ -35,6 +35,16 @@ export interface Options {
    * are `stat()`ed, and the rest are touched solely when no ancestor is on the
    * target's device. An unreachable entry therefore costs nothing unless the
    * target actually resolves through the fallback.
+   *
+   * **The list must contain every mount that is a path ancestor of anything you
+   * resolve.** Build it with
+   * `getVolumeMountPoints({ includeSystemVolumes: true })` rather than by hand.
+   * On Linux btrfs an incomplete list produces a plausible wrong answer instead
+   * of an error: a path resolves to the deepest **supplied** btrfs ancestor, so
+   * omitting a deeper btrfs mount makes the path look like a nested subvolume
+   * of a shallower one, and `subvolumeRoot` is computed against the wrong mount.
+   * Note also that this enumeration omits file mount targets, so add any exact
+   * file bind-mount path you need to resolve.
    */
   mountPoints?: MountPoint[];
   /**

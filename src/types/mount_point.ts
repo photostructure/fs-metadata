@@ -82,8 +82,10 @@ export interface MountPoint {
   subvol?: string;
 
   /**
-   * On btrfs, the numeric subvolume id from the `subvolid=` mount option (e.g.
-   * `256`, `257`). Undefined on non-btrfs volumes.
+   * On btrfs, the numeric subvolume id (e.g. `256`, `257`) from the `subvolid=`
+   * mount option — or, for a subvolume that is not separately mounted, from the
+   * `BTRFS_IOC_GET_SUBVOL_INFO` ioctl, which reports the subvolume that owns
+   * the queried path. Undefined on non-btrfs volumes.
    *
    * Stable across remount/reboot on a given filesystem, but **not** unique
    * across filesystems and **not** preserved by `btrfs send`/`receive`. See

@@ -63,6 +63,7 @@ struct VolumeMetadata {
   double available = 0.0;
   std::string uuid;
   std::string subvolumeUuid; // btrfs per-subvolume UUID (Linux only)
+  double subvolid = 0;       // btrfs subvolume id from the ioctl (Linux only)
   std::string fsid;          // statfs f_fsid, hex (Linux; quick zfs dataset id)
   std::string mountFrom;
   std::string mountName;
@@ -108,6 +109,11 @@ struct VolumeMetadata {
     // otherwise so consumers see `undefined`, matching volumeRole's pattern.
     if (!subvolumeUuid.empty()) {
       result.Set("subvolumeUuid", Napi::String::New(env, subvolumeUuid));
+    }
+
+    // Subvolume ids start at 5 (the top-level tree), so 0 means "not read".
+    if (subvolid > 0) {
+      result.Set("subvolid", Napi::Number::New(env, subvolid));
     }
 
     // Only present where f_fsid is a useful identity signal (currently zfs),

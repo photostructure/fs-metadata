@@ -2,6 +2,7 @@
 
 import type { Stats } from "node:fs";
 import { realpath } from "node:fs/promises";
+import { dirname } from "node:path";
 import {
   TimeoutError,
   mapConcurrent,
@@ -10,13 +11,18 @@ import {
 } from "./async";
 import { debug } from "./debuglog";
 import { WrappedError, toError } from "./error";
-import { canReaddir, statAsync } from "./fs";
+import { canReaddir, statAsync, statfsAsync } from "./fs";
 import { getLabelFromDevDisk, getUuidFromDevDisk } from "./linux/dev_disk";
-import { getLinuxMtabMetadata } from "./linux/mount_points";
 import {
+  getContainingMountEntry,
+  getLinuxMtabMetadata,
+} from "./linux/mount_points";
+import {
+  type MountEntry,
   type MtabVolumeMetadata,
   mountEntryToPartialVolumeMetadata,
 } from "./linux/mtab";
+import { findSubvolumeRoot, isBtrfsPath } from "./linux/subvolume";
 import { getZfsGuids, zfsEnrichmentTimeoutMs } from "./linux/zfs_guids";
 import { compactValues } from "./object";
 import { IncludeSystemVolumesDefault, optionsWithDefaults } from "./options";
@@ -41,6 +47,8 @@ export async function getVolumeMetadataImpl(
   o: GetVolumeMetadataOptions & Options,
   nativeFn: NativeBindingsFn,
   operationDeadlineMs?: number,
+  statImpl: typeof statAsync = statAsync,
+  statfsImpl: typeof statfsAsync = statfsAsync,
 ): Promise<VolumeMetadata> {
   if (isBlank(o.mountPoint)) {
     throw new TypeError(
@@ -54,7 +62,7 @@ export async function getVolumeMetadataImpl(
   const deadlineMs =
     operationDeadlineMs ??
     (timeoutMs === 0 ? undefined : Date.now() + timeoutMs);
-  const p = _getVolumeMetadata(o, nativeFn, deadlineMs);
+  const p = _getVolumeMetadata(o, nativeFn, deadlineMs, statImpl, statfsImpl);
   return withTimeout({
     desc: "getVolumeMetadata()",
     timeoutMs,
@@ -66,6 +74,8 @@ async function _getVolumeMetadata(
   o: GetVolumeMetadataOptions & Options,
   nativeFn: NativeBindingsFn,
   deadlineMs: number | undefined,
+  statImpl: typeof statAsync = statAsync,
+  statfsImpl: typeof statfsAsync = statfsAsync,
 ): Promise<VolumeMetadata> {
   o = optionsWithDefaults(o);
   const norm = normalizePath(o.mountPoint);
@@ -83,25 +93,57 @@ async function _getVolumeMetadata(
   let remote: boolean = false;
   let mtabInfo: undefined | MtabVolumeMetadata;
   let device: undefined | string;
+  let mountEntry: undefined | MountEntry;
+  // The path whose identity we report. It differs from o.mountPoint only on
+  // the nested-subvolume fallback below, where symlinks must be resolved.
+  let identityPath = o.mountPoint;
   // On Linux, read the mount table before touching the mount point: it comes
   // from /proc (or /etc/mtab) and never blocks on the volume itself, so
   // remote-ness is known before any IO that could hang on a dead mount.
   if (isLinux) {
     debug("[getVolumeMetadata] collecting Linux mtab info");
     try {
-      const m = await getLinuxMtabMetadata(o.mountPoint, o);
-      mtabInfo = mountEntryToPartialVolumeMetadata(m, o);
-      debug("[getVolumeMetadata] mtab info: %o", mtabInfo);
-      if (mtabInfo.remote) {
-        remote = true;
-      }
-      if (isNotBlank(m.fs_spec)) {
-        device = m.fs_spec;
-      }
+      mountEntry = await getLinuxMtabMetadata(o.mountPoint, o);
     } catch (err) {
       debug("[getVolumeMetadata] failed to get mtab info: " + err);
       // Mtab lookup can fail for transient mounts or race conditions.
       // Ignore and continue with whatever the native call returns.
+
+      // A btrfs subvolume nested inside a mounted filesystem has no mount entry
+      // of its own, so an exact-path lookup cannot find one. Fall back to the
+      // mount that contains it — but only with the same corroboration
+      // resolveMountPoint() demands, so no other unlisted path silently
+      // acquires an ancestor's identity.
+      // Resolve symlinks first. getContainingMountEntry() matches lexically, so
+      // a symlink under a btrfs mount that points into a DIFFERENT filesystem
+      // would otherwise take its uuid, mountFrom, and device from the mount the
+      // link lives under, while the ioctl reported the target's subvolume —
+      // one result object describing two block devices. getVolumeMetadataForPath()
+      // resolves its own input; this is the direct-call route.
+      const real = await realpath(o.mountPoint).catch(() => o.mountPoint);
+      const containing = await getContainingMountEntry(real, o);
+      if (
+        containing?.fs_vfstype === "btrfs" &&
+        (await isBtrfsPath(real, statfsImpl))
+      ) {
+        debug(
+          "[getVolumeMetadata] %s is nested under btrfs mount %s",
+          real,
+          containing.fs_file,
+        );
+        mountEntry = containing;
+        identityPath = real;
+      }
+    }
+    if (mountEntry != null) {
+      mtabInfo = mountEntryToPartialVolumeMetadata(mountEntry, o);
+      debug("[getVolumeMetadata] mtab info: %o", mtabInfo);
+      if (mtabInfo.remote) {
+        remote = true;
+      }
+      if (isNotBlank(mountEntry.fs_spec)) {
+        device = mountEntry.fs_spec;
+      }
     }
   }
 
@@ -156,6 +198,32 @@ async function _getVolumeMetadata(
     o.fstype = mtabInfo.fstype;
   }
 
+  // On btrfs, identity belongs to the subvolume, not to the mount: several
+  // subvolumes share one filesystem uuid, and a nested one has no mount entry
+  // at all. Probe the subvolume's own root directory so the ioctl answers for
+  // the subvolume that owns the queried path — for an ordinary mount that is
+  // the mount point itself, and for a file it is the containing directory.
+  const subvolumeRoot =
+    mountEntry?.fs_vfstype === "btrfs"
+      ? await findSubvolumeRoot(identityPath, mountEntry.fs_file, statImpl)
+      : undefined;
+
+  // The subvolume ioctl needs a directory descriptor. For an ordinary file,
+  // probe its parent: the ioctl reports the owning subvolume either way, and
+  // otherwise a direct getVolumeMetadata(file) silently loses the
+  // subvolumeUuid, subvolid, and read-only flag that
+  // getVolumeMetadataForPath() returns for that same file. A file that is
+  // itself a mount target keeps its own path — that mount IS the volume being
+  // asked about.
+  let probePath = identityPath;
+  if (
+    mountEntry?.fs_vfstype === "btrfs" &&
+    identityPath !== mountEntry.fs_file
+  ) {
+    const st = await statImpl(identityPath).catch(() => undefined);
+    if (st?.isDirectory() === false) probePath = dirname(identityPath);
+  }
+
   debug("[getVolumeMetadata] requesting native metadata");
   if (isMacOS && deadlineMs != null) {
     const remaining = deadlineMs - Date.now();
@@ -165,7 +233,13 @@ async function _getVolumeMetadata(
   const metadata = (await (
     await nativeFn()
   )
-    .getVolumeMetadata(o)
+    .getVolumeMetadata(
+      // Probe the queried path itself, NOT subvolumeRoot: the ioctl reports the
+      // owning subvolume for any directory within it, and the subvolume root
+      // can be traversable but unreadable (mode 711), which would turn a
+      // readable child into EACCES.
+      probePath === o.mountPoint ? o : { ...o, mountPoint: probePath },
+    )
     .catch((error: unknown) => {
       throw toError(error);
     })) as VolumeMetadata;
@@ -184,12 +258,25 @@ async function _getVolumeMetadata(
     isRemoteFsType(metadata.fstype, o.networkFsTypes) ||
     (remoteInfo?.remote ?? metadata.remote ?? false);
 
+  // `mountPoint` means "what findmnt would say". When the caller asked about a
+  // path inside a nested subvolume, that is the containing mount — the
+  // subvolume itself is not mounted, and `subvolumeRoot` is where it begins.
+  const mountPoint = mountEntry?.fs_file ?? o.mountPoint;
+
+  // When the queried path belongs to a subvolume other than the one the mount
+  // exposes, the mount's `subvol=`/`subvolid=` options describe a *different*
+  // subvolume. Drop them rather than pair them with this subvolume's uuid:
+  // `subvol` has no value here (there is no mount option to read), and
+  // `subvolid` comes from the ioctl instead.
+  const nestedSubvolume = subvolumeRoot != null && subvolumeRoot !== mountPoint;
+
   debug("[getVolumeMetadata] assembling: %o", {
     status,
     mtabInfo,
     remoteInfo,
     metadata,
-    mountPoint: o.mountPoint,
+    mountPoint,
+    subvolumeRoot,
     remote,
   });
   const result = compactValues({
@@ -197,7 +284,15 @@ async function _getVolumeMetadata(
     ...compactValues(remoteInfo),
     ...compactValues(metadata),
     ...compactValues(mtabInfo),
-    mountPoint: o.mountPoint,
+    ...(nestedSubvolume
+      ? { subvol: undefined, subvolid: metadata.subvolid }
+      : {}),
+    subvolumeRoot,
+    // A read-only subvolume under a read-write mount is still read-only, and
+    // only the ioctl sees that: statfs()'s ST_RDONLY stays clear for it.
+    isReadOnly:
+      (mtabInfo?.isReadOnly ?? false) || (metadata.isReadOnly ?? false),
+    mountPoint,
     remote,
   }) as VolumeMetadata;
 
@@ -261,6 +356,8 @@ export async function getVolumeMetadataForPathImpl(
   opts: Options,
   nativeFn: NativeBindingsFn,
   resolvePath: typeof realpath = realpath,
+  statImpl: typeof statAsync = statAsync,
+  statfsImpl: typeof statfsAsync = statfsAsync,
 ): Promise<VolumeMetadata> {
   if (isBlank(pathname)) {
     throw new TypeError("Invalid pathname: got " + JSON.stringify(pathname));
@@ -290,6 +387,8 @@ export async function getVolumeMetadataForPathImpl(
       nativeFn,
       resolvePath,
       operationDeadlineMs,
+      statImpl,
+      statfsImpl,
     ),
   });
 }
@@ -300,6 +399,8 @@ async function _getVolumeMetadataForPath(
   nativeFn: NativeBindingsFn,
   resolvePath: typeof realpath,
   operationDeadlineMs: number | undefined,
+  statImpl: typeof statAsync = statAsync,
+  statfsImpl: typeof statfsAsync = statfsAsync,
 ): Promise<VolumeMetadata> {
   if (isMacOS) {
     const native = await nativeFn();
@@ -321,22 +422,37 @@ async function _getVolumeMetadataForPath(
 
   // Keep the original path so an exact Linux file bind mount remains
   // distinguishable from its containing directory.
-  const resolvedStat = await statAsync(resolved);
+  const resolvedStat = await statImpl(resolved);
+
+  // The subvolume ioctl needs a directory, so a file is asked about through
+  // the directory that contains it.
+  const dir = resolvedStat.isDirectory() ? resolved : dirname(resolved);
 
   // Linux/Windows: stat().dev is reliable (no firmlinks). Find the mount point
   // by comparing device IDs, using path prefix as a tiebreaker for bind mounts
   // or GVfs/FUSE mounts that share the same device id.
-  const mountPoint = await findMountPointByDeviceId(
+  const resolution = await resolveMountPoint(
     resolved,
     resolvedStat,
     opts,
     nativeFn,
+    statImpl,
+    undefined,
+    statfsImpl,
   );
 
   return getVolumeMetadataImpl(
-    { ...opts, mountPoint },
+    {
+      ...opts,
+      // A nested btrfs subvolume shares its containing mount's mount point but
+      // not its identity, so keep asking about the path itself: querying
+      // `resolution.mountPoint` would return the mount's subvolume instead.
+      mountPoint: resolution.nested ? dir : resolution.mountPoint,
+    },
     nativeFn,
     operationDeadlineMs,
+    statImpl,
+    statfsImpl,
   );
 }
 
@@ -376,7 +492,44 @@ export async function findMountPointByDeviceId(
   nativeFn: NativeBindingsFn,
   statImpl: typeof statAsync = statAsync,
   canReaddirImpl: typeof canReaddir = canReaddir,
+  statfsImpl: typeof statfsAsync = statfsAsync,
 ): Promise<string> {
+  return (
+    await resolveMountPoint(
+      resolved,
+      resolvedStat,
+      opts,
+      nativeFn,
+      statImpl,
+      canReaddirImpl,
+      statfsImpl,
+    )
+  ).mountPoint;
+}
+
+/** What {@link resolveMountPoint} matched, and how. */
+export interface MountPointResolution {
+  /** The mount point the path resolves to. */
+  mountPoint: string;
+  /**
+   * True when the path's device matched no mount entry and it was resolved to
+   * the btrfs mount containing it: the path is inside a subvolume the mount
+   * table does not name. Callers that want the path's own identity — rather
+   * than the mount's — must keep querying the path, not `mountPoint`.
+   */
+  nested: boolean;
+}
+
+/** @see findMountPointByDeviceId */
+export async function resolveMountPoint(
+  resolved: string,
+  resolvedStat: Stats,
+  opts: Options,
+  nativeFn: NativeBindingsFn,
+  statImpl: typeof statAsync = statAsync,
+  canReaddirImpl: typeof canReaddir = canReaddir,
+  statfsImpl: typeof statfsAsync = statfsAsync,
+): Promise<MountPointResolution> {
   const targetDev = resolvedStat.dev;
   const mountPoints =
     opts.mountPoints ??
@@ -423,9 +576,51 @@ export async function findMountPointByDeviceId(
   // Phase 1: ancestors only. These are all on the path realpath() already
   // traversed, so they are reachable by construction.
   const prefixMatches = await sameDeviceMountPoints(ancestors);
-  if (prefixMatches.length > 0) return longestPath(prefixMatches);
+  const deviceMatch =
+    prefixMatches.length > 0 ? longestPath(prefixMatches) : undefined;
 
-  // Phase 2: the bind-mount fallback, reached only when nothing on the target's
+  // Phase 2: on btrfs, path ancestry outranks the device match.
+  //
+  // A btrfs anonymous st_dev names the SUBVOLUME, not the mount, which makes it
+  // a poor mount discriminator in two ways. It is absent for a subvolume with
+  // no mount entry of its own, so nothing matches. And it is ambiguous when one
+  // subvolume is mounted twice: with `@` mounted at / and the same filesystem's
+  // top-level tree at /mnt/all — the standard snapshot-management layout —
+  // /mnt/all/@/photos is inside @, so it device-matches / even though the mount
+  // it actually traverses is /mnt/all. Taking / there reports a subvolumeRoot of
+  // /, and relative() then yields "mnt/all/@/photos" instead of "photos".
+  //
+  // The deepest btrfs ancestor is the mount the path really goes through.
+  // statfs() corroborates that the target is on btrfs first, and only runs when
+  // a btrfs ancestor is deeper than whatever the device matched — so the common
+  // case costs no extra syscall.
+  const btrfsAncestors = ancestors.filter(({ fstype }) => fstype === "btrfs");
+  const deepestBtrfs =
+    btrfsAncestors.length > 0
+      ? longestPath(btrfsAncestors.map((ea) => ea.mountPoint))
+      : undefined;
+  if (
+    deepestBtrfs != null &&
+    (deviceMatch == null || deepestBtrfs.length > deviceMatch.length) &&
+    (await isBtrfsPath(resolved, statfsImpl))
+  ) {
+    debug(
+      "[resolveMountPoint] %s traverses btrfs mount %s (device matched %s)",
+      resolved,
+      deepestBtrfs,
+      deviceMatch,
+    );
+    // Reaching here means this mount's device did NOT match the target's, so
+    // the path's subvolume is not the one the mount exposes. Callers must keep
+    // querying the path itself to get its identity.
+    return { mountPoint: deepestBtrfs, nested: true };
+  }
+
+  if (deviceMatch != null) {
+    return { mountPoint: deviceMatch, nested: false };
+  }
+
+  // Phase 3: the bind-mount fallback, reached only when nothing on the target's
   // own path matched. skipNetworkVolumes: don't stat() non-ancestor remote
   // mount points — a dead network mount would hang the lookup for an unrelated
   // local path. Ancestors are exempt above: if the target lives under a remote
@@ -439,12 +634,11 @@ export async function findMountPointByDeviceId(
         ),
     ),
   );
-  if (deviceMatches.length === 0) {
-    throw new Error(
-      "No mount point found for path: " + JSON.stringify(resolved),
-    );
+  if (deviceMatches.length > 0) {
+    return { mountPoint: longestPath(deviceMatches), nested: false };
   }
-  return longestPath(deviceMatches);
+
+  throw new Error("No mount point found for path: " + JSON.stringify(resolved));
 }
 
 /** The most specific of several matching mount points. */

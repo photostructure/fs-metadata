@@ -16,6 +16,40 @@ Security in case of vulnerabilities.
 
 ## Unreleased
 
+### Added
+
+- **Identity for btrfs subvolumes that are not separately mounted.** A subvolume
+  nested inside a mounted btrfs filesystem gets its own anonymous device but no
+  mount table entry, so `getMountPointForPath()` and `getVolumeMetadataForPath()`
+  threw `No mount point found for path`, and `getVolumeMetadata()` returned no
+  `uuid`, `subvolumeUuid`, or `subvolid` for it. All three now resolve such a
+  path to the btrfs mount that contains it and report the subvolume's own
+  identity, read from `BTRFS_IOC_GET_SUBVOL_INFO` (unprivileged, kernel ≥ 4.18).
+- **`VolumeMetadata.subvolumeRoot`**: the absolute path where the subvolume
+  identified by `subvolumeUuid` begins. It equals `mountPoint` for an ordinary
+  btrfs mount and names the nested subvolume otherwise, so
+  `relative(subvolumeRoot, path)` is stable across remounts. Undefined off
+  btrfs.
+
+### Changed
+
+- **`getVolumeMetadata()` given any btrfs directory that is not itself a mount
+  point now reports the containing mount as `mountPoint`** rather than echoing
+  the path it was given — nested subvolumes and ordinary subdirectories alike.
+  `mountPoint` is what `findmnt` reports; `subvolumeRoot ?? mountPoint` is what
+  `df` reports. Paths that are real mount points are unaffected, as are all
+  other filesystems.
+- **btrfs paths now resolve to the deepest btrfs mount that contains them,
+  rather than to the deepest mount whose device matches.** A btrfs anonymous
+  `st_dev` names the subvolume, not the mount, so it is absent for a subvolume
+  with no mount entry and ambiguous when one subvolume is mounted twice: with
+  `@` at `/` and the same filesystem's top-level tree at `/mnt/all`,
+  `/mnt/all/@/photos` previously resolved to `/`. Device matching still decides
+  on every other filesystem, where one device means one mount.
+- **`subvolid` for a nested subvolume comes from the ioctl**, and the containing
+  mount's `subvol` / `subvolid` mount options are no longer reported for it:
+  they describe a different subvolume.
+
 ### Fixed
 
 - **Stalled macOS volume queries no longer block `process.exit()`.** Metadata,
@@ -26,6 +60,12 @@ Security in case of vulnerabilities.
   Worker teardown does not wait for native calls that never return. Other Node
   filesystem calls, including `watchAvailableSpace()` polling, still need
   application-level subprocess supervision when mounts can hang.
+
+- **`isReadOnly` now reflects a read-only btrfs subvolume**, not just a
+  read-only mount. A read-only snapshot under a read-write mount reported
+  `false`: `statvfs`'s `ST_RDONLY` describes the mount and stays clear for it,
+  so the value now also comes from the subvolume's `BTRFS_ROOT_SUBVOL_RDONLY`
+  root-item flag.
 
 ## [2.5.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.5.0) (2026-08-06)
 

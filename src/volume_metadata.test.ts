@@ -205,6 +205,16 @@ describe("getAllVolumeMetadata()", () => {
       }
     }
   });
+
+  it("never sets subvolumeRoot off btrfs", async () => {
+    // subvolumeRoot names the directory a btrfs subvolume begins at. Every
+    // other filesystem — on every platform — must leave it undefined.
+    const all = await getAllVolumeMetadata({ includeSystemVolumes: true });
+    for (const ea of all) {
+      if (ea.fstype === "btrfs") continue;
+      expect(ea.subvolumeRoot).toBeUndefined();
+    }
+  });
 });
 
 describe("Timeout Handling", () => {

@@ -1,7 +1,13 @@
 // src/fs.ts
 
-import { type PathLike, type StatOptions, Stats, statSync } from "node:fs";
-import { opendir, stat } from "node:fs/promises";
+import {
+  type PathLike,
+  type StatOptions,
+  Stats,
+  type StatsFs,
+  statSync,
+} from "node:fs";
+import { opendir, stat, statfs } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { withTimeout } from "./async";
 
@@ -16,6 +22,16 @@ export async function statAsync(
   options?: StatOptions & { bigint?: false; throwIfNoEntry?: true },
 ): Promise<Stats> {
   return stat(path, options);
+}
+
+/**
+ * Wrapping node:fs/promises.statfs() so we can mock it in tests.
+ *
+ * `StatsFs.type` is the filesystem's magic number (`statfs(2)`'s `f_type` on
+ * Linux), which identifies the filesystem without a mount table lookup.
+ */
+export async function statfsAsync(path: PathLike): Promise<StatsFs> {
+  return statfs(path);
 }
 
 export async function canStatAsync(path: string): Promise<boolean> {

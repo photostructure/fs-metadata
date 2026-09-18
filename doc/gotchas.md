@@ -390,6 +390,38 @@ elsewhere): `subvolid` / `subvol` (from mount options), or the strong
 [Subvolume Identity](./subvolume-identity.md) for the full rationale, stability
 semantics, and how zfs/bcachefs differ.
 
+#### A Nested btrfs Subvolume Has No Mount Table Entry
+
+A subvolume you did not explicitly mount — a snapshot, or anything made with
+`btrfs subvolume create` inside an existing filesystem — is reached as a
+directory, and the kernel gives it its **own anonymous `st_dev`** with no entry
+in `/proc/self/mounts`. The standard tools disagree about what to call that:
+`findmnt` reads the mount table and reports the containing mount, while `df`
+walks up while `st_dev` is unchanged and reports the subvolume. This library
+returns both — `mountPoint` is findmnt's answer,
+`subvolumeRoot ?? mountPoint` is df's:
+
+```typescript
+const m = await getVolumeMetadata("/mnt/12tb/backup-2026-05-02");
+// mountPoint:     "/mnt/12tb"                     ← the mount that contains it
+// subvolumeRoot:  "/mnt/12tb/backup-2026-05-02"   ← the subvolume itself
+// subvolumeUuid:  "319fe68e-…"                    ← distinct per subvolume
+// uuid:           "03c98b0e-…"                    ← the filesystem, shared
+```
+
+Derive volume-relative paths from `subvolumeRoot`, not `mountPoint`: it is
+`mountPoint` for an ordinary btrfs mount, and it keeps naming the same subvolume
+if that subvolume is later mounted directly.
+
+`subvol` is `undefined` for such a path (there is no mount option to read) and
+`subvolid` comes from the ioctl. `isReadOnly` reflects the **subvolume**, so a
+read-only snapshot under a read-write mount correctly reports `true`.
+
+This is the one case where `getMountPointForPath()` returns a mount point whose
+device does not match the target's; it requires the containing mount to be btrfs
+and `statfs()` to agree that the path is on btrfs. Any other unresolvable path
+still throws `No mount point found for path`.
+
 #### btrfs `used + available` Can Exceed `size`
 
 `used` is derived from `statvfs` `f_bfree` and `available` from `f_bavail`.
@@ -507,6 +539,13 @@ mount point by device ID matching: mount points on the same device as the
 target path are candidates, and candidates that are path ancestors of the
 target are strongly preferred (the deepest one wins).
 
+**btrfs is the exception**: its anonymous device names the _subvolume_, not the
+mount, so it cannot discriminate mounts. A path on btrfs resolves to the deepest
+btrfs mount that is a path ancestor, confirmed by `statfs()`, regardless of
+whether that mount's device matches. This is what makes a nested subvolume
+resolve at all, and it is also why `/mnt/all/@/photos` resolves to `/mnt/all`
+rather than to `/` when `@` is mounted at both.
+
 When **no** candidate is a path ancestor — for example, the path is inside a
 bind mount but only the canonical mount point appears in the mount table — the
 longest same-device mount point is returned instead. This fallback is
@@ -517,6 +556,16 @@ of the target path, any same-device entry can be returned, even one with no
 path relationship to the target. Build custom arrays with
 `getVolumeMountPoints({ includeSystemVolumes: true })` rather than
 hand-picking entries.
+
+On **btrfs this gotcha is sharper**, because resolution there uses path ancestry
+rather than the device: a path resolves to the deepest btrfs mount **present in
+the list you supplied**. Omit a deeper btrfs mount and the path silently looks
+like a nested subvolume of a shallower one — you get a wrong `mountPoint` and a
+`subvolumeRoot` computed against it, with no error. Measured: dropping
+`/mnt/a/inner-mount` from the array made a path beneath it resolve to `/mnt/a`.
+The array must contain every mount that is a path ancestor of anything you
+resolve. Public enumeration also omits file mount targets, so add any exact file
+bind-mount path you need to resolve.
 
 (macOS is unaffected: it resolves mount points natively via `fstatfs()` and
 never scans a mount point list.)

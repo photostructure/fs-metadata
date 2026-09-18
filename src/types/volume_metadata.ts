@@ -77,6 +77,33 @@ export interface VolumeMetadata extends RemoteInfo, MountPoint {
   subvolumeUuid?: string;
 
   /**
+   * On btrfs, the absolute path where the subvolume identified by
+   * {@link subvolumeUuid} begins.
+   *
+   * For an ordinary btrfs mount this is {@link MountPoint.mountPoint}. It
+   * differs when the queried path is inside a subvolume that is **not
+   * separately mounted**: such a subvolume gets its own anonymous device but no
+   * mount table entry, so `mountPoint` names the filesystem that contains it
+   * (what `findmnt` would say) while this names the subvolume itself.
+   *
+   * Use it to build paths relative to the volume the identity describes:
+   * `relative(subvolumeRoot, path)` stays correct if the filesystem is later
+   * mounted elsewhere, or if the subvolume itself is mounted directly.
+   *
+   * `subvolumeRoot ?? mountPoint` is what `df` reports for the path, since `df`
+   * stops where `st_dev` changes. {@link MountPoint.mountPoint} alone is what
+   * `findmnt` reports: an actual kernel mount entry, which this never is unless
+   * the subvolume happens to be mounted. Note that not every `mountPoint`
+   * appears in `getVolumeMountPoints()` — that enumeration omits detected
+   * non-directory mount targets, and filters system volumes by default.
+   *
+   * Undefined on non-btrfs volumes, and on the rare btrfs mount whose subvolume
+   * root is not reachable through it — a bind mount of a *subdirectory* of a
+   * subvolume. {@link subvolumeUuid} is still correct in that case.
+   */
+  subvolumeRoot?: string;
+
+  /**
    * A quick filesystem identifier read from `statfs(2)`'s `f_fsid`, rendered as
    * a 16-character lowercase hex string.
    *

@@ -23,18 +23,20 @@ siblings.
 
 ## The additive discriminators
 
-fs-metadata exposes three optional, additive fields (all `undefined` off btrfs;
+fs-metadata exposes four optional, additive fields (all `undefined` off btrfs;
 no consumer breaks). `uuid` is never changed — it stays the filesystem UUID.
 
-| Field           | Type     | Source                            | Tier         | Stability                                                                                                                                     |
-| --------------- | -------- | --------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `subvol`        | `string` | `subvol=` mount option            | mount-option | changes on subvolume rename/move                                                                                                              |
-| `subvolid`      | `number` | `subvolid=` mount option          | mount-option | stable per-fs; **not** unique across filesystems; **not** preserved by `send`/`receive`                                                       |
-| `subvolumeUuid` | `string` | `BTRFS_IOC_GET_SUBVOL_INFO` ioctl | ioctl        | **strongest**: stable across remount/reboot; `send`/`receive` preserves source as `received_uuid`; snapshots get a fresh uuid + `parent_uuid` |
+| Field           | Type     | Source                                      | Tier         | Stability                                                                                                                                                                                        |
+| --------------- | -------- | ------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `subvol`        | `string` | `subvol=` mount option                      | mount-option | changes on subvolume rename/move                                                                                                                                                                 |
+| `subvolid`      | `number` | `subvolid=` mount option                    | mount-option | stable per-fs; **not** unique across filesystems; **not** preserved by `send`/`receive`                                                                                                          |
+| `subvolumeUuid` | `string` | `BTRFS_IOC_GET_SUBVOL_INFO` ioctl           | ioctl        | **strongest local id**: stable across remount/reboot. Always the subvolume's OWN uuid — a `send`/`receive` destination reports its own, not the source's (see below); snapshots get a fresh uuid |
+| `subvolumeRoot` | `string` | `st_ino === 256` walk from the queried path | path         | the path where that subvolume begins; equals `mountPoint` for an ordinary btrfs mount                                                                                                            |
 
 `subvol` / `subvolid` live on `MountPoint` (available from both
 `getVolumeMountPoints()` and `getVolumeMetadata()`). `subvolumeUuid` lives on
-`VolumeMetadata` (it requires the metadata ioctl).
+`VolumeMetadata` (it requires the metadata ioctl), as does `subvolumeRoot`
+(below).
 
 ### Mount-option tier
 
@@ -54,8 +56,11 @@ _distinguish_ siblings on the local machine.
 
 `BTRFS_IOC_GET_SUBVOL_INFO` (kernel ≥ 4.18, **unprivileged**) returns the
 subvolume's own UUID from its root item. `src/linux/volume_metadata.cpp` calls
-it on the already-open mount-point fd when `fstype === "btrfs"`, and formats the
-16 raw bytes as a canonical lowercase hyphenated UUID into `subvolumeUuid`.
+it on the descriptor it already opened for `statvfs` when `fstype === "btrfs"`,
+and formats the 16 raw bytes as a canonical lowercase hyphenated UUID into
+`subvolumeUuid`. That descriptor is the mount point for an ordinary mount, and
+the subvolume root when the queried path is inside a nested subvolume (below).
+The same call also supplies `subvolid` and the read-only flag.
 
 Notes for maintainers:
 
@@ -67,6 +72,82 @@ Notes for maintainers:
   `linux-headers` is installed. The include is guarded with `__has_include`, so
   a build without the header still compiles — the feature is just unavailable
   and `subvolumeUuid` stays `undefined`.
+
+## Subvolumes that are not separately mounted
+
+Only a subvolume someone chose to mount appears in the mount table. Every other
+subvolume — the common case for snapshots and for backup targets created with
+`btrfs subvolume create` — is reached as a directory inside its parent, and the
+kernel gives it its **own anonymous `st_dev`** with no entry anywhere:
+
+```
+/mnt/12tb                          dev=110  ← the only mount table entry
+/mnt/12tb/migration-2026-07-24     dev=110  ← a plain directory
+/mnt/12tb/backup-2026-05-02        dev=113  ← a nested subvolume
+/mnt/12tb/backup-2026-05-02@frozen dev=120  ← a read-only snapshot
+```
+
+Device-id resolution cannot match those devices to anything, so a nested path is
+resolved by ancestry instead — to the btrfs mount that contains it, corroborated
+by `statfs()`'s `f_type`. `mountPoint` is that mount (what `findmnt` would say);
+the subvolume's own path is `subvolumeRoot`:
+
+```typescript
+await getVolumeMetadata("/mnt/12tb/backup-2026-05-02");
+// { mountPoint: "/mnt/12tb",                  ← the mount that contains it
+//   subvolumeRoot: "/mnt/12tb/backup-2026-05-02",
+//   uuid: "03c98b0e-…",                       ← the filesystem uuid, shared
+//   subvolumeUuid: "319fe68e-…",              ← this subvolume alone
+//   subvolid: 256, isReadOnly: false }
+```
+
+Build volume-relative paths from `subvolumeRoot`, not from `mountPoint`: it
+stays correct if the filesystem is later mounted elsewhere, and if the subvolume
+is eventually mounted directly, the same identity is reported with
+`subvolumeRoot === mountPoint`.
+
+The two fields answer the two questions the standard tools answer — and for a
+nested subvolume those tools disagree. `mountPoint` is what `findmnt` reports,
+because it reads the mount table. **`subvolumeRoot ?? mountPoint` is what `df`
+reports**, because `df` walks up while `st_dev` is unchanged, which stops at the
+subvolume boundary rather than the mount. The two expressions were measured
+equal across 21 paths: nested subvolumes, read-only snapshots, a subvolume
+inside a subvolume, a bind-mounted subdirectory, a file bind mount, a directly
+mounted subvolume, a mount path containing a space, ZFS datasets, ext4, and
+tmpfs.
+
+Notes for maintainers:
+
+- **`st_ino === 256` identifies a subvolume root.** `BTRFS_FIRST_FREE_OBJECTID`
+  is the root directory inode of every subvolume, including the top-level tree
+  (id 5). `findSubvolumeRoot()` in `src/linux/subvolume.ts` walks up from the
+  queried path to the mount point looking for it.
+- The ioctl answers for **any** path in a subvolume, not just its root — called
+  on a plain directory it reports the subvolume that owns it. The library still
+  probes the subvolume root, so the answer does not depend on which path the
+  caller passed, and it works when the caller passed a file.
+- `subvol` is absent for a nested subvolume: there is no `subvol=` mount option
+  to read. `subvolid` comes from the ioctl's `treeid` instead — the same number
+  the mount option would carry.
+- `subvolumeRoot` is undefined for the one btrfs mount whose subvolume root is
+  not reachable through it: a bind mount of a _subdirectory_ of a subvolume.
+  `subvolumeUuid` is still correct there.
+- **`subvolumeUuid` is a local identifier, not a portable one.** btrfs records
+  the source's uuid in a received subvolume's `received_uuid`, but this package
+  neither exposes that field nor resolves through it: a `send`/`receive` copy
+  reports its own fresh uuid. Measured — sending a snapshot with uuid
+  `78fb8421-…` produced a destination reporting `bad9be3c-…`. Consumers that
+  need to follow a subvolume across `send`/`receive` must track that themselves.
+
+### Read-only subvolumes
+
+`isReadOnly` is true when **either** the mount or the subvolume is read-only.
+The subvolume half is only visible through the ioctl: `statvfs()`'s `ST_RDONLY`
+describes the mount, and stays clear for a read-only snapshot under a read-write
+mount. The flag to test is `BTRFS_ROOT_SUBVOL_RDONLY` (`1 << 0`, from
+`<linux/btrfs_tree.h>`) — **not** `BTRFS_SUBVOL_RDONLY` (`1 << 1`, from
+`<linux/btrfs.h>`), which belongs to `SUBVOL_GETFLAGS`/`SETFLAGS` and would
+silently always test false against this ioctl's root-item flags.
 
 ## Filesystem landscape (all platforms)
 
@@ -177,6 +258,10 @@ should be aware this can arise from LVM/dm snapshots as well as btrfs siblings.
 
 - `src/linux/mtab.ts` — `parseSubvolInfo()`: mount-option tier.
 - `src/linux/volume_metadata.cpp` — `BTRFS_IOC_GET_SUBVOL_INFO`: ioctl tier.
+- `src/linux/subvolume.ts` — `findSubvolumeRoot()`, `isBtrfsPath()`: the
+  nested-subvolume path work.
+- `src/volume_metadata.ts` — `resolveMountPoint()` phase 3: resolving a path
+  whose device matches no mount entry.
 - `src/linux/volume_metadata.cpp` — `fstatfs()` `f_fsid`: zfs `fsid`.
 - `src/linux/zfs_guids.ts` — opt-in `zfs` / `zpool` GUID queries.
 - `src/types/mount_point.ts` — `subvol` / `subvolid` fields.

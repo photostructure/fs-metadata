@@ -27,6 +27,15 @@
 #include <linux/btrfs.h> // BTRFS_IOC_GET_SUBVOL_INFO, btrfs_ioctl_get_subvol_info_args
 #include <sys/ioctl.h> // ioctl()
 #define FSMETA_HAVE_BTRFS 1
+// The `flags` field returned by BTRFS_IOC_GET_SUBVOL_INFO carries ROOT ITEM
+// flags, so read-only is BTRFS_ROOT_SUBVOL_RDONLY (1 << 0) — declared in
+// <linux/btrfs_tree.h>, which <linux/btrfs.h> does NOT include. Do not reach
+// for BTRFS_SUBVOL_RDONLY (1 << 1) from <linux/btrfs.h>: that one belongs to
+// SUBVOL_GETFLAGS/SETFLAGS/SNAP_CREATE_V2 and would silently always test false
+// here. Verified against `btrfs property get -ts <path> ro`.
+#ifndef BTRFS_ROOT_SUBVOL_RDONLY
+#define BTRFS_ROOT_SUBVOL_RDONLY (1ULL << 0)
+#endif
 #endif
 #endif
 
@@ -198,11 +207,24 @@ public:
               u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8], u[9], u[10],
               u[11], u[12], u[13], u[14], u[15]);
           metadata.subvolumeUuid = uuid_str;
+          // The subvolume id the `subvolid=` mount option would carry. It is
+          // the only source for a subvolume that is not separately mounted,
+          // and agrees with the mount option wherever both exist. Ids are
+          // allocated sequentially from 256, so a double holds them exactly.
+          metadata.subvolid = static_cast<double>(subvol_info.treeid);
+          // A read-only snapshot under a read-write mount is read-only, and
+          // this flag is the only signal for it: statvfs() reports ST_RDONLY
+          // for the MOUNT, which stays clear. Never clear isReadOnly here — a
+          // read-write subvolume under a read-only mount is still read-only.
+          if ((subvol_info.flags & BTRFS_ROOT_SUBVOL_RDONLY) != 0) {
+            metadata.isReadOnly = true;
+          }
           DEBUG_LOG("[LinuxMetadataWorker] btrfs subvolume '%s' (id %llu) "
-                    "uuid %s",
+                    "uuid %s flags 0x%llx",
                     subvol_info.name,
                     static_cast<unsigned long long>(subvol_info.treeid),
-                    metadata.subvolumeUuid.c_str());
+                    metadata.subvolumeUuid.c_str(),
+                    static_cast<unsigned long long>(subvol_info.flags));
         } else {
           DEBUG_LOG("[LinuxMetadataWorker] BTRFS_IOC_GET_SUBVOL_INFO "
                     "unavailable for %s: %s",

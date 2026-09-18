@@ -63,7 +63,14 @@ The Linux filesystem-identity integration tests auto-skip unless the matching
 filesystem is actually mounted, so on a typical dev box (and in CI) they no-op:
 
 - `src/linux/btrfs-subvolume.test.ts` runs against any mounted **btrfs**
-  filesystem (e.g. when `/` or `/home` is btrfs).
+  filesystem (e.g. when `/` or `/home` is btrfs). Its nested-subvolume
+  assertions additionally need a btrfs mount with a subvolume inside it that is
+  not separately mounted; the test discovers those read-only (a directory whose
+  `st_ino` is 256 on a device other than the mount's) and never creates one,
+  because removing a subvolume needs `CAP_SYS_ADMIN` or the
+  `user_subvol_rm_allowed` mount option. `src/linux/nested-subvolume.test.ts`
+  covers the same resolution logic with injected `stat`/`statfs` and needs no
+  btrfs at all.
 - `src/linux/zfs-fsid.test.ts` needs a mounted **zfs** dataset.
 
 To exercise the zfs `fsid` path, create a throwaway file-backed pool:
