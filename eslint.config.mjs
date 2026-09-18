@@ -20,6 +20,11 @@ export default [
       "coverage",
       "dist",
       "docs",
+      // Agent worktrees are full checkouts of this repo, each with its own
+      // tsconfig.json. Linting into them makes typescript-eslint see several
+      // candidate TSConfigRootDirs and fail to parse ANY file, including this
+      // checkout's own sources.
+      ".claude",
       "*.cts",
       "*.cjs",
       "**/*.cjs",

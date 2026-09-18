@@ -9,5 +9,8 @@ dist/
 prebuilds/
 
 
+# Agent worktrees: full checkouts of this repo, formatted by their own session
+.claude/
+
 # Other
 *.min.*js
