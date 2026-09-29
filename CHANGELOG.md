@@ -18,13 +18,8 @@ Security in case of vulnerabilities.
 
 ### Added
 
-- **Identity for btrfs subvolumes that are not separately mounted.** A subvolume
-  nested inside a mounted btrfs filesystem gets its own anonymous device but no
-  mount table entry, so `getMountPointForPath()` and `getVolumeMetadataForPath()`
-  threw `No mount point found for path`, and `getVolumeMetadata()` returned no
-  `uuid`, `subvolumeUuid`, or `subvolid` for it. All three now resolve such a
-  path to the btrfs mount that contains it and report the subvolume's own
-  identity, read from `BTRFS_IOC_GET_SUBVOL_INFO` (unprivileged, kernel ≥ 4.18).
+- **Identity for btrfs subvolumes that are not separately mounted.** A subvolume nested inside a mounted btrfs filesystem gets its own anonymous device but no mount table entry, so `getMountPointForPath()` and `getVolumeMetadataForPath()` threw `No mount point found for path`, and `getVolumeMetadata()` returned no `uuid`, `subvolumeUuid`, or `subvolid` for it. All three now resolve such a path to the btrfs mount that contains it and report the subvolume's own identity, read from `BTRFS_IOC_GET_SUBVOL_INFO` (unprivileged, kernel ≥ 4.18).
+
 - **`VolumeMetadata.subvolumeRoot`**: the absolute path where the subvolume
   identified by `subvolumeUuid` begins. It equals `mountPoint` for an ordinary
   btrfs mount and names the nested subvolume otherwise, so
@@ -33,162 +28,59 @@ Security in case of vulnerabilities.
 
 ### Changed
 
-- **`getVolumeMetadata()` given any btrfs directory that is not itself a mount
-  point now reports the containing mount as `mountPoint`** rather than echoing
-  the path it was given — nested subvolumes and ordinary subdirectories alike.
-  `mountPoint` is what `findmnt` reports; `subvolumeRoot ?? mountPoint` is what
-  `df` reports. Paths that are real mount points are unaffected, as are all
-  other filesystems.
-- **btrfs paths now resolve to the deepest btrfs mount that contains them,
-  rather than to the deepest mount whose device matches.** A btrfs anonymous
-  `st_dev` names the subvolume, not the mount, so it is absent for a subvolume
-  with no mount entry and ambiguous when one subvolume is mounted twice: with
-  `@` at `/` and the same filesystem's top-level tree at `/mnt/all`,
-  `/mnt/all/@/photos` previously resolved to `/`. Device matching still decides
-  on every other filesystem, where one device means one mount.
-- **`subvolid` for a nested subvolume comes from the ioctl**, and the containing
-  mount's `subvol` / `subvolid` mount options are no longer reported for it:
-  they describe a different subvolume.
+- **`getVolumeMetadata()` given any btrfs directory that is not itself a mount point now reports the containing mount as `mountPoint`** rather than echoing the path it was given — nested subvolumes and ordinary subdirectories alike. `mountPoint` is what `findmnt` reports; `subvolumeRoot ?? mountPoint` is what `df` reports. Paths that are real mount points are unaffected, as are all other filesystems.
+
+- **btrfs paths now resolve to the deepest btrfs mount that contains them, rather than to the deepest mount whose device matches.** A btrfs anonymous `st_dev` names the subvolume, not the mount, so it is absent for a subvolume with no mount entry and ambiguous when one subvolume is mounted twice: with `@` at `/` and the same filesystem's top-level tree at `/mnt/all`, `/mnt/all/@/photos` previously resolved to `/`. Device matching still decides on every other filesystem, where one device means one mount.
+
+- **`subvolid` for a nested subvolume comes from the ioctl**, and the containing mount's `subvol` / `subvolid` mount options are no longer reported for it: they describe a different subvolume.
 
 ### Fixed
 
-- **Global npm installs no longer fail in the install script.** Run the installed
-  `node-gyp-build` directly with Node instead of invoking `npx`, whose bootstrap
-  fails when it inherits `npm_config_global=true`. This also removes the shell
-  invocation that emitted Node's DEP0190 deprecation warning.
-- **Stalled macOS volume queries no longer block `process.exit()`.** Metadata,
-  mount enumeration, path resolution, and directory probes now run on bounded
-  detached threads instead of libuv's joined worker pool. This also applies
-  when `timeoutMs: 0` disables the deadline. DiskArbitration lock waits observe
-  cancellation and deadlines, excess queued requests reject with `EBUSY`, and
-  Worker teardown does not wait for native calls that never return. Other Node
-  filesystem calls, including `watchAvailableSpace()` polling, still need
-  application-level subprocess supervision when mounts can hang.
+- **Global npm installs no longer fail in the install script.** Run the installed `node-gyp-build` directly with Node instead of invoking `npx`, whose bootstrap fails when it inherits `npm_config_global=true`. This also removes the shell invocation that emitted Node's DEP0190 deprecation warning.
 
-- **`isReadOnly` now reflects a read-only btrfs subvolume**, not just a
-  read-only mount. A read-only snapshot under a read-write mount reported
-  `false`: `statvfs`'s `ST_RDONLY` describes the mount and stays clear for it,
-  so the value now also comes from the subvolume's `BTRFS_ROOT_SUBVOL_RDONLY`
-  root-item flag.
+- **Stalled macOS volume queries no longer block `process.exit()`.** Metadata, mount enumeration, path resolution, and directory probes now run on bounded detached threads instead of libuv's joined worker pool. This also applies when `timeoutMs: 0` disables the deadline. DiskArbitration lock waits observe cancellation and deadlines, excess queued requests reject with `EBUSY`, and Worker teardown does not wait for native calls that never return. Other Node filesystem calls, including `watchAvailableSpace()` polling, still need application-level subprocess supervision when mounts can hang.
+
+- **`isReadOnly` now reflects a read-only btrfs subvolume**, not just a read-only mount. A read-only snapshot under a read-write mount reported `false`: `statvfs`'s `ST_RDONLY` describes the mount and stays clear for it, so the value now also comes from the subvolume's `BTRFS_ROOT_SUBVOL_RDONLY` root-item flag.
 
 ## [2.5.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.5.0) (2026-08-06)
 
 ### Added
 
-- **Cross-platform volume subscriptions.** `watchVolumeMountPoints()` observes
-  additions and removals using non-overlapping shallow snapshots at a
-  caller-configurable `pollIntervalMs` (one minute by default). Initial state is
-  exposed through `ready`; recurring failures retain the last good snapshot.
-  `watchAvailableSpace()` separately reports crossings of a caller-selected
-  available-space threshold, with optional hysteresis and no overlapping
-  filesystem requests after a caller-visible timeout.
-  Linux retains the public directory-only mount contract with one tracked probe
-  per newly observed local path; remote paths are not touched. Windows observes
-  logical drive roots and rejects custom `systemFsTypes`, which shallow drive
-  enumeration cannot evaluate.
+- **Cross-platform volume subscriptions.** `watchVolumeMountPoints()` observes additions and removals using non-overlapping shallow snapshots at a caller-configurable `pollIntervalMs` (one minute by default). Initial state is exposed through `ready`; recurring failures retain the last good snapshot. `watchAvailableSpace()` separately reports crossings of a caller-selected available-space threshold, with optional hysteresis and no overlapping filesystem requests after a caller-visible timeout. Linux retains the public directory-only mount contract with one tracked probe per newly observed local path; remote paths are not touched. Windows observes logical drive roots and rejects custom `systemFsTypes`, which shallow drive enumeration cannot evaluate.
 
 ### Fixed
 
-- **Shallow mount enumeration is now reliable for long-lived consumers.**
-  macOS now honors `skipHealthProbes` instead of starting `faccessat` probes for
-  every path, and Windows retries `GetLogicalDriveStringsW` if the drive set
-  grows between sizing and filling the result buffer.
+- **Shallow mount enumeration is now reliable for long-lived consumers.** macOS now honors `skipHealthProbes` instead of starting `faccessat` probes for every path, and Windows retries `GetLogicalDriveStringsW` if the drive set grows between sizing and filling the result buffer.
 
 ## 2.4.0 (not released)
 
 ### Changed
 
-- **The npm package now uses an explicit file allowlist.** Published tarballs
-  contain the runtime JavaScript and declarations, supported native prebuilds,
-  native rebuild sources, install script, and top-level package documentation.
-  Tests, coverage output, generated API documentation, and internal plans are no
-  longer published.
+- **The npm package now uses an explicit file allowlist.** Published tarballs contain the runtime JavaScript and declarations, supported native prebuilds, native rebuild sources, install script, and top-level package documentation. Tests, coverage output, generated API documentation, and internal plans are no longer published.
 
-- **`maxConcurrency` now tracks `UV_THREADPOOL_SIZE`, not core count.** It
-  defaults to the libuv pool size plus a small fixed headroom (7 unless the pool
-  was raised), capped by `availableParallelism()`. All filesystem work runs on
-  that shared, FIFO-queued pool rather than one thread per core, so the old
-  core-count default queued up to 128 requests against 4 threads on a large
-  machine and delayed unrelated IO in the host application. Enumeration is a few
-  milliseconds slower for a far shallower queue; raise `UV_THREADPOOL_SIZE` to
-  lift both.
+- **`maxConcurrency` now tracks `UV_THREADPOOL_SIZE`, not core count.** It defaults to the libuv pool size plus a small fixed headroom (7 unless the pool was raised), capped by `availableParallelism()`. All filesystem work runs on that shared, FIFO-queued pool rather than one thread per core, so the old core-count default queued up to 128 requests against 4 threads on a large machine and delayed unrelated IO in the host application. Enumeration is a few milliseconds slower for a far shallower queue; raise `UV_THREADPOOL_SIZE` to lift both.
 
 ### Removed
 
-- **Dropped the inert `"snap*"` entry from `SystemFsTypesDefault`.**
-  `systemFsTypes` is compared exactly — only `systemPathPatterns` is
-  glob-compiled — so the entry never matched anything, and no filesystem is
-  named `snap`-anything. Its real coverage gap is fixed below.
+- **Dropped the inert `"snap*"` entry from `SystemFsTypesDefault`.** `systemFsTypes` is compared exactly — only `systemPathPatterns` is glob-compiled — so the entry never matched anything, and no filesystem is named `snap`-anything. Its real coverage gap is fixed below.
 
 ### Fixed
 
-- **Snap mounts are now excluded on every snapd configuration.** Inside a
-  container with `/dev/fuse` and a helper binary, snapd mounts snaps through
-  FUSE rather than the kernel `squashfs` driver, preferring `squashfuse` over
-  `snapfuse`; only the less-likely `fuse.snapfuse` was listed, so
-  `fuse.squashfuse` snaps were reported as ordinary volumes. snapd also mounts
-  under `/var/lib/snapd/snap` wherever `/snap` is absent or a symlink to it
-  (Fedora, openSUSE), and mount entries report the resolved path, so `/snap/**`
-  did not cover that root — it is now listed too, which matters for callers who
-  override `systemFsTypes`. Both values are now in the defaults.
+- **Snap mounts are now excluded on every snapd configuration.** Inside a container with `/dev/fuse` and a helper binary, snapd mounts snaps through FUSE rather than the kernel `squashfs` driver, preferring `squashfuse` over `snapfuse`; only the less-likely `fuse.snapfuse` was listed, so `fuse.squashfuse` snaps were reported as ordinary volumes. snapd also mounts under `/var/lib/snapd/snap` wherever `/snap` is absent or a symlink to it (Fedora, openSUSE), and mount entries report the resolved path, so `/snap/**` did not cover that root — it is now listed too, which matters for callers who override `systemFsTypes`. Both values are now in the defaults.
 
-- **Stacked mount points now report the entry mounted on top.** A systemd direct
-  automount keeps its `autofs` trigger in the mount table and mounts the real
-  filesystem over it, so one path appears twice and this library selected the
-  first. Affected volumes reported `fstype: "autofs"` and
-  `mountFrom: "systemd-1"` — which names no block device, so `uuid` and `label`
-  came back empty — and were misclassified as system volumes and dropped from
-  default enumeration, all while `size` and `used` correctly described the real
-  filesystem. `mount --bind` and overlay stacking are fixed the same way.
-  Selection is last-entry-wins: `/proc/self/mounts` carries no mount or parent
-  IDs, so file order is a proxy for stacking order that every appending
-  mechanism satisfies, but `mount --move` can still defeat.
+- **Stacked mount points now report the entry mounted on top.** A systemd direct automount keeps its `autofs` trigger in the mount table and mounts the real filesystem over it, so one path appears twice and this library selected the first. Affected volumes reported `fstype: "autofs"` and `mountFrom: "systemd-1"` — which names no block device, so `uuid` and `label` came back empty — and were misclassified as system volumes and dropped from default enumeration, all while `size` and `used` correctly described the real filesystem. `mount --bind` and overlay stacking are fixed the same way. Selection is last-entry-wins: `/proc/self/mounts` carries no mount or parent IDs, so file order is a proxy for stacking order that every appending mechanism satisfies, but `mount --move` can still defeat.
 
-- **One unreachable mount point no longer taxes every path resolution.**
-  `getMountPointForPath()` and `getVolumeMetadataForPath()` now partition
-  candidates by path ancestry before any IO and stat only the target's
-  ancestors, falling back to the others solely when no ancestor matches the
-  device, and no longer health-probe while building that candidate list. A dead
-  `autofs` trigger or wedged FUSE mount elsewhere on the system is never
-  touched. `fs.promises.stat()` cannot be cancelled, so a blocked call parks a
-  libuv thread until the kernel gives up — not issuing it is the only remedy.
-  Windows gets the same isolation natively: building the candidate list for path
-  resolution now reads only the logical drive strings, skipping `GetDriveTypeW`,
-  the drive status check, and `GetVolumeInformationW`, so a disconnected network
-  drive no longer delays a lookup on another drive. Those entries carry only
-  `mountPoint`. macOS resolves paths through targeted native calls rather than
-  enumeration and was never affected.
+- **One unreachable mount point no longer taxes every path resolution.** `getMountPointForPath()` and `getVolumeMetadataForPath()` now partition candidates by path ancestry before any IO and stat only the target's ancestors, falling back to the others solely when no ancestor matches the device, and no longer health-probe while building that candidate list. A dead `autofs` trigger or wedged FUSE mount elsewhere on the system is never touched. `fs.promises.stat()` cannot be cancelled, so a blocked call parks a libuv thread until the kernel gives up — not issuing it is the only remedy. Windows gets the same isolation natively: building the candidate list for path resolution now reads only the logical drive strings, skipping `GetDriveTypeW`, the drive status check, and `GetVolumeInformationW`, so a disconnected network drive no longer delays a lookup on another drive. Those entries carry only `mountPoint`. macOS resolves paths through targeted native calls rather than enumeration and was never affected.
 
-- **Enumeration no longer fails outright when a single mount point is wedged.**
-  `getVolumeMountPoints()` gave each per-mount `readdir()` probe the same budget
-  as the whole call, so the outer deadline always won the race and one
-  unresponsive volume rejected the entire request. Probes now get a fraction of
-  the budget, making `status: "timeout"` reachable and letting healthy volumes
-  return. macOS's native accessibility probes get the same fraction and run in
-  a rolling window, so one blocked probe cannot stop later healthy volumes from
-  being checked; an expired native probe reports `status: "timeout"`.
-  Windows is unchanged — `timeoutMs` applies per system call there, with no
-  outer deadline, so its probe keeps the full budget.
+- **Enumeration no longer fails outright when a single mount point is wedged.** `getVolumeMountPoints()` gave each per-mount `readdir()` probe the same budget as the whole call, so the outer deadline always won the race and one unresponsive volume rejected the entire request. Probes now get a fraction of the budget, making `status: "timeout"` reachable and letting healthy volumes return. macOS's native accessibility probes get the same fraction and run in a rolling window, so one blocked probe cannot stop later healthy volumes from being checked; an expired native probe reports `status: "timeout"`. Windows is unchanged — `timeoutMs` applies per system call there, with no outer deadline, so its probe keeps the full budget.
 
-- **`fuse.gvfsd-fuse` mounts are now excluded by default.** GVfs does not mount
-  its FUSE bridge with `allow_other`, so FUSE denies access to every user except
-  the owner and cross-user `readdir` calls fail with `EACCES`; the bridge was
-  therefore reported as `inaccessible` rather than as a system volume.
-  `SystemPathPatternsDefault` covered `/run/user/*/gvfs` but missed gvfsd-fuse's
-  documented `$HOME/.gvfs` fallback when `$XDG_RUNTIME_DIR` is unavailable
-  (commonly for root). Matching on fstype covers either location.
-  `includeSystemVolumes: true` restores the aggregate bridge; its individual GIO
-  backends remain subdirectories rather than separate mount-table entries.
+- **`fuse.gvfsd-fuse` mounts are now excluded by default.** GVfs does not mount its FUSE bridge with `allow_other`, so FUSE denies access to every user except the owner and cross-user `readdir` calls fail with `EACCES`; the bridge was therefore reported as `inaccessible` rather than as a system volume. `SystemPathPatternsDefault` covered `/run/user/*/gvfs` but missed gvfsd-fuse's documented `$HOME/.gvfs` fallback when `$XDG_RUNTIME_DIR` is unavailable (commonly for root). Matching on fstype covers either location. `includeSystemVolumes: true` restores the aggregate bridge; its individual GIO backends remain subdirectories rather than separate mount-table entries.
 
 ## [2.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.3.0) (2026-07-20)
 
 ### Added
 
-- **Opt-in authoritative ZFS GUIDs.** `includeZfsGuids: true` adds
-  `zfsDatasetGuid` and `zfsPoolGuid` as decimal strings on Linux ZFS volumes,
-  using bounded, shell-free `zfs` / `zpool` queries. The default remains the
-  fast syscall-only path; missing commands and query failures leave the fields
-  undefined without failing metadata retrieval.
+- **Opt-in authoritative ZFS GUIDs.** `includeZfsGuids: true` adds `zfsDatasetGuid` and `zfsPoolGuid` as decimal strings on Linux ZFS volumes, using bounded, shell-free `zfs` / `zpool` queries. The default remains the fast syscall-only path; missing commands and query failures leave the fields undefined without failing metadata retrieval.
 
 ### Changed
 
