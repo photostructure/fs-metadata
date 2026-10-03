@@ -131,7 +131,9 @@ Note that a timeout **abandons** the operation, it does not cancel it:
 `fs.promises.stat()` has no cancellation, so the libuv worker stays occupied
 until the kernel returns. This is why resolution avoids issuing the stat rather
 than merely bounding it, and why embedders should size `UV_THREADPOOL_SIZE` (see
-below) for the number of volumes they enumerate.
+below) for the number of volumes they enumerate. Concurrent `opendir()` health
+probes of one path share a single request, so repeatedly enumerating a hung
+mount parks one worker for it rather than one per call.
 
 **How each platform gets there.** The mechanism differs, but no platform lets an
 unreachable volume tax an unrelated lookup:

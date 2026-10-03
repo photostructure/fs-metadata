@@ -14,6 +14,12 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
+## Unreleased
+
+### Fixed
+
+- **Repeated enumeration of a hung mount no longer exhausts libuv's thread pool on Linux and Windows.** A timed-out `opendir()` health probe keeps its worker until the kernel returns, and every later `getVolumeMountPoints()` or `getVolumeMetadata()` call used to start another one. With the default pool of four, four calls against a hard-hung NFS mount stalled all filesystem, DNS lookup, and crypto work in the host process. Concurrent probes of one path now share a single request, as they already did on macOS.
+
 ## [2.6.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.0) (2026-09-17)
 
 ### Added

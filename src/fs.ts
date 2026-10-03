@@ -86,12 +86,33 @@ export async function canReaddir(
   return canReaddirObservation(dir, timeoutMs).value;
 }
 
-/** A directory probe and the underlying filesystem work it time-bounds. */
+/**
+ * Raw `opendir()` probes that have not settled yet, keyed by directory.
+ *
+ * A timeout abandons a probe but cannot cancel it: on a hung mount the libuv
+ * worker stays parked until the kernel returns. Later probes of the same path
+ * join the running one instead of parking another worker, so repeated polling
+ * holds at most one worker per hung path. The macOS native probe does the same
+ * (src/darwin/volume_mount_points.cpp).
+ */
+const pendingReaddirProbes = new Map<string, Promise<true>>();
+
+/**
+ * A directory probe and the underlying filesystem work it time-bounds.
+ *
+ * `settled` is shared by every concurrent observation of `dir`.
+ */
 export function canReaddirObservation(
   dir: string,
   timeoutMs: number,
 ): { value: Promise<true>; settled: Promise<true> } {
-  const settled = _canReaddir(dir);
+  let settled = pendingReaddirProbes.get(dir);
+  if (settled == null) {
+    settled = _canReaddir(dir);
+    pendingReaddirProbes.set(dir, settled);
+    const forget = () => pendingReaddirProbes.delete(dir);
+    settled.then(forget, forget);
+  }
   const value = withTimeout({
     desc: "canReaddir()",
     promise: settled,

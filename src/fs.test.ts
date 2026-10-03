@@ -5,6 +5,7 @@ import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import {
   canReaddir,
+  canReaddirObservation,
   canStatAsync,
   existsSync,
   findAncestorDir,
@@ -179,6 +180,51 @@ describe("fs", () => {
       await mkdir(dirPath);
 
       await expect(canReaddir(dirPath, 1)).rejects.toThrow(/timeout/i);
+    });
+  });
+
+  describe("canReaddirObservation", () => {
+    // opendir() cannot be cancelled: a probe of a hung mount keeps its libuv
+    // worker after the caller times out. Repeated probes of that path must
+    // join the running one rather than park another worker each time.
+    it("joins a timed-out probe whose opendir() is still running", async () => {
+      const dirPath = join(tempDir, "sharedProbe");
+      await mkdir(dirPath);
+
+      const first = canReaddirObservation(dirPath, 1);
+      await expect(first.value).rejects.toThrow(/timeout/i);
+      const second = canReaddirObservation(dirPath, 1000);
+
+      expect(second.settled).toBe(first.settled);
+      await expect(second.value).resolves.toBe(true);
+    });
+
+    it("starts a new probe once the previous one has settled", async () => {
+      const dirPath = join(tempDir, "freshProbe");
+      await mkdir(dirPath);
+
+      const first = canReaddirObservation(dirPath, 1000);
+      await first.settled;
+      const second = canReaddirObservation(dirPath, 1000);
+
+      expect(second.settled).not.toBe(first.settled);
+      await expect(second.value).resolves.toBe(true);
+    });
+
+    it("probes different paths independently", async () => {
+      const a = join(tempDir, "a");
+      const b = join(tempDir, "b");
+      await mkdir(a);
+      await mkdir(b);
+
+      const first = canReaddirObservation(a, 1000);
+      const second = canReaddirObservation(b, 1000);
+
+      expect(second.settled).not.toBe(first.settled);
+      await expect(Promise.all([first.value, second.value])).resolves.toEqual([
+        true,
+        true,
+      ]);
     });
   });
 });
