@@ -5,7 +5,7 @@
 #include "../common/fd_guard.h"
 #include "../common/path_security.h"
 #include "../common/shutdown.h"
-#include <fcntl.h>  // for open(), O_RDONLY, O_CLOEXEC
+#include <fcntl.h>  // for open(), O_RDONLY, O_CLOEXEC, O_NONBLOCK
 #include <string.h> // for strcmp
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -50,7 +50,9 @@ void GetHiddenWorker::Execute() {
   // checking the same file that realpath() validated.
   // O_CLOEXEC: Prevent fd leak to child processes on fork/exec
   // O_RDONLY: We only need to read the flags
-  int fd = open(validated_path.c_str(), O_RDONLY | O_CLOEXEC);
+  // O_NONBLOCK: A FIFO with no writer (or a tty) would otherwise block open()
+  // indefinitely, parking this libuv thread. fstat() ignores blocking mode.
+  int fd = open(validated_path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
   if (fd < 0) {
     int error = errno;
     if (error == ENOENT) {
@@ -145,7 +147,10 @@ void SetHiddenWorker::Execute() {
   // flags with fchflags() all operate on the same inode via the fd.
   // O_CLOEXEC: Prevent fd leak to child processes on fork/exec
   // O_RDONLY: fchflags() doesn't require write access to the file contents
-  int fd = open(validated_path.c_str(), O_RDONLY | O_CLOEXEC);
+  // O_NONBLOCK: A FIFO with no writer (or a tty) would otherwise block open()
+  // indefinitely, parking this libuv thread. fstat(), fchflags(), and
+  // fstatfs() ignore blocking mode.
+  int fd = open(validated_path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
   if (fd < 0) {
     int error = errno;
     if (error == ENOENT) {

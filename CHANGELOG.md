@@ -24,6 +24,8 @@ Security in case of vulnerabilities.
 
 - **Redundant wildcards in `systemPathPatterns` no longer stall the event loop.** `**/**/**/**/zz` compiled to adjacent `.*` quantifiers that took 21 seconds to reject an 801-character mount path; it now takes 0.04ms. A wildcard that follows a globstar no longer compiles to a second quantifier competing for the same characters, and every pattern matches the same paths as before.
 
+- **The hidden-attribute APIs no longer hang on a FIFO on macOS.** `isHidden()`, `isHiddenRecursive()`, `getHiddenMetadata()`, and `setHidden()` with the `systemFlag` or `all` method opened the path in blocking mode to read its flags. With no writer on the FIFO, that `open()` waited for one, possibly forever, and each call parked a libuv worker for as long. With the default pool of four, four such calls stalled all filesystem, DNS lookup, crypto, and zlib work in the host process. Device nodes that block on open, such as serial ttys, did the same. The path is now opened non-blocking, so these calls return immediately.
+
 ## [2.6.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.0) (2026-09-17)
 
 ### Added
