@@ -61,7 +61,9 @@ function _compileGlob(patterns: string[] | readonly string[]): RegExp {
     while (i < pattern.length) {
       // Handle '**' pattern
       if (pattern[i] === "*" && pattern[i + 1] === "*") {
-        regex += ".*";
+        // `.*.*` matches the same strings as `.*`, but adjacent unbounded
+        // quantifiers backtrack polynomially on a non-matching path.
+        if (!regex.endsWith(".*")) regex += ".*";
         i += 2;
         if (pattern[i] === "/") {
           i++; // Skip the slash after **
@@ -71,7 +73,13 @@ function _compileGlob(patterns: string[] | readonly string[]): RegExp {
 
       // Handle single '*' pattern
       if (pattern[i] === "*") {
-        regex += "[^/]*";
+        // After a globstar, `[^/]*` adds only what `.` cannot match: line
+        // terminators, and anything after one up to the next slash.
+        // `.*(?:[\n\r\u2028\u2029][^/]*)?` matches the same strings as
+        // `.*[^/]*` without two quantifiers competing for the same characters.
+        regex += regex.endsWith(".*")
+          ? "(?:[\\n\\r\\u2028\\u2029][^/]*)?"
+          : "[^/]*";
         i++;
         continue;
       }

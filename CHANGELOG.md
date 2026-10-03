@@ -22,6 +22,8 @@ Security in case of vulnerabilities.
 
 - **The bind-mount fallback in `getMountPointForPath()` and `getVolumeMetadataForPath()` honors `maxConcurrency` and `timeoutMs`.** When no ancestor mount matched the target's device, every other mount point was `stat()`ed at once. They are now `stat()`ed at most `maxConcurrency` at a time, and none start after `timeoutMs` has elapsed.
 
+- **Redundant wildcards in `systemPathPatterns` no longer stall the event loop.** `**/**/**/**/zz` compiled to adjacent `.*` quantifiers that took 21 seconds to reject an 801-character mount path; it now takes 0.04ms. A wildcard that follows a globstar no longer compiles to a second quantifier competing for the same characters, and every pattern matches the same paths as before.
+
 ## [2.6.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.0) (2026-09-17)
 
 ### Added

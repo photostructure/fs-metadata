@@ -90,6 +90,52 @@ describe("compileGlob", () => {
     expect(regex.test("src/components/Button.test.ts")).toBe(true);
   });
 
+  // Adjacent unbounded quantifiers (`.*.*`, `.*[^/]*`) backtrack polynomially
+  // on a non-matching path: `**/**/**/**/zz` took 21s against an 801-char
+  // path. No wildcard may compile to a quantifier that competes with the one
+  // before it for the same characters.
+  test("collapses wildcards that follow a globstar", () => {
+    const source = (pattern: string) => compileGlob([pattern]).source;
+    expect(source("**/**/**/**/zz")).toBe(source("**/zz"));
+    const adjacentQuantifiers = /\.\*(?:\.\*|\[\^\/\]\*)/;
+    for (const pattern of [
+      "**/***/zz",
+      "a/**/*/b",
+      "a/**/*",
+      "****",
+      "**/**/*/**",
+    ]) {
+      expect(source(pattern)).not.toMatch(adjacentQuantifiers);
+    }
+  });
+
+  test("collapsing wildcards preserves what a pattern matches", () => {
+    const repeated = compileGlob(["**/**/**/**/zz"]);
+    expect(repeated.test("/a/b/zz")).toBe(true);
+    expect(repeated.test("zz")).toBe(true);
+    expect(repeated.test("/a/b/z")).toBe(false);
+
+    // The * after the globstar still requires the following separator:
+    const segment = compileGlob(["a/**/*/b"]);
+    expect(segment.test("a/x/b")).toBe(true);
+    expect(segment.test("a/x/y/b")).toBe(true);
+    expect(segment.test("a/b")).toBe(false);
+    expect(segment.test("a/xb")).toBe(false);
+
+    const trailing = compileGlob(["a/**/*"]);
+    expect(trailing.test("a/x")).toBe(true);
+    expect(trailing.test("a/x/y")).toBe(true);
+
+    // `.` never matches a line terminator but `[^/]` does, and a mount path
+    // can contain one (the mount table escapes a newline as \012). Expected
+    // values are what HEAD's compiler returned before any collapsing:
+    // `git show 75706a9:src/glob.ts`.
+    const lineTerminators = compileGlob(["/mnt/**/*"]);
+    expect(lineTerminators.test("/mnt/cache\nvolume")).toBe(true);
+    expect(lineTerminators.test("/mnt/cache\u2028volume")).toBe(true);
+    expect(lineTerminators.test("/mnt/cache\n/volume")).toBe(false);
+  });
+
   // Test null/undefined patterns
   test("handles null and undefined patterns", () => {
     const regex1 = compileGlob(null as unknown as string[]);
