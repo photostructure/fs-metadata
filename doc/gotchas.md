@@ -116,8 +116,9 @@ cost local:
 `getVolumeMetadataForPath()` partition the candidate mount points by path
 ancestry before doing any IO, and stat only the ancestors of the target. The
 non-ancestors are touched solely when no ancestor is on the target's device
-(the bind-mount fallback). On a typical Linux desktop that is 2 stats rather
-than 57, and an unrelated dead mount is never touched.
+(the bind-mount fallback), and then at most `maxConcurrency` at a time, with
+none starting after `timeoutMs` has elapsed. On a typical Linux desktop that is
+2 stats rather than 57, and an unrelated dead mount is never touched.
 
 **Enumeration gives each health probe a fraction of the budget.** On Linux and
 macOS, `getVolumeMountPoints()` is bounded by `timeoutMs` as a whole, so its

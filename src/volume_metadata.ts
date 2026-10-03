@@ -439,6 +439,7 @@ async function _getVolumeMetadataForPath(
     statImpl,
     undefined,
     statfsImpl,
+    operationDeadlineMs,
   );
 
   return getVolumeMetadataImpl(
@@ -493,6 +494,7 @@ export async function findMountPointByDeviceId(
   statImpl: typeof statAsync = statAsync,
   canReaddirImpl: typeof canReaddir = canReaddir,
   statfsImpl: typeof statfsAsync = statfsAsync,
+  operationDeadlineMs?: number,
 ): Promise<string> {
   return (
     await resolveMountPoint(
@@ -503,6 +505,7 @@ export async function findMountPointByDeviceId(
       statImpl,
       canReaddirImpl,
       statfsImpl,
+      operationDeadlineMs,
     )
   ).mountPoint;
 }
@@ -529,6 +532,7 @@ export async function resolveMountPoint(
   statImpl: typeof statAsync = statAsync,
   canReaddirImpl: typeof canReaddir = canReaddir,
   statfsImpl: typeof statfsAsync = statfsAsync,
+  operationDeadlineMs?: number,
 ): Promise<MountPointResolution> {
   const targetDev = resolvedStat.dev;
   const mountPoints =
@@ -549,10 +553,21 @@ export async function resolveMountPoint(
       canReaddirImpl,
     ));
 
+  // Bounded by maxConcurrency: each stat() of a dead mount parks a libuv
+  // thread until the kernel returns, and the fallback phase can have one
+  // candidate per mount on the system. No stat() starts after the caller's
+  // deadline, since the caller has already been told it timed out.
   const sameDeviceMountPoints = async (candidates: MountPoint[]) => {
     const matches: string[] = [];
-    await Promise.all(
-      candidates.map(async ({ mountPoint }) => {
+    let expired = false;
+    await mapConcurrent({
+      maxConcurrency: opts.maxConcurrency,
+      items: candidates,
+      fn: async ({ mountPoint }) => {
+        if (operationDeadlineMs != null && Date.now() >= operationDeadlineMs) {
+          expired = true;
+          return;
+        }
         try {
           if ((await statImpl(mountPoint)).dev === targetDev) {
             matches.push(mountPoint);
@@ -560,8 +575,10 @@ export async function resolveMountPoint(
         } catch {
           // skip inaccessible mount points
         }
-      }),
-    );
+      },
+    });
+    // A skipped candidate might have been the longest match.
+    if (expired) throw new TimeoutError("resolveMountPoint(): timeout");
     return matches;
   };
 

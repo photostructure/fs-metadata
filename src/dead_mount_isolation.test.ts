@@ -1,10 +1,11 @@
 // src/dead_mount_isolation.test.ts
 
+import { jest } from "@jest/globals";
 import type { Stats } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { withTimeout } from "./async";
+import { TimeoutError, withTimeout } from "./async";
 import { type canReaddir, statAsync } from "./fs";
 import { optionsWithDefaults } from "./options";
 import { isLinux, isMacOS, isWindows } from "./platform";
@@ -160,6 +161,79 @@ describe("dead mount isolation", () => {
 
       expect(result).toBe(p.bindSource);
       expect(statted.sort()).toEqual([p.root, p.bindSource]);
+    });
+
+    it("stats at most maxConcurrency fallback candidates at a time", async () => {
+      // Each stat() that a dead mount parks holds a libuv thread, so the
+      // fallback must not issue one per candidate all at once.
+      const candidates = Array.from(
+        { length: 20 },
+        (_, i) => `${p.bindSource}${i}`,
+      );
+      const match = candidates[candidates.length - 1];
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const impl: typeof statAsync = async (path) => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await Promise.resolve();
+        inFlight--;
+        return stats(String(path) === match ? targetDev : otherDev);
+      };
+
+      const result = await findMountPointByDeviceId(
+        p.fallbackTarget,
+        stats(targetDev),
+        options({
+          maxConcurrency: 3,
+          mountPoints: mountPoints(p.root, ...candidates),
+        }),
+        nativeFn,
+        impl,
+      );
+
+      expect(result).toBe(match);
+      expect(maxInFlight).toBe(3);
+    });
+
+    it("starts no fallback stat() after the operation deadline", async () => {
+      // The caller has already been told it timed out, so further stat()s
+      // would only queue behind whatever made the lookup slow.
+      jest.useFakeTimers();
+      try {
+        const deadline = Date.now() + 1000;
+        const candidates = Array.from(
+          { length: 20 },
+          (_, i) => `${p.bindSource}${i}`,
+        );
+        const statted: string[] = [];
+        const impl: typeof statAsync = async (path) => {
+          statted.push(String(path));
+          // The budget runs out while the first two candidates are in flight.
+          if (statted.length === 3) jest.setSystemTime(deadline);
+          await Promise.resolve();
+          return stats(otherDev);
+        };
+
+        await expect(
+          findMountPointByDeviceId(
+            p.fallbackTarget,
+            stats(targetDev),
+            options({
+              maxConcurrency: 2,
+              mountPoints: mountPoints(p.root, ...candidates),
+            }),
+            nativeFn,
+            impl,
+            undefined,
+            undefined,
+            deadline,
+          ),
+        ).rejects.toThrow(TimeoutError);
+        expect(statted).toEqual([p.root, candidates[0], candidates[1]]);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it("honors skipNetworkVolumes in the fallback phase", async () => {

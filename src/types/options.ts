@@ -33,8 +33,9 @@ export interface Options {
    *
    * A long array is cheap: only entries that are path ancestors of the target
    * are `stat()`ed, and the rest are touched solely when no ancestor is on the
-   * target's device. An unreachable entry therefore costs nothing unless the
-   * target actually resolves through the fallback.
+   * target's device, at most {@link maxConcurrency} at a time. An unreachable
+   * entry therefore costs nothing unless the target actually resolves through
+   * the fallback.
    *
    * **The list must contain every mount that is a path ancestor of anything you
    * resolve.** Build it with

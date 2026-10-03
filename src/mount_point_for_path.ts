@@ -24,12 +24,20 @@ export async function getMountPointForPathImpl(
   // Validate up front: the Linux/Windows device-matching route (especially
   // with a caller-supplied opts.mountPoints) never reaches withTimeout(),
   // which would otherwise be the first place an invalid timeoutMs throws.
-  validateTimeoutMs(opts.timeoutMs, "getMountPointForPath()");
+  const timeoutMs = validateTimeoutMs(opts.timeoutMs, "getMountPointForPath()");
+  const operationDeadlineMs =
+    timeoutMs === 0 ? undefined : Date.now() + timeoutMs;
 
   return withTimeout({
     desc: "getMountPointForPath()",
-    timeoutMs: opts.timeoutMs,
-    promise: _getMountPointForPath(pathname, opts, nativeFn, resolvePath),
+    timeoutMs,
+    promise: _getMountPointForPath(
+      pathname,
+      opts,
+      nativeFn,
+      resolvePath,
+      operationDeadlineMs,
+    ),
   });
 }
 
@@ -38,6 +46,7 @@ async function _getMountPointForPath(
   opts: Options,
   nativeFn: NativeBindingsFn,
   resolvePath: typeof realpath,
+  operationDeadlineMs: number | undefined,
 ): Promise<string> {
   if (isMacOS) {
     const native = await nativeFn();
@@ -61,5 +70,14 @@ async function _getMountPointForPath(
 
   // Linux/Windows: device ID filtering + longest ancestor path matching
   debug("[getMountPointForPath] using device matching for %s", resolved);
-  return findMountPointByDeviceId(resolved, resolvedStat, opts, nativeFn);
+  return findMountPointByDeviceId(
+    resolved,
+    resolvedStat,
+    opts,
+    nativeFn,
+    undefined,
+    undefined,
+    undefined,
+    operationDeadlineMs,
+  );
 }
