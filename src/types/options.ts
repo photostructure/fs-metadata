@@ -67,9 +67,24 @@ export interface Options {
    * fraction, and the opt-in ZFS GUID queries reserve time for teardown.
    * Raising `timeoutMs` raises both.
    *
-   * On Windows this is applied **per system call** by the native layer rather
-   * than as one deadline around enumeration, so the health probe there keeps
-   * the full value instead of a fraction.
+   * On Windows the native layer enforces this itself rather than as one
+   * deadline around enumeration, so the health probe there keeps the full
+   * value instead of a fraction. In `getVolumeMountPoints()` it bounds the
+   * whole batch of per-drive checks, and every call that touches a volume is
+   * inside one: the `FindFirstFileExW` probe behind `status`, and the
+   * `GetVolumeInformationW` query behind `fstype` and `isReadOnly`. A drive
+   * that answers the probe and then stalls reports `status: "timeout"` rather
+   * than hanging the call: `status` covers the whole check, not just the
+   * probe. A volume query that *answers* unsuccessfully is a different case
+   * and is unchanged — the drive stays `"healthy"`, `fstype` is absent, and
+   * `isReadOnly` falls back to `false`, so treat `isReadOnly` as meaningful
+   * only when `fstype` is present.
+   *
+   * `getVolumeMetadata()` on Windows is different: its later native calls
+   * have no deadline of their own, so only the TypeScript timeout above
+   * bounds the promise. A stuck native worker stays held after it rejects,
+   * because Windows cancellation is driver-dependent. Repeated checks of one
+   * drive are coalesced, so polling a dead share does not accumulate them.
    *
    * @see {@link getTimeoutMsDefault}.
    */

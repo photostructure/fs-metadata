@@ -47,12 +47,13 @@ type GetVolumeMountPointImplOptions = Required<GetVolumeMountPointOptions> & {
    * which is exactly the hazard the ancestor-only `stat()` partitioning exists
    * to avoid.
    *
-   * Forwarded to the native enumerator too. Windows honors it by skipping both
-   * the drive status check and `GetVolumeInformationW`, the two calls that
-   * touch the volume, so a disconnected network drive no longer stalls a lookup
-   * on another drive; those entries then carry only `mountPoint`. macOS never
-   * reaches this code path — both macOS path APIs resolve through targeted
-   * native calls rather than enumeration.
+   * Forwarded to the native enumerator too. Windows honors it by skipping the
+   * per-drive check, which is where both volume-touching calls live — the
+   * `FindFirstFileExW` probe and the `GetVolumeInformationW` query — so a
+   * disconnected network drive no longer stalls a lookup on another drive;
+   * those entries then carry only `mountPoint`. macOS never reaches this code
+   * path — both macOS path APIs resolve through targeted native calls rather
+   * than enumeration.
    */
   skipHealthProbes?: boolean;
 };
@@ -125,11 +126,13 @@ async function _getVolumeMountPoints(
   // budget means the enumeration rejects before any single wedged mount point
   // can be marked `timeout` and stepped over.
   //
-  // Windows is exempt: getVolumeMountPointsImpl() returns the raw promise there
-  // (native code enforces its own timeouts), so there is no outer deadline to
-  // lose the race to. Shortening the probe would only make a slow-but-healthy
-  // drive that answers within the caller's budget report `timeout` and be
-  // skipped by getAllVolumeMetadata().
+  // Windows is exempt: getVolumeMountPointsImpl() returns the raw promise
+  // there, because the native layer bounds every volume-touching call in
+  // enumeration by timeoutMs itself — the FindFirstFileExW probe and the
+  // GetVolumeInformationW query are both inside one timed per-drive callback —
+  // so there is no outer deadline to lose the race to. Shortening the probe
+  // would only make a slow-but-healthy drive that answers within the caller's
+  // budget report `timeout` and be skipped by getAllVolumeMetadata().
   const probeTimeoutMs = isWindows
     ? o.timeoutMs
     : healthProbeTimeoutMs(o.timeoutMs);

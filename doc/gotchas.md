@@ -124,27 +124,65 @@ none starting after `timeoutMs` has elapsed. On a typical Linux desktop that is
 macOS, `getVolumeMountPoints()` is bounded by `timeoutMs` as a whole, so its
 health-probe phase gets a quarter of that. A wedged mount reports
 `status: "timeout"` on both platforms. Enumeration returns the other volumes
-instead of failing the whole call on one bad entry. Windows is exempt —
-`timeoutMs` applies per system call there, with no outer deadline to lose a race
-to, so its probe keeps the full budget.
+instead of failing the whole call on one bad entry.
+
+Windows is exempt from the outer deadline, because the native layer enforces
+`timeoutMs` itself and there is no outer deadline to lose a race to, so its
+probe keeps the full budget. Every call that touches a volume during Windows
+enumeration is inside that budget: the `FindFirstFileExW` probe behind
+`status`, and the `GetVolumeInformationW` query behind `fstype` and
+`isReadOnly`. A drive that answers the probe and then stalls therefore reports
+`status: "timeout"` rather than hanging the call — that second query was
+previously unbounded, and measured 21 seconds against a drive letter pointing
+at an unroutable UNC path. `status` covers the whole check, not just the probe,
+because `isReadOnly` is always serialized and `false` would otherwise claim a
+volume nobody could read is writable.
+
+A volume query that _answers_ unsuccessfully is a different case, and is
+unchanged from previous releases: the drive stays `"healthy"`, `fstype` is
+absent, and `isReadOnly` falls back to `false`. So read `isReadOnly` as
+meaningful only when `fstype` is present.
+
+`GetDriveTypeW` and the system volume check are outside the budget because
+neither touches the volume: `GetDriveTypeW` classifies a mapped drive from the
+drive letter's DosDevices symlink target without any network I/O (measured:
+1000 calls against unreachable targets totalled under a millisecond), and the
+system volume check compares drive letters against `CSIDL_WINDOWS`.
+
+Windows metadata is different: `getVolumeMetadata()` bounds its per-drive
+health check natively, but its later native calls —
+`GetVolumeNameForVolumeMountPointW`, `GetVolumeInformationW`,
+`GetDiskFreeSpaceExW`, `WNetGetConnectionW` — have no deadline of their own.
+There, only `timeoutMs` at the JavaScript layer bounds the caller's promise,
+and the native worker stays held after it rejects.
 
 Note that a timeout **abandons** the operation, it does not cancel it:
 `fs.promises.stat()` has no cancellation, so the libuv worker stays occupied
 until the kernel returns. This is why resolution avoids issuing the stat rather
 than merely bounding it, and why embedders should size `UV_THREADPOOL_SIZE` (see
-below) for the number of volumes they enumerate. Concurrent `opendir()` health
-probes of one path share a single request, so repeatedly enumerating a hung
-mount parks one worker for it rather than one per call.
+below) for the number of volumes they enumerate.
+
+Health probes of one path share a single in-flight request, so repeatedly
+probing a hung path holds one worker for it rather than one per call. All three
+probes work this way: the JavaScript `opendir()` probe, the macOS native access
+probe, and the Windows native per-drive check. A later probe of a path whose
+probe is still running waits on that one with its own deadline. The two native
+registries additionally cap how many distinct paths can be in flight at 64, and
+differ in what happens past it: macOS rejects the whole enumeration with
+`access probe queue busy`, while Windows reports `status: "unknown"` for the
+drive it could not check and returns the rest. None of the three is a cache —
+an entry is dropped as soon as its probe settles, so the next call probes
+afresh.
 
 **How each platform gets there.** The mechanism differs, but no platform lets an
 unreachable volume tax an unrelated lookup:
 
 - **Linux** reads the mount table without per-volume I/O.
 - **Windows** enumerates drive roots for path resolution without
-  `GetDriveTypeW`, the status check, or `GetVolumeInformationW`, so a
-  disconnected network drive costs nothing. Those entries carry only
-  `mountPoint`; anything needing `status` or `fstype` enumerates normally and
-  pays for the probe.
+  `GetDriveTypeW` and without the per-drive check — which is where both
+  `FindFirstFileExW` and `GetVolumeInformationW` live — so a disconnected
+  network drive costs nothing. Those entries carry only `mountPoint`; anything
+  needing `status` or `fstype` enumerates normally and pays for the check.
 - **macOS** never enumerates for path resolution: `getMountPointForPath()` and
   `getVolumeMetadataForPath()` resolve through targeted native calls
   (`fstatfs`). They also ignore `mountPoints`, so caching it changes nothing
@@ -617,8 +655,16 @@ await setHidden("/path/../file", true); // Error!
 Drive accessibility checks run on the Windows callback pool and are marked as
 long-running so the pool can provide replacement capacity when a network
 provider blocks. A timed-out OS request may still remain in that pool because
-Windows cancellation is driver-dependent; avoid repeatedly probing the same
-known-dead share.
+Windows cancellation is driver-dependent.
+
+Repeated checks of the same drive are coalesced: one in-flight check per path,
+which later callers join with their own deadlines, so polling a known-dead
+share holds one stuck callback for it rather than one per
+`getVolumeMountPoints()`, `getAllVolumeMetadata()`, `getVolumeMetadata()`, or
+`getVolumeMetadataForPath()` call. At most 64 distinct paths are checked
+concurrently; a drive beyond that reports `status: "unknown"`. Coalescing
+bounds the cost but does not remove it, so a known-dead share is still worth
+excluding from polling.
 
 ## Testing Gotchas
 

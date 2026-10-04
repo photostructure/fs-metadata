@@ -75,6 +75,13 @@ public:
           continue;
         }
 
+        // GetDriveTypeW stays outside the timed check: it classifies a mapped
+        // drive from the drive letter's DosDevices symlink target without
+        // touching the network. Measured against letters pointing at an
+        // unroutable UNC path (in \??\UNC, \Device\Mup and
+        // \Device\LanmanRedirector form), 1000 calls each took 0.5-0.8 ms in
+        // total, max 0.144 ms — including while GetVolumeInformationW was
+        // blocked 21 s on the same letter.
         UINT driveType = GetDriveTypeW(drive);
         if (driveType == DRIVE_NO_ROOT_DIR) {
           DEBUG_LOG("[GetVolumeMountPoints] skipping %ls: DRIVE_NO_ROOT_DIR",
@@ -87,18 +94,18 @@ public:
         paths.push_back(WideToUtf8(drive));
       }
 
-      // Check all drive statuses in parallel.
-      //
-      // Both this and GetVolumeInformationW() below touch the volume itself, so
-      // a disconnected network drive blocks here until timeoutMs_ elapses. Path
-      // resolution only needs the drive letters, so it asks for neither and
-      // also bypasses GetDriveTypeW() above.
-      std::vector<DriveStatus> statuses;
+      // Check all drives in parallel. Every call that touches the volume —
+      // the FindFirstFileExW probe and the GetVolumeInformationW query behind
+      // fstype and isReadOnly — runs inside this timed, per-drive, coalesced
+      // callback, so a disconnected network drive blocks here until timeoutMs_
+      // elapses and nowhere afterward. Path resolution needs none of it, so it
+      // asks for neither and also bypasses GetDriveTypeW() above.
+      std::vector<DriveCheckResult> checks;
       if (!skipHealthProbes_) {
         if (IsShuttingDown()) {
           return;
         }
-        statuses = CheckDriveStatus(paths, timeoutMs_);
+        checks = CheckDrives(paths, timeoutMs_);
       }
 
       // Build mount points from results
@@ -129,20 +136,20 @@ public:
         }
 
         std::wstring widePath = SecurityUtils::SafeStringToWide(paths[i]);
-        mp.status = DriveStatusToString(statuses[i]);
+        mp.status = DriveStatusToString(checks[i].status);
 
-        if (statuses[i] == DriveStatus::Healthy) {
-          DWORD fsFlags = 0;
-          WCHAR fsName[MAX_PATH + 1] = {0};
-
-          if (GetVolumeInformationW(widePath.c_str(), nullptr, 0, nullptr,
-                                    nullptr, &fsFlags, fsName, MAX_PATH)) {
-            mp.fstype = WideToUtf8(fsName);
-            mp.isReadOnly = (fsFlags & FILE_READ_ONLY_VOLUME) != 0;
-            DEBUG_LOG("[GetVolumeMountPoints] drive %s filesystem: %s",
-                      paths[i].c_str(), mp.fstype.c_str());
+        if (checks[i].status == DriveStatus::Healthy) {
+          // A healthy check always has an answer here: invalid means
+          // GetVolumeInformationW itself returned FALSE, which has always left
+          // these two fields at their defaults. Only a query that never
+          // answered is different, and it reports timeout rather than healthy.
+          // Nothing here re-asks the volume.
+          if (checks[i].volumeInfo.valid) {
+            mp.fstype = checks[i].volumeInfo.fstype;
+            mp.isReadOnly = checks[i].volumeInfo.isReadOnly;
           }
 
+          // Compares drive letters against CSIDL_WINDOWS. Touches no volume.
           mp.isSystemVolume = IsSystemVolume(widePath);
         }
         mountPoints_.push_back(std::move(mp));

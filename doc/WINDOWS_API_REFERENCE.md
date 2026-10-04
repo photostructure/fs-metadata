@@ -35,6 +35,19 @@ if (size > 0) {
   - `DRIVE_REMOTE` (4)
   - `DRIVE_CDROM` (5)
   - `DRIVE_RAMDISK` (6)
+- **Thread Safety**: does **not** block on a disconnected network drive. It
+  classifies a drive letter from the target of its DosDevices symlink, so a
+  remote target short-circuits to `DRIVE_REMOTE` before any I/O. Measured
+  against letters pointing at an unroutable UNC path (RFC 5737 TEST-NET-1) in
+  all three redirector forms — `\??\UNC\host\share`, `\Device\Mup\host\share`,
+  and `\Device\LanmanRedirector\;Z:…\host\share` — 1000 calls each returned
+  `DRIVE_REMOTE` in 0.5–0.8 ms total, max 0.144 ms per call, including while
+  `GetVolumeInformationW` was blocked 21 s on the same letter. A local-looking
+  target does touch the filesystem (a nonexistent directory returned
+  `DRIVE_NO_ROOT_DIR` in 0.04 ms), so a third-party user-mode filesystem
+  mounted at a drive letter is the one case left untested here.
+- This is why `GetDriveTypeW` stays outside the timed per-drive callback in
+  `src/windows/volume_mount_points.cpp`.
 
 ### GetVolumeInformationW / GetVolumeInformationA
 
@@ -56,6 +69,13 @@ if (size > 0) {
 - **Common Errors**:
   - `ERROR_NOT_READY`: Drive not ready (CD/DVD)
   - `ERROR_PATH_NOT_FOUND`: Invalid path
+- **Thread Safety**: **blocks on network drives**, unlike `GetDriveTypeW`.
+  Measured 21,047 ms before returning `ERROR_BAD_NETPATH` for a drive letter
+  pointing at an unroutable UNC path; the redirector then cached that failure,
+  so immediate retries returned in 0.1 ms. Never call it without a deadline:
+  in enumeration it runs inside the timed per-drive callback
+  (`src/windows/drive_status.h`), and in `getVolumeMetadata()` only the
+  TypeScript `timeoutMs` bounds the caller's promise.
 
 ### GetDiskFreeSpaceExA
 
@@ -268,6 +288,21 @@ if (GetVolumeNameForVolumeMountPointW(L"C:\\", volumeGUID, 50)) {
 - The signal is adaptive, not cancellation. A timed-out callback can keep
   running; `CancelSynchronousIo()` is driver-dependent and is unsafe to apply
   casually to a reused pool thread.
+- Because a timed-out callback is abandoned rather than cancelled, checks are
+  coalesced per path: `DriveStatusChecker` keeps one in-flight check per drive
+  in a mutex-guarded map of `std::shared_future`, and a later check of a drive
+  whose probe is still running waits on that future with its own deadline.
+  Without this, every call against a stalled mapped drive submitted another
+  callback that could never finish. At most 64 distinct paths are in flight,
+  matching the macOS probe registry; a drive past that cap reports
+  `status: "unknown"` rather than failing the whole enumeration. The registry
+  entry is dropped once the check settles, so it coalesces rather than caches.
+- The addon is compiled with **`_HAS_EXCEPTIONS=0`** (from Node's
+  `common.gypi`) even though `/EHsc` is on. MSVC's standard library therefore
+  calls `std::terminate()` where it would otherwise throw — including
+  `promise_already_satisfied`. Satisfying a `std::promise` twice kills the
+  process, and a surrounding `catch (...)` never runs. Track whether a promise
+  has been settled instead of relying on the throw.
 - The callback runs addon code on a process-wide pool that Node does not track,
   so it holds a reference to the addon module for its lifetime:
   `GetModuleHandleEx(...FROM_ADDRESS...)` at submit time plus
