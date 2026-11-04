@@ -73,7 +73,7 @@
     "fmt:pkg": "npm pkg fix",
     "update": "run-p update:*",
     "update:deps": "ncu -u",
-    "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@latest",
+    "install:pinact": "go install github.com/suzuki-shunsuke/pinact/v4/cmd/pinact@v4.1.0",
     "update:actions": "pinact run -u || echo \"problem with pinact\"",
     "release:verify-prebuilds": "tsx scripts/release-prebuild-artifacts-cli.ts verify",
     "release:pack-package": "tsx scripts/release-package-cli.ts pack",

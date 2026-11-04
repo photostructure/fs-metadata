@@ -203,10 +203,15 @@ have access to these organization-level signing secrets:
 Do not create or move a release tag manually. Do not run `npm publish` from a
 workstation. To release:
 
-1. Run the **Build & Prepare Release** workflow on `main`.
-2. Choose `patch`, `minor`, or `major`.
+1. Write the release notes in `CHANGELOG.md` under a heading that names the
+   version bump: `## [Unreleased (patch)]`, `## [Unreleased (minor)]`, or
+   `## [Unreleased (major)]`.
+2. Run the **Build & Prepare Release** workflow on `main`. It takes no input.
 3. Wait for `publish.yaml` to validate, build, test, and stage the exact tag.
-4. Inspect the staged package on npm and approve it with 2FA.
+4. Inspect the staged package on npm and approve it with 2FA. The
+   **Create immutable GitHub release** job in `publish.yaml` waits for that
+   approval, then creates the GitHub release with the version's `CHANGELOG.md`
+   section above GitHub's generated notes.
 
 See `doc/RELEASING.md` for the complete procedure and failure recovery.
 

@@ -5,19 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The version bump comes from the "## [Unreleased (patch|minor|major)]"
+  # heading in CHANGELOG.md.
   workflow_dispatch:
-    inputs:
-      version:
-        description: Version bump
-        required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
 
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', inputs.version) || format('Build - {0}', github.ref_name) }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && 'Release' || format('Build - {0}', github.ref_name) }}
 
 permissions:
   contents: read
@@ -529,11 +521,29 @@ jobs:
       - if: always()
         run: git diff --exit-code
 
+  changelog:
+    name: Read the version bump from CHANGELOG.md
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    outputs:
+      bump: ${{ steps.bump.outputs.bump }}
+    steps:
+      - name: Checkout the commit being released
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the Unreleased heading
+        id: bump
+        uses: photostructure/changelog-release-action@efbfab9798f52b3e1538ab1f1d3b73b261b73885 # v0.1.0
+        with:
+          command: bump
+
   release:
     name: Create signed release commit and tag
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     needs:
+      - changelog
       - lint
       - test-mac-win
       - test-ubuntu
@@ -592,7 +602,7 @@ jobs:
       - name: Bump the package version
         id: version
         env:
-          BUMP: ${{ inputs.version }}
+          BUMP: ${{ needs.changelog.outputs.bump }}
         run: |
           case "$BUMP" in
             patch|minor|major) ;;
@@ -623,12 +633,18 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Stamp the release section of CHANGELOG.md
+        uses: photostructure/changelog-release-action@efbfab9798f52b3e1538ab1f1d3b73b261b73885 # v0.1.0
+        with:
+          command: stamp
+          tag: ${{ steps.version.outputs.tag }}
+
       - name: Create the signed release commit and annotated tag
         env:
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          git add package.json package-lock.json
+          git add package.json package-lock.json CHANGELOG.md
           git commit -S -m "chore(release): $VERSION"
           git tag -s -m "Release $VERSION" "$TAG"
 
