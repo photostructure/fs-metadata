@@ -14,7 +14,9 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## [2.6.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.1) (2026-10-03)
+## [Unreleased]
+
+## [2.6.1] - 2026-10-03
 
 ### Fixed
 
@@ -30,7 +32,7 @@ Security in case of vulnerabilities.
 
 - **The hidden-attribute APIs no longer hang on a FIFO on macOS.** `isHidden()`, `isHiddenRecursive()`, `getHiddenMetadata()`, and `setHidden()` with the `systemFlag` or `all` method opened the path in blocking mode to read its flags. With no writer on the FIFO, that `open()` waited for one, possibly forever, and each call parked a libuv worker for as long. With the default pool of four, four such calls stalled all filesystem, DNS lookup, crypto, and zlib work in the host process. Device nodes that block on open, such as serial ttys, did the same. The path is now opened non-blocking, so these calls return immediately.
 
-## [2.6.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.0) (2026-09-17)
+## [2.6.0] - 2026-09-17
 
 ### Added
 
@@ -58,7 +60,7 @@ Security in case of vulnerabilities.
 
 - **`isReadOnly` now reflects a read-only btrfs subvolume**, not just a read-only mount. A read-only snapshot under a read-write mount reported `false`: `statvfs`'s `ST_RDONLY` describes the mount and stays clear for it, so the value now also comes from the subvolume's `BTRFS_ROOT_SUBVOL_RDONLY` root-item flag.
 
-## [2.5.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.5.0) (2026-08-06)
+## [2.5.0] - 2026-08-06
 
 ### Added
 
@@ -68,7 +70,7 @@ Security in case of vulnerabilities.
 
 - **Shallow mount enumeration is now reliable for long-lived consumers.** macOS now honors `skipHealthProbes` instead of starting `faccessat` probes for every path, and Windows retries `GetLogicalDriveStringsW` if the drive set grows between sizing and filling the result buffer.
 
-## 2.4.0 (not released)
+## [2.4.0] - 2026-08-06 (not released)
 
 ### Changed
 
@@ -92,7 +94,7 @@ Security in case of vulnerabilities.
 
 - **`fuse.gvfsd-fuse` mounts are now excluded by default.** GVfs does not mount its FUSE bridge with `allow_other`, so FUSE denies access to every user except the owner and cross-user `readdir` calls fail with `EACCES`; the bridge was therefore reported as `inaccessible` rather than as a system volume. `SystemPathPatternsDefault` covered `/run/user/*/gvfs` but missed gvfsd-fuse's documented `$HOME/.gvfs` fallback when `$XDG_RUNTIME_DIR` is unavailable (commonly for root). Matching on fstype covers either location. `includeSystemVolumes: true` restores the aggregate bridge; its individual GIO backends remain subdirectories rather than separate mount-table entries.
 
-## [2.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.3.0) (2026-07-20)
+## [2.3.0] - 2026-07-20
 
 ### Added
 
@@ -117,7 +119,7 @@ Security in case of vulnerabilities.
   Remote targets remain unprobed when `skipNetworkVolumes` is true and are
   retained when their target type is unknown.
 
-## [2.2.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.2.1) (2026-07-13)
+## [2.2.1] - 2026-07-13
 
 No API changes. This release hardens the shipped native binaries and fixes the
 build/analysis tooling that was silently not working.
@@ -209,7 +211,7 @@ each fix was verified by injecting a defect and confirming it is now caught.
 - **Removed dead sanitizer config.** `.asan-options` and `.asan-suppressions.txt`
   were never loaded by any script.
 
-## [2.2.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.2.0) (2026-07-11)
+## [2.2.0] - 2026-07-11
 
 ### Changed
 
@@ -259,7 +261,7 @@ each fix was verified by injecting a defect and confirming it is now caught.
   alone; they now confirm the path exists first (Windows still reaches native
   validation for malformed paths).
 
-## [2.1.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.1.0) (2026-07-04)
+## [2.1.0] - 2026-07-04
 
 ### Added
 
@@ -375,7 +377,7 @@ each fix was verified by injecting a defect and confirming it is now caught.
   Windows bypass now enforce the same `[0, one day]` bound as the TypeScript
   wrapper, and validation runs before any native work is started.
 
-## [2.0.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.0.0) (2026-06-03)
+## [2.0.0] - 2026-06-03
 
 ### Changed
 
@@ -398,7 +400,7 @@ each fix was verified by injecting a defect and confirming it is now caught.
 - **`statAsync` now passes `throwIfNoEntry`** to comply with the updated Node.js
   `fs.stat` signature, avoiding a deprecation/typing mismatch on newer runtimes.
 
-## [1.4.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.4.1) (2026-04-27)
+## [1.4.1] - 2026-04-27
 
 ### Fixed
 
@@ -421,7 +423,7 @@ each fix was verified by injecting a defect and confirming it is now caught.
 
   No public API changes.
 
-## [1.4.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.4.0) (2026-04-20)
+## [1.4.0] - 2026-04-20
 
 ### Removed
 
@@ -452,19 +454,19 @@ each fix was verified by injecting a defect and confirming it is now caught.
 - `scripts/setup-native.mjs` removed — its only purpose was GIO autodetection.
   `npm run build` and `npm run build:native` no longer invoke it.
 
-## [1.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.3.0) (2026-03-26)
+## [1.3.0] - 2026-03-26
 
 ### Added
 
 - New optional `mountPoints` field on `Options`: pass pre-fetched mount points to `getMountPointForPath()` and `getVolumeMetadataForPath()` to avoid redundant system queries when resolving multiple paths. Obtain via `getVolumeMountPoints({ includeSystemVolumes: true })`.
 
-## [1.2.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.2.0) (2026-03-26)
+## [1.2.0] - 2026-03-26
 
 ### Added
 
 - New `getMountPointForPath(pathname)` function: a lightweight alternative to `getVolumeMetadataForPath()` that returns only the mount point string without fetching full volume metadata (size, UUID, label, etc.). On macOS, uses a single `fstatfs()` call — no DiskArbitration, IOKit, or space calculations. On Linux/Windows, uses the same device-ID matching logic. Handles symlinks and APFS firmlinks correctly.
 
-## [1.1.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.1.0) (2026-03-16)
+## [1.1.0] - 2026-03-16
 
 ### Added
 
@@ -502,13 +504,13 @@ each fix was verified by injecting a defect and confirming it is now caught.
 
 - Removed macOS `/System/Volumes/*` path patterns from `SystemPathPatternsDefault` — these are now handled natively via APFS volume roles. The Spotlight, FSEvents, and Trashes glob patterns (`**/.Spotlight-V100`, `**/.fseventsd`, etc.) were also removed as they matched directories within volumes, not mount points.
 
-## [1.0.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.0.1) (2026-03-01)
+## [1.0.1] - 2026-03-01
 
 ### Fixed
 
 - `isHidden()` and `getHiddenMetadata()` now return `false` for root directories on all platforms. Windows root drives (e.g. `C:\`) have `FILE_ATTRIBUTE_HIDDEN` set by default as a system quirk, not user intent.
 
-## [1.0.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.0.0) (2026-02-23)
+## [1.0.0] - 2026-02-23
 
 ### Security
 
@@ -517,7 +519,7 @@ each fix was verified by injecting a defect and confirming it is now caught.
 - Linux/macOS: add `-D_FORTIFY_SOURCE=2` and `-Wformat-security` compiler flags
 - Linux x64: add `-fcf-protection=full` (Intel CET); Linux ARM64: add `-mbranch-protection=standard` (PAC+BTI)
 
-## [0.9.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.9.0) (2025-12-28)
+## [0.9.0] - 2025-12-28
 
 ### Added
 
@@ -530,13 +532,13 @@ each fix was verified by injecting a defect and confirming it is now caught.
 - Expanded `SystemPathPatternsDefault` with macOS metadata paths, kubelet, LXC/LXD, Flatpak paths
 - `isRemoteFsType()` and `extractRemoteInfo()` accept optional `networkFsTypes` parameter
 
-## [0.8.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.8.1) (2025-12-28)
+## [0.8.1] - 2025-12-28
 
 ### Changed
 
 - Added container runtime paths to the default set of system paths. See SystemPathPatternsDefault
 
-## [0.8.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.8.0) (2025-12-01)
+## [0.8.0] - 2025-12-01
 
 ### Added
 
@@ -569,13 +571,13 @@ each fix was verified by injecting a defect and confirming it is now caught.
 - Consolidated Linux GIO RAII helpers (`GFilePtr`, `GVolumePtr`, etc.) in `gio_utils.h`
 - Added move semantics to `BlkidCache` for proper resource transfer
 
-## [0.7.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.7.1) (2025-10-29)
+## [0.7.1] - 2025-10-29
 
 - Audit and address [several resource handling issues](./doc/SECURITY_AUDIT_2025.md)
 - Added support for Node.js v25
 - Updated dev dependencies
 
-## 0.6.0 (2025-06-09)
+## [0.6.0] - 2025-06-09
 
 ### Added
 
@@ -612,11 +614,11 @@ each fix was verified by injecting a defect and confirming it is now caught.
 - Removed unnecessary std::move operations in worker implementations
 - Resolved CI test reliability issues across different environments, particularly Alpine ARM64 emulation timeouts
 
-## [0.4.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/0.4.0) (2025-01-09)
+## [0.4.0] - 2025-01-09
 
 - `Fixed`: Switch to thread-safe `getmntinfo_r_np()` for macOS. Improved darwin resource management.
 
-## [0.3.3](https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.3) (2025-01-08)
+## [0.3.3] - 2025-01-08
 
 - `Packaging`: Improved ESM/CJS support with common `__dirname` implementation thanks to `tsup` [shims](https://tsup.egoist.dev/#inject-cjs-and-esm-shims).
 
@@ -628,11 +630,11 @@ each fix was verified by injecting a defect and confirming it is now caught.
 
 - `Packaging`: Fixed `npm run watch`
 
-## [0.3.2](https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.2) (2025-01-03)
+## [0.3.2] - 2025-01-03
 
 - `Fixed`: prior `canReaddir()` (and subsequent `status` of volume metadata) would incorrectly fail if the first directory element wasn't readable.
 
-## [0.3.1](https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.1) (2025-01-03)
+## [0.3.1] - 2025-01-03
 
 No public codepath updates.
 
@@ -644,11 +646,11 @@ No public codepath updates.
 
 - `Added`: scripts for **manually** running `clang-tidy` and `snyk code test` (as they both emit spurious warnings that don't seem to be safely silenced)
 
-## [0.3.0](https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.0) (2025-01-01)
+## [0.3.0] - 2025-01-01
 
 - `Changed`: For consistency, [Options.systemFsTypes](https://photostructure.github.io/fs-metadata/interfaces/Options.html#systemfstypes) is now a `string[]` (it was a `Set<string>`)
 
-## 0.2.0 (2025-01-01)
+## [0.2.0] - 2025-01-01
 
 - `Changed`: Add `**/#snapshot` to the list of "system" volumes
 
@@ -656,9 +658,38 @@ No public codepath updates.
 
 - `Fixed`: macOS system mount points are now filtered properly
 
-## 0.1.0 (2024-12-17)
+## [0.1.0] - 2024-12-17
 
 First release! Everything is a new feature!
 
 The 1.0.0 release will happen after some integration testing with the native
 library payloads, but the API should be stable after the first release.
+
+[2.6.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.1
+[2.6.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.0
+[2.5.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.5.0
+[2.4.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.4.0
+[2.3.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.3.0
+[2.2.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.2.1
+[2.2.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.2.0
+[2.1.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.1.0
+[2.0.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.0.0
+[1.4.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.4.1
+[1.4.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.4.0
+[1.3.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.3.0
+[1.2.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.2.0
+[1.1.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.1.0
+[1.0.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.0.1
+[1.0.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v1.0.0
+[0.9.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.9.0
+[0.8.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.8.1
+[0.8.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.8.0
+[0.7.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v0.7.1
+[0.6.0]: https://www.npmjs.com/package/@photostructure/fs-metadata/v/0.6.0
+[0.4.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/0.4.0
+[0.3.3]: https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.3
+[0.3.2]: https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.2
+[0.3.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.1
+[0.3.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/0.3.0
+[0.2.0]: https://www.npmjs.com/package/@photostructure/fs-metadata/v/0.2.0
+[0.1.0]: https://www.npmjs.com/package/@photostructure/fs-metadata/v/0.1.0
