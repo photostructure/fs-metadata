@@ -115,6 +115,14 @@ Verify these conditions:
 | The GitHub release job fails before releasing  | Approve the stage if needed, then re-run the failed job, as described below.                  |
 | An approved package is bad                     | Deprecate it or publish a corrected version. Never overwrite it.                              |
 
+When a failure above calls for a new version after the tag exists, the release
+commit has already moved the notes under `## [X.Y.Z] - YYYY-MM-DD` in
+`CHANGELOG.md`, and the next release run fails until `## [Unreleased]` names a
+bump and has notes. Rename that empty heading to
+`## [Unreleased (patch|minor|major)]`, move the unpublished version's notes
+under it, leave a line under `## [X.Y.Z]` saying that version was never
+published, and then start the new release.
+
 If the **Create immutable GitHub release** job fails before it creates the
 release (its checks ran out before you approved the stage, or `npm view` failed
 with an error other than E404), approve the stage if you have not, then use
