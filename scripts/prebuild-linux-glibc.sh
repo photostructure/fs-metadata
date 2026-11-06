@@ -106,6 +106,10 @@ Components: main
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 Check-Valid-Until: no
 SOURCES
+# snapshot.debian.org intermittently returns 504s; retry each download.
+cat > /etc/apt/apt.conf.d/80-retries <<'APTCONF'
+Acquire::Retries "5";
+APTCONF
 EOF
 
 # Run build inside container
