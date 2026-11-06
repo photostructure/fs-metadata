@@ -14,7 +14,9 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## [Unreleased (patch)]
+## [Unreleased]
+
+## [2.6.2] - 2026-11-06
 
 ### Changed
 
@@ -669,6 +671,7 @@ First release! Everything is a new feature!
 The 1.0.0 release will happen after some integration testing with the native
 library payloads, but the API should be stable after the first release.
 
+[2.6.2]: https://github.com/photostructure/fs-metadata/releases/tag/v2.6.2
 [2.6.1]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.1
 [2.6.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.6.0
 [2.5.0]: https://github.com/PhotoStructure/fs-metadata/releases/tag/v2.5.0
