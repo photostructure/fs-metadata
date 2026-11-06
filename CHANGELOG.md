@@ -14,7 +14,11 @@ Fixed for any bug fixes.
 Security in case of vulnerabilities.
 -->
 
-## [Unreleased]
+## [Unreleased (patch)]
+
+### Changed
+
+- **GitHub releases now wait for npm to serve the approved package, and carry these release notes.**
 
 ## [2.6.1] - 2026-10-03
 
