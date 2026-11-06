@@ -103,7 +103,7 @@ jobs:
           - target: darwin-x64
             runner: macos-15-intel
           - target: darwin-arm64
-            runner: macos-14
+            runner: macos-15
           - target: win32-x64
             runner: windows-latest
           - target: win32-arm64
@@ -265,7 +265,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15-intel, macos-14, windows-latest, windows-11-arm]
+        os: [macos-15-intel, macos-15, windows-latest, windows-11-arm]
         node-version: [22, 24, 26]
     runs-on: ${{ matrix.os }}
     defaults:

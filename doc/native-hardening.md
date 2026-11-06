@@ -217,7 +217,7 @@ compiled because some other header happened to pull `<utility>` in first.
 If the MSVC or Windows SDK include directory cannot be located, the script now **throws** rather
 than emitting a compile database with no standard library on the include path.
 
-`src/darwin/*` is linted by the `macos-14` leg of the `lint` CI matrix. Before that it was
+`src/darwin/*` is linted by the `macos-15` leg of the `lint` CI matrix. Before that it was
 analyzed on no CI leg at all, because the runner excludes the non-host platform's sources.
 
 ## Deliberately not done
